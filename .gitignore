@@ -1,0 +1,37 @@
+# Foundry
+cache/
+out/
+broadcast/
+lib/forge-std/
+lib/*
+!lib/.gitkeep
+
+# Node
+node_modules/
+dist/
+build/
+.turbo/
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# TypeScript build info
+*.tsbuildinfo

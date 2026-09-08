@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contracts:
+    name: Foundry build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install forge-std
+        run: forge install foundry-rs/forge-std --no-commit
+
+      - name: forge fmt --check
+        run: forge fmt --check
+
+      - name: forge build
+        run: forge build
+
+      - name: forge test
+        run: forge test -vvv
+
+  typescript:
+    name: TS workspace build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build sdk + resolver
+        run: pnpm --filter novak-resolver build && pnpm --filter @novak/sdk build
+
+      - name: Run TS tests
+        run: pnpm --filter novak-resolver test && pnpm --filter @novak/sdk test
+
+      - name: Build frontend
+        run: pnpm --filter novak-frontend build

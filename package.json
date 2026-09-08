@@ -1,0 +1,21 @@
+{
+  "name": "novak",
+  "private": true,
+  "description": "Novak (Neural Event Network) — a decentralized, composable event bus for Ethereum, with a derivatives market as the first consumer application.",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "resolver",
+    "sdk",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "pnpm -r --if-present run build",
+    "test": "pnpm run test:contracts && pnpm -r --if-present run test",
+    "lint": "pnpm -r --if-present run lint",
+    "test:contracts": "forge test -vvv",
+    "build:contracts": "forge build",
+    "dev:frontend": "pnpm --filter novak-frontend dev",
+    "dev:resolver": "pnpm --filter novak-resolver dev"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,4 @@
+packages:
+  - "resolver"
+  - "sdk"
+  - "frontend"

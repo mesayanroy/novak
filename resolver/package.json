@@ -1,0 +1,24 @@
+{
+  "name": "novak-resolver",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Novak resolver node: fetches source data via adapters, packages evidence, and participates in quorum for event resolution.",
+  "type": "module",
+  "main": "dist/node/index.js",
+  "scripts": {
+    "dev": "tsx watch node/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/node/index.js",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
