@@ -1,3 +1,40 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-paper text-ink antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    @apply bg-ink text-paper;
+  }
+
+  a {
+    @apply text-ink underline decoration-gray-400 underline-offset-2 transition-colors;
+  }
+  a:hover {
+    @apply decoration-ink;
+  }
+
+  /* Links that are styled as buttons/nav items opt out of the default
+     underline treatment above via this utility. */
+  .link-plain {
+    @apply no-underline;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-paper;
+  }
+}

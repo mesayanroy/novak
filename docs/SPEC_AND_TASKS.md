@@ -23,6 +23,15 @@ canonical flow, now wired through `DisputeManager` (undisputed path, so its
 assertions are unchanged), is covered by
 `test/integration/EndToEndFlow.t.sol`, which passes.
 
+**Also done since that pass, not yet reflected anywhere else but here:** the
+frontend MVP (Issue #21) — a real landing page, a full `/docs` hub (9
+sub-pages), and `/markets` + `/markets/[id]` wired to the live `@novak/sdk`
+ABIs wherever a real read/write makes sense — was built out in this
+environment on top of the pre-existing minimal scaffold. See
+`docs/FRONTEND_SPEC.md` for the exact stack, route map, component inventory,
+and live/mock data map, and Issue #21 below for the checklist. This work is
+tracked here regardless of which repo-ownership row it falls under.
+
 ---
 
 ## Repository Ownership
@@ -317,6 +326,36 @@ assertions are unchanged), is covered by
 - [x] Derivatives market never imports or calls a resolver, the Registry, or
       the Composer directly — structural invariant, regression-tested
 
+### Issue #21 — Frontend MVP (landing, docs, markets)
+**Owner:** ansu555 · **Contributors:** all · **Priority:** P1
+- [x] Real Next.js 14 App Router site in `frontend/` (extended the existing
+      minimal scaffold in place, not a second workspace): landing page,
+      `/docs` hub (introduction, architecture, lifecycle, composition,
+      disputes, API reference, SDK reference, threat model, FAQ), `/markets`
+      list + `/markets/[id]` detail with parimutuel position-taking gated
+      behind wallet connection
+- [x] RainbowKit + wagmi + viem wallet connection (local Anvil only, chain
+      31337 — see `docs/FRONTEND_SPEC.md` for why no testnet chain is listed
+      yet), shadcn/ui-style primitives hand-restyled to a strict
+      black/white/gray design system (Geist + Geist Mono), no accent color
+      anywhere including status — every event/dispute/composite state is a
+      distinct shape+icon+label combination, never color-coded
+- [x] Wired to the real `@novak/sdk` ABIs/types wherever a live read/write
+      makes sense (`EventStatusCard`, `MarketPositionCard`,
+      `CreateMarketCard`); `/markets`' list is explicitly mock data with a
+      visible "Example data" badge, since `Market.sol` has no market
+      enumeration getter — see `docs/FRONTEND_SPEC.md`'s live/mock data map
+      for the exact per-page breakdown
+- [ ] Real market discovery/indexing — no on-chain enumeration exists;
+      `/markets` cannot show real markets until an indexer or subgraph is
+      built
+- [ ] A live API server for `/docs/api`'s documented REST surface — that
+      page is explicitly labeled "on-chain reference, not a live REST API"
+      pending one
+- [ ] `NovakClient` write methods for the tiered dispute flow (same
+      already-tracked gap as Issue #7/#17) — `/docs/sdk` shows them
+      "coming soon"
+
 ---
 
 ## Milestone 8 — SDK
@@ -399,6 +438,17 @@ composite outcomes, and a settling derivatives market are all implemented,
 unit/integration/fuzz/adversarial tested (80/80 passing), with the SDK's
 ABI/types kept in sync.
 
+**Frontend (Issue #21) is also functionally MVP-complete on top of that
+backend:** a full Next.js 14 site — landing page, a 9-page `/docs` hub, and
+`/markets` + `/markets/[id]` — hand-restyled to a strict black/white/gray
+design system with RainbowKit/wagmi wallet connection, wired to the real
+`@novak/sdk` ABIs everywhere a live read/write is possible (mock data used
+only where the contracts have no enumeration getter to make it live, and
+always visibly badged as mock). See `docs/FRONTEND_SPEC.md` for the exact
+route map, component inventory, and live/mock data breakdown, and Issue #21
+above for the per-item checklist. Repo-ownership rows aside, this is real,
+verified progress and is recorded here as such.
+
 **Left for a deliberate next pass, not silently skipped:**
 1. Real testnet deployment (needs your funded key/RPC — see Issue #20).
 2. The relayer/trigger service (Issue #13, P1) — currently zero code.
@@ -415,6 +465,9 @@ ABI/types kept in sync.
    exposed (`disputeManagerAbi`) but `NovakClient` doesn't wrap it yet, by
    the same design choice that already excludes `submitObservation` (this
    is resolver/committee-member territory, not a consumer read/write path).
+   `frontend/docs/sdk` already lists these method names as "coming soon"
+   against that same ABI, so the frontend and SDK docs won't drift once this
+   ships.
 7. Full stake-weighted, VRF-selected, reputation-gated dispute arbitration —
    the MVP replaced single-owner arbitration with a bonded committee ladder
    (a real structural change), but committee selection is still block-data
@@ -422,3 +475,10 @@ ABI/types kept in sync.
    rather than a variable stake. Deliberately deferred per the MVP scope
    boundary (no on-chain staking/reputation token), not forgotten — see
    `docs/protocol-spec.md` and `docs/threat-model.md` item 10.
+8. Real on-chain market discovery/indexing — `/markets`' list is
+   structurally mock today because `Market.sol` has no market-enumeration
+   getter; this is an indexer/subgraph problem, not a frontend one (see
+   Issue #21 and `docs/FRONTEND_SPEC.md` "Next up" #1).
+9. A live API server behind `/docs/api`'s documented REST-style reference —
+   that page is explicitly labeled as an on-chain function-signature
+   reference, not a deployed API, pending real backend work to stand one up.

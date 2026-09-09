@@ -2,15 +2,21 @@
 
 import { useState } from "react";
 import { parseEther } from "viem";
-import { useReadContract, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { marketAbi } from "@novak/sdk";
 import { novakAddresses } from "@/lib/addresses";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ConnectButton } from "@/components/ConnectButton";
+import { shortHex } from "@/lib/utils";
 
 /** Deposit collateral into a market, settle it once its event is finalized,
- *  and claim a payout — the parimutuel YES/NO flow described in
- *  derivatives/Market.sol. */
-export function MarketPositionCard() {
-  const [marketIdInput, setMarketIdInput] = useState("");
+ *  and claim a payout — the parimutuel YES/NO flow in derivatives/Market.sol.
+ *  Position-taking is gated behind wallet connection. */
+export function MarketPositionCard({ marketId: presetMarketId }: { marketId?: `0x${string}` }) {
+  const { isConnected } = useAccount();
+  const [marketIdInput, setMarketIdInput] = useState(presetMarketId ?? "");
   const [amountEth, setAmountEth] = useState("0.1");
   const { writeContract, isPending, data: txHash } = useWriteContract();
 
@@ -28,96 +34,102 @@ export function MarketPositionCard() {
   const outcome = marketDef?.[3];
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 sm:col-span-2">
-      <h2 className="mb-3 text-lg font-semibold">Position</h2>
-      <input
-        value={marketIdInput}
-        onChange={(e) => setMarketIdInput(e.target.value)}
-        placeholder="0x… market ID (from Create market's tx logs)"
-        className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-      />
+    <Card>
+      <CardHeader>
+        <CardTitle>Take a position</CardTitle>
+        <CardDescription>Parimutuel YES/NO pool — reads/writes go through Market.sol only.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!isConnected ? (
+          <div className="flex flex-col items-start gap-3 border border-dashed border-gray-300 p-4">
+            <p className="text-sm text-gray-600">Connect a wallet to take a position.</p>
+            <ConnectButton />
+          </div>
+        ) : (
+          <>
+            {!presetMarketId && (
+              <Input
+                value={marketIdInput}
+                onChange={(e) => setMarketIdInput(e.target.value)}
+                placeholder="0x… market ID"
+                className="mb-3"
+              />
+            )}
 
-      {marketDef && (
-        <p className="mb-3 text-xs text-slate-400">
-          {settled ? `Settled — outcome: ${outcome ? "YES" : "NO"}` : "Not yet settled"}
-        </p>
-      )}
+            {marketDef && (
+              <p className="mb-3 font-mono text-xs text-gray-500">
+                {settled ? `Settled — outcome: ${outcome ? "YES" : "NO"}` : "Not yet settled"}
+              </p>
+            )}
 
-      <div className="mb-3 flex items-center gap-2">
-        <input
-          value={amountEth}
-          onChange={(e) => setAmountEth(e.target.value)}
-          placeholder="ETH amount"
-          className="w-32 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-        />
-        <button
-          disabled={!marketId || isPending}
-          onClick={() =>
-            marketId &&
-            writeContract({
-              address: novakAddresses.market,
-              abi: marketAbi,
-              functionName: "depositCollateral",
-              args: [marketId, true],
-              value: parseEther(amountEth || "0"),
-            })
-          }
-          className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
-        >
-          Back YES
-        </button>
-        <button
-          disabled={!marketId || isPending}
-          onClick={() =>
-            marketId &&
-            writeContract({
-              address: novakAddresses.market,
-              abi: marketAbi,
-              functionName: "depositCollateral",
-              args: [marketId, false],
-              value: parseEther(amountEth || "0"),
-            })
-          }
-          className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium hover:bg-rose-500 disabled:opacity-50"
-        >
-          Back NO
-        </button>
-      </div>
+            <div className="mb-3 flex items-center gap-2">
+              <Input
+                value={amountEth}
+                onChange={(e) => setAmountEth(e.target.value)}
+                placeholder="ETH amount"
+                className="w-32"
+              />
+              <Button
+                variant="secondary"
+                disabled={!marketId || isPending}
+                onClick={() =>
+                  marketId &&
+                  writeContract({
+                    address: novakAddresses.market,
+                    abi: marketAbi,
+                    functionName: "depositCollateral",
+                    args: [marketId, true],
+                    value: parseEther(amountEth || "0"),
+                  })
+                }
+              >
+                Back YES
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!marketId || isPending}
+                onClick={() =>
+                  marketId &&
+                  writeContract({
+                    address: novakAddresses.market,
+                    abi: marketAbi,
+                    functionName: "depositCollateral",
+                    args: [marketId, false],
+                    value: parseEther(amountEth || "0"),
+                  })
+                }
+              >
+                Back NO
+              </Button>
+            </div>
 
-      <div className="flex gap-2">
-        <button
-          disabled={!marketId || isPending}
-          onClick={() =>
-            marketId &&
-            writeContract({
-              address: novakAddresses.market,
-              abi: marketAbi,
-              functionName: "settle",
-              args: [marketId],
-            })
-          }
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800 disabled:opacity-50"
-        >
-          Settle
-        </button>
-        <button
-          disabled={!marketId || isPending}
-          onClick={() =>
-            marketId &&
-            writeContract({
-              address: novakAddresses.market,
-              abi: marketAbi,
-              functionName: "claim",
-              args: [marketId],
-            })
-          }
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800 disabled:opacity-50"
-        >
-          Claim payout
-        </button>
-      </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                disabled={!marketId || isPending}
+                onClick={() =>
+                  marketId &&
+                  writeContract({ address: novakAddresses.market, abi: marketAbi, functionName: "settle", args: [marketId] })
+                }
+              >
+                Settle
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={!marketId || isPending}
+                onClick={() =>
+                  marketId &&
+                  writeContract({ address: novakAddresses.market, abi: marketAbi, functionName: "claim", args: [marketId] })
+                }
+              >
+                Claim payout
+              </Button>
+            </div>
 
-      {txHash && <p className="mt-3 break-all text-xs text-slate-500">tx: {txHash}</p>}
-    </div>
+            {txHash && <p className="mt-3 font-mono text-xs text-gray-500">tx: {shortHex(txHash, 10, 8)}</p>}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
