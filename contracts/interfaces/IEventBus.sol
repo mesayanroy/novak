@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IEventRegistry} from "./IEventRegistry.sol";
+import { IEventRegistry } from "./IEventRegistry.sol";
 
 /// @title IEventBus
 /// @notice Pull-based read surface for finalized events. This is the ONLY interface

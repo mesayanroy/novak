@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {EventComposer} from "../../contracts/EventComposer.sol";
-import {DisputeManager} from "../../contracts/DisputeManager.sol";
-import {IEventComposer} from "../../contracts/interfaces/IEventComposer.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { EventComposer } from "../../contracts/EventComposer.sol";
+import { DisputeManager } from "../../contracts/DisputeManager.sol";
+import { IEventComposer } from "../../contracts/interfaces/IEventComposer.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 
 contract EventComposerTest is Test {
     EventRegistry internal registry;
@@ -48,7 +48,9 @@ contract EventComposerTest is Test {
 
         vm.expectRevert(bytes("EventComposer: AND/OR take >= 2 operands"));
         composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
     }
 
@@ -59,7 +61,9 @@ contract EventComposerTest is Test {
 
         vm.expectRevert(bytes("EventComposer: unknown operand"));
         composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
     }
 
@@ -72,7 +76,9 @@ contract EventComposerTest is Test {
 
         vm.expectRevert(bytes("EventComposer: NOT takes 1 operand"));
         composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Not, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Not, operands: operands, window: 0
+            })
         );
     }
 
@@ -83,7 +89,9 @@ contract EventComposerTest is Test {
         operands[0] = a;
         operands[1] = b;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -98,7 +106,9 @@ contract EventComposerTest is Test {
         operands[0] = a;
         operands[1] = b;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -113,7 +123,9 @@ contract EventComposerTest is Test {
         operands[0] = a;
         operands[1] = b;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Or, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Or, operands: operands, window: 0
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -126,7 +138,9 @@ contract EventComposerTest is Test {
         bytes32[] memory operands = new bytes32[](1);
         operands[0] = a;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Not, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Not, operands: operands, window: 0
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -152,7 +166,9 @@ contract EventComposerTest is Test {
         operands[0] = a;
         operands[1] = b;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -171,7 +187,9 @@ contract EventComposerTest is Test {
         operands[0] = a;
         operands[1] = b;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Within, operands: operands, window: 48 hours})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Within, operands: operands, window: 48 hours
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -188,7 +206,9 @@ contract EventComposerTest is Test {
         operands[0] = a;
         operands[1] = b;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Within, operands: operands, window: 48 hours})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Within, operands: operands, window: 48 hours
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -205,7 +225,9 @@ contract EventComposerTest is Test {
         operands[0] = a;
         operands[1] = b;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Before, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Before, operands: operands, window: 0
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -220,7 +242,9 @@ contract EventComposerTest is Test {
         operands[0] = a;
         operands[1] = b;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         composer.tryResolve(compositeId);
@@ -250,12 +274,16 @@ contract EventComposerTest is Test {
         reversed[1] = a;
 
         bytes32 idForward = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: forward, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: forward, window: 0
+            })
         );
 
         EventComposer composer2 = new EventComposer(address(registry));
         bytes32 idReversed = composer2.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: reversed, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: reversed, window: 0
+            })
         );
 
         assertEq(idForward, idReversed, "AND(a,b) and AND(b,a) must be the same composite");
@@ -273,10 +301,14 @@ contract EventComposerTest is Test {
         reversed[1] = a;
 
         bytes32 idForward = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Before, operands: forward, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Before, operands: forward, window: 0
+            })
         );
         bytes32 idReversed = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Before, operands: reversed, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Before, operands: reversed, window: 0
+            })
         );
 
         assertTrue(idForward != idReversed, "BEFORE(a,b) and BEFORE(b,a) are different claims");
@@ -293,7 +325,9 @@ contract EventComposerTest is Test {
 
         vm.expectRevert(bytes("EventComposer: too many operands"));
         composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
     }
 
@@ -306,7 +340,9 @@ contract EventComposerTest is Test {
             bytes32[] memory operands = new bytes32[](1);
             operands[0] = current;
             current = composer.createComposite(
-                IEventComposer.CompositeSpec({op: IEventComposer.Op.Not, operands: operands, window: 0})
+                IEventComposer.CompositeSpec({
+                    op: IEventComposer.Op.Not, operands: operands, window: 0
+                })
             );
         }
         assertEq(composer.getDepth(current), maxDepth);
@@ -316,7 +352,9 @@ contract EventComposerTest is Test {
         oneMore[0] = current;
         vm.expectRevert(bytes("EventComposer: composition too deep"));
         composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Not, operands: oneMore, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Not, operands: oneMore, window: 0
+            })
         );
     }
 
@@ -335,7 +373,9 @@ contract EventComposerTest is Test {
         operands[0] = voided;
         operands[1] = trueEvent;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -352,7 +392,9 @@ contract EventComposerTest is Test {
         operands[0] = voided;
         operands[1] = falseEvent;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         // False dominates Voided: the AND can never be true regardless of
@@ -380,7 +422,9 @@ contract EventComposerTest is Test {
         operands[0] = voided;
         operands[1] = stillOpen;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         // A genuinely-pending sibling must NOT be short-circuited to Voided —
@@ -398,7 +442,9 @@ contract EventComposerTest is Test {
         operands[0] = voided;
         operands[1] = falseEvent;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Or, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Or, operands: operands, window: 0
+            })
         );
 
         (bool resolved,) = composer.tryResolve(compositeId);
@@ -411,7 +457,9 @@ contract EventComposerTest is Test {
         bytes32[] memory operands = new bytes32[](1);
         operands[0] = voided;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Not, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Not, operands: operands, window: 0
+            })
         );
 
         (bool resolved,) = composer.tryResolve(compositeId);
@@ -427,7 +475,9 @@ contract EventComposerTest is Test {
         operands[0] = voided;
         operands[1] = trueEvent;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Within, operands: operands, window: 48 hours})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Within, operands: operands, window: 48 hours
+            })
         );
 
         (bool resolved,) = composer.tryResolve(compositeId);
@@ -474,7 +524,7 @@ contract EventComposerTest is Test {
         // documented vm.prank + inline-value-expression gotcha).
         uint256 bond = disputeManager.DISPUTE_BOND();
         vm.prank(disputer);
-        disputeManager.dispute{value: bond}(eventId);
+        disputeManager.dispute{ value: bond }(eventId);
 
         uint64 tier1Window = disputeManager.TIER1_WINDOW();
         vm.warp(block.timestamp + tier1Window + 1);

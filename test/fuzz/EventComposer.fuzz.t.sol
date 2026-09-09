@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {EventComposer} from "../../contracts/EventComposer.sol";
-import {IEventComposer} from "../../contracts/interfaces/IEventComposer.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { EventComposer } from "../../contracts/EventComposer.sol";
+import { IEventComposer } from "../../contracts/interfaces/IEventComposer.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 
 /// @notice Fuzz tests targeting the Composer's determinism invariant: identical
 ///         CompositeSpec inputs must always yield the identical compositeId, and
@@ -55,8 +55,9 @@ contract EventComposerFuzzTest is Test {
         operands[0] = eventA;
         operands[1] = eventB;
 
-        IEventComposer.CompositeSpec memory spec =
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: window});
+        IEventComposer.CompositeSpec memory spec = IEventComposer.CompositeSpec({
+            op: IEventComposer.Op.And, operands: operands, window: window
+        });
 
         vm.prank(caller1);
         bytes32 idFromCaller1 = composer.createComposite(spec);
@@ -97,7 +98,9 @@ contract EventComposerFuzzTest is Test {
         operands[0] = eventA;
         operands[1] = eventB;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Within, operands: operands, window: window})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Within, operands: operands, window: window
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);

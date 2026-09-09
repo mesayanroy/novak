@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ISubscriptionManager} from "./interfaces/ISubscriptionManager.sol";
+import { ISubscriptionManager } from "./interfaces/ISubscriptionManager.sol";
 
 /// @title SubscriptionManager
 /// @notice Stub only. MVP is pull-based — this contract records subscription intent

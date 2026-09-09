@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {DisputeManager} from "../../contracts/DisputeManager.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { DisputeManager } from "../../contracts/DisputeManager.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 
 /// @notice Adversarial scenarios against the resolver <-> Registry submission
 ///         and dispute flow. See docs/threat-model.md for the full adversary
@@ -55,7 +55,10 @@ contract MaliciousResolverTest is Test {
         vm.prank(resolverA);
         registry.submitObservation(eventId, abi.encode(true), keccak256("malicious"));
 
-        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ObservationsSubmitted));
+        assertEq(
+            uint8(registry.getEvent(eventId)),
+            uint8(IEventRegistry.EventStatus.ObservationsSubmitted)
+        );
         assertFalse(registry.isFinalized(eventId));
     }
 
@@ -75,7 +78,9 @@ contract MaliciousResolverTest is Test {
         vm.prank(resolverB);
         registry.submitObservation(eventId, abi.encode(true), keccak256("ev-b"));
 
-        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ProposedOutcome));
+        assertEq(
+            uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ProposedOutcome)
+        );
 
         vm.warp(block.timestamp + 1 hours + 1);
         registry.finalize(eventId);
@@ -105,7 +110,10 @@ contract MaliciousResolverTest is Test {
         registry.submitObservation(eventId, abi.encode(true), keccak256("ev-a-replay"));
         vm.stopPrank();
 
-        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ObservationsSubmitted));
+        assertEq(
+            uint8(registry.getEvent(eventId)),
+            uint8(IEventRegistry.EventStatus.ObservationsSubmitted)
+        );
     }
 
     /// @dev Stale/late evidence: a resolver submitting after the observation
@@ -139,15 +147,15 @@ contract MaliciousResolverTest is Test {
         uint256 balanceBefore = attacker.balance;
 
         vm.prank(attacker);
-        disputeManager.dispute{value: bond}(eventId);
+        disputeManager.dispute{ value: bond }(eventId);
 
         uint256 tier1Bond = disputeManager.TIER1_BOND();
         vm.deal(resolverA, 1 ether);
         vm.deal(resolverB, 1 ether);
         vm.prank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.prank(resolverB);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true); // 2/3 >= 66% -> converges, upholds "true"
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true); // 2/3 >= 66% -> converges, upholds "true"
 
         assertTrue(registry.isFinalized(eventId));
         assertEq(attacker.balance, balanceBefore - bond);
@@ -166,7 +174,7 @@ contract MaliciousResolverTest is Test {
         uint256 bond = disputeManager.DISPUTE_BOND();
         vm.deal(attacker, 1 ether);
         vm.prank(attacker);
-        disputeManager.dispute{value: bond}(eventId);
+        disputeManager.dispute{ value: bond }(eventId);
 
         address secondDisputer = address(0xDEAD);
         vm.deal(secondDisputer, 1 ether);
@@ -175,7 +183,7 @@ contract MaliciousResolverTest is Test {
         // disputer above), so a second attempt — from anyone — is rejected
         // up front, before even checking the Registry's status.
         vm.expectRevert(bytes("DisputeManager: already escalated"));
-        disputeManager.dispute{value: bond}(eventId);
+        disputeManager.dispute{ value: bond }(eventId);
     }
 
     /// @dev Finalizing a disputed event before arbitration must be blocked,
@@ -191,7 +199,7 @@ contract MaliciousResolverTest is Test {
         uint256 bond = disputeManager.DISPUTE_BOND();
         vm.deal(attacker, 1 ether);
         vm.prank(attacker);
-        disputeManager.dispute{value: bond}(eventId);
+        disputeManager.dispute{ value: bond }(eventId);
 
         vm.warp(block.timestamp + 1 hours + 1);
         vm.expectRevert(bytes("EventRegistry: nothing to finalize"));

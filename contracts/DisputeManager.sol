@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IDisputeManager} from "./interfaces/IDisputeManager.sol";
-import {IEventRegistry} from "./interfaces/IEventRegistry.sol";
+import { IDisputeManager } from "./interfaces/IDisputeManager.sol";
+import { IEventRegistry } from "./interfaces/IEventRegistry.sol";
 
 /// @title DisputeManager
 /// @notice Bonded, two-tier committee escalation ladder for disagreement
@@ -260,7 +260,9 @@ contract DisputeManager is IDisputeManager {
         m.treasuryDust = treasuryShare + dust;
     }
 
-    function _payoutCommittee(Tier storage t, bool decidedOutcome, ResolutionMath memory m) private {
+    function _payoutCommittee(Tier storage t, bool decidedOutcome, ResolutionMath memory m)
+        private
+    {
         for (uint256 i = 0; i < t.committee.length; i++) {
             address member = t.committee[i];
             VoteChoice v = t.votes[member];
@@ -278,7 +280,9 @@ contract DisputeManager is IDisputeManager {
     ///      is forfeited using the same burn/treasury split, but is not
     ///      further distributed to the committee (that would require a
     ///      second per-member loop) — a documented simplification.
-    function _settleDisputerBond(bool disputerWasRight, address disputer, uint256 disputerBond) private {
+    function _settleDisputerBond(bool disputerWasRight, address disputer, uint256 disputerBond)
+        private
+    {
         if (disputerWasRight) {
             _send(disputer, disputerBond);
         } else {
@@ -300,7 +304,8 @@ contract DisputeManager is IDisputeManager {
 
     function _hasConverged(Tier storage t) private view returns (bool) {
         uint256 size = t.committee.length;
-        return t.trueVotes * 100 >= size * AGREEMENT_BPS || t.falseVotes * 100 >= size * AGREEMENT_BPS;
+        return
+            t.trueVotes * 100 >= size * AGREEMENT_BPS || t.falseVotes * 100 >= size * AGREEMENT_BPS;
     }
 
     // --- Internal: committee selection ---
@@ -323,7 +328,8 @@ contract DisputeManager is IDisputeManager {
             return pool;
         }
 
-        bytes32 seed = keccak256(abi.encode(eventId, tierNum, blockhash(block.number - 1), block.timestamp));
+        bytes32 seed =
+            keccak256(abi.encode(eventId, tierNum, blockhash(block.number - 1), block.timestamp));
         uint256 remaining = pool.length;
         for (uint256 i = 0; i < size; i++) {
             uint256 j = i + (uint256(keccak256(abi.encode(seed, i))) % remaining);
@@ -338,7 +344,11 @@ contract DisputeManager is IDisputeManager {
         return committee;
     }
 
-    function _isCommitteeMember(address[] storage committee, address account) private view returns (bool) {
+    function _isCommitteeMember(address[] storage committee, address account)
+        private
+        view
+        returns (bool)
+    {
         for (uint256 i = 0; i < committee.length; i++) {
             if (committee[i] == account) return true;
         }
@@ -346,7 +356,7 @@ contract DisputeManager is IDisputeManager {
     }
 
     function _send(address to, uint256 amount) private {
-        (bool sent,) = to.call{value: amount}("");
+        (bool sent,) = to.call{ value: amount }("");
         require(sent, "DisputeManager: transfer failed");
     }
 

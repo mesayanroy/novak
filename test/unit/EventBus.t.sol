@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {EventComposer} from "../../contracts/EventComposer.sol";
-import {EventBus} from "../../contracts/EventBus.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
-import {IEventComposer} from "../../contracts/interfaces/IEventComposer.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { EventComposer } from "../../contracts/EventComposer.sol";
+import { EventBus } from "../../contracts/EventBus.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
+import { IEventComposer } from "../../contracts/interfaces/IEventComposer.sol";
 
 contract EventBusTest is Test {
     EventRegistry internal registry;
@@ -75,7 +75,9 @@ contract EventBusTest is Test {
         operands[0] = eventA;
         operands[1] = eventB;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         assertFalse(bus.isAvailable(compositeId));

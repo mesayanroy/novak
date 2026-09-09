@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {EventComposer} from "../../contracts/EventComposer.sol";
-import {DisputeManager} from "../../contracts/DisputeManager.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
-import {IEventComposer} from "../../contracts/interfaces/IEventComposer.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { EventComposer } from "../../contracts/EventComposer.sol";
+import { DisputeManager } from "../../contracts/DisputeManager.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
+import { IEventComposer } from "../../contracts/interfaces/IEventComposer.sol";
 
 /// @notice Covers Gap 3 (structural DAG bounds + the cycle-impossibility
 ///         proof) and the "dead child stalls the composite forever" half of
@@ -65,7 +65,9 @@ contract CompositeGriefingTest is Test {
 
         vm.expectRevert(bytes("EventComposer: too many operands"));
         composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
     }
 
@@ -80,7 +82,9 @@ contract CompositeGriefingTest is Test {
             bytes32[] memory operands = new bytes32[](1);
             operands[0] = current;
             current = composer.createComposite(
-                IEventComposer.CompositeSpec({op: IEventComposer.Op.Not, operands: operands, window: 0})
+                IEventComposer.CompositeSpec({
+                    op: IEventComposer.Op.Not, operands: operands, window: 0
+                })
             );
         }
 
@@ -88,7 +92,9 @@ contract CompositeGriefingTest is Test {
         oneMore[0] = current;
         vm.expectRevert(bytes("EventComposer: composition too deep"));
         composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Not, operands: oneMore, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Not, operands: oneMore, window: 0
+            })
         );
     }
 
@@ -105,7 +111,8 @@ contract CompositeGriefingTest is Test {
         // hash to) is indistinguishable on-chain from any other unknown
         // bytes32 — it was never registered, so it's rejected exactly like
         // any other made-up ID.
-        bytes32 guessedFutureId = keccak256(abi.encode(IEventComposer.Op.And, real, real, uint64(0)));
+        bytes32 guessedFutureId =
+            keccak256(abi.encode(IEventComposer.Op.And, real, real, uint64(0)));
 
         bytes32[] memory operands = new bytes32[](2);
         operands[0] = real;
@@ -113,7 +120,9 @@ contract CompositeGriefingTest is Test {
 
         vm.expectRevert(bytes("EventComposer: unknown operand"));
         composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
     }
 
@@ -129,7 +138,9 @@ contract CompositeGriefingTest is Test {
         operands[0] = voided;
         operands[1] = healthy;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
         );
 
         (bool resolved,) = composer.tryResolve(compositeId);
@@ -167,7 +178,7 @@ contract CompositeGriefingTest is Test {
         vm.deal(disputer, 1 ether);
         uint256 bond = disputeManager.DISPUTE_BOND();
         vm.prank(disputer);
-        disputeManager.dispute{value: bond}(eventId);
+        disputeManager.dispute{ value: bond }(eventId);
 
         uint64 tier1Window = disputeManager.TIER1_WINDOW();
         vm.warp(block.timestamp + tier1Window + 1);

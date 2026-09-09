@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {EventComposer} from "../../contracts/EventComposer.sol";
-import {EventBus} from "../../contracts/EventBus.sol";
-import {Settlement} from "../../derivatives/Settlement.sol";
-import {PositionManager} from "../../derivatives/PositionManager.sol";
-import {Market} from "../../derivatives/Market.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { EventComposer } from "../../contracts/EventComposer.sol";
+import { EventBus } from "../../contracts/EventBus.sol";
+import { Settlement } from "../../derivatives/Settlement.sol";
+import { PositionManager } from "../../derivatives/PositionManager.sol";
+import { Market } from "../../derivatives/Market.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 
 contract MarketTest is Test {
     EventRegistry internal registry;
@@ -89,9 +89,9 @@ contract MarketTest is Test {
         bytes32 marketId = market.createMarket(eventId);
 
         vm.prank(alice);
-        market.depositCollateral{value: 1 ether}(marketId, true); // backs YES
+        market.depositCollateral{ value: 1 ether }(marketId, true); // backs YES
         vm.prank(bob);
-        market.depositCollateral{value: 1 ether}(marketId, false); // backs NO
+        market.depositCollateral{ value: 1 ether }(marketId, false); // backs NO
 
         _finalize(eventId, true); // YES wins
 
@@ -112,9 +112,9 @@ contract MarketTest is Test {
         bytes32 marketId = market.createMarket(eventId);
 
         vm.prank(alice);
-        market.depositCollateral{value: 1 ether}(marketId, false); // backs NO
+        market.depositCollateral{ value: 1 ether }(marketId, false); // backs NO
         vm.prank(bob);
-        market.depositCollateral{value: 2 ether}(marketId, false); // backs NO
+        market.depositCollateral{ value: 2 ether }(marketId, false); // backs NO
 
         _finalize(eventId, true); // YES wins, but nobody backed YES
 
@@ -136,7 +136,7 @@ contract MarketTest is Test {
         bytes32 marketId = market.createMarket(eventId);
 
         vm.startPrank(alice);
-        market.depositCollateral{value: 1 ether}(marketId, true);
+        market.depositCollateral{ value: 1 ether }(marketId, true);
         uint256 balanceBefore = alice.balance;
         market.closePosition(marketId, true, 1 ether);
         vm.stopPrank();
@@ -150,7 +150,7 @@ contract MarketTest is Test {
         bytes32 marketId = market.createMarket(eventId);
 
         vm.prank(alice);
-        market.depositCollateral{value: 1 ether}(marketId, true);
+        market.depositCollateral{ value: 1 ether }(marketId, true);
 
         vm.expectRevert(bytes("Market: not settled"));
         vm.prank(alice);

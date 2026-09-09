@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {DisputeManager} from "../../contracts/DisputeManager.sol";
-import {EventComposer} from "../../contracts/EventComposer.sol";
-import {EventBus} from "../../contracts/EventBus.sol";
-import {Settlement} from "../../derivatives/Settlement.sol";
-import {PositionManager} from "../../derivatives/PositionManager.sol";
-import {Market} from "../../derivatives/Market.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
-import {IEventComposer} from "../../contracts/interfaces/IEventComposer.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { DisputeManager } from "../../contracts/DisputeManager.sol";
+import { EventComposer } from "../../contracts/EventComposer.sol";
+import { EventBus } from "../../contracts/EventBus.sol";
+import { Settlement } from "../../derivatives/Settlement.sol";
+import { PositionManager } from "../../derivatives/PositionManager.sol";
+import { Market } from "../../derivatives/Market.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
+import { IEventComposer } from "../../contracts/interfaces/IEventComposer.sol";
 
 /// @notice The canonical Novak flow, fully wired end-to-end (see
 ///         examples/end-to-end-flow.ts for the off-chain/SDK narration of the
@@ -91,8 +91,12 @@ contract EndToEndFlowTest is Test {
         vm.prank(resolverC);
         registry.submitObservation(eventB, abi.encode(true), keccak256("evidence-b3"));
 
-        assertEq(uint8(registry.getEvent(eventA)), uint8(IEventRegistry.EventStatus.ProposedOutcome));
-        assertEq(uint8(registry.getEvent(eventB)), uint8(IEventRegistry.EventStatus.ProposedOutcome));
+        assertEq(
+            uint8(registry.getEvent(eventA)), uint8(IEventRegistry.EventStatus.ProposedOutcome)
+        );
+        assertEq(
+            uint8(registry.getEvent(eventB)), uint8(IEventRegistry.EventStatus.ProposedOutcome)
+        );
 
         // 3. Undisputed -> finalize once each event's dispute window elapses.
         vm.warp(block.timestamp + 1 hours + 1);
@@ -106,7 +110,9 @@ contract EndToEndFlowTest is Test {
         operands[0] = eventA;
         operands[1] = eventB;
         bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({op: IEventComposer.Op.Within, operands: operands, window: 48 hours})
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Within, operands: operands, window: 48 hours
+            })
         );
 
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
@@ -119,9 +125,9 @@ contract EndToEndFlowTest is Test {
         //    take opposing positions.
         bytes32 marketId = market.createMarket(compositeId);
         vm.prank(alice);
-        market.depositCollateral{value: 1 ether}(marketId, true); // backs YES
+        market.depositCollateral{ value: 1 ether }(marketId, true); // backs YES
         vm.prank(bob);
-        market.depositCollateral{value: 1 ether}(marketId, false); // backs NO
+        market.depositCollateral{ value: 1 ether }(marketId, false); // backs NO
 
         // 6. Settle against the finalized composite outcome and claim.
         market.settle(marketId);

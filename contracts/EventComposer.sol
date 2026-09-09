@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IEventComposer} from "./interfaces/IEventComposer.sol";
-import {IEventRegistry} from "./interfaces/IEventRegistry.sol";
+import { IEventComposer } from "./interfaces/IEventComposer.sol";
+import { IEventRegistry } from "./interfaces/IEventRegistry.sol";
 
 /// @title EventComposer
 /// @notice Builds composite events (AND/OR/NOT, BEFORE/WITHIN) from primitive or
@@ -72,8 +72,9 @@ contract EventComposer is IEventComposer {
         compositeId = keccak256(abi.encode(compositeSpec.op, operands, compositeSpec.window));
         require(_specs[compositeId].operands.length == 0, "EventComposer: composite exists");
 
-        _specs[compositeId] =
-            CompositeSpec({op: compositeSpec.op, operands: operands, window: compositeSpec.window});
+        _specs[compositeId] = CompositeSpec({
+            op: compositeSpec.op, operands: operands, window: compositeSpec.window
+        });
         _depth[compositeId] = thisDepth;
 
         emit CompositeEventCreated(compositeId, compositeSpec.op, operands);
@@ -210,7 +211,10 @@ contract EventComposer is IEventComposer {
             bool b = abi.decode(o.outcomeData, (bool));
             return (b ? Status.True : Status.False, o.finalizedAt);
         }
-        if (regStatus == IEventRegistry.EventStatus.Voided || regStatus == IEventRegistry.EventStatus.Expired) {
+        if (
+            regStatus == IEventRegistry.EventStatus.Voided
+                || regStatus == IEventRegistry.EventStatus.Expired
+        ) {
             return (Status.Voided, 0);
         }
         if (regStatus != IEventRegistry.EventStatus.None) {
@@ -225,7 +229,9 @@ contract EventComposer is IEventComposer {
     }
 
     function _operandExists(bytes32 id) private view returns (bool) {
-        return registry.getEvent(id) != IEventRegistry.EventStatus.None || _specs[id].operands.length != 0;
+        return
+            registry.getEvent(id) != IEventRegistry.EventStatus.None
+                || _specs[id].operands.length != 0;
     }
 
     function _validateOperandCount(Op op, uint256 count) private pure {

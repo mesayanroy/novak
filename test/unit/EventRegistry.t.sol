@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 
 contract EventRegistryTest is Test {
     EventRegistry internal registry;
@@ -16,7 +16,11 @@ contract EventRegistryTest is Test {
         registry = new EventRegistry();
     }
 
-    function _defaultSpec(uint8 quorumThreshold) internal view returns (IEventRegistry.EventSpec memory) {
+    function _defaultSpec(uint8 quorumThreshold)
+        internal
+        view
+        returns (IEventRegistry.EventSpec memory)
+    {
         return IEventRegistry.EventSpec({
             specVersion: 1,
             sourceId: keccak256("example.price-feed"),
@@ -60,15 +64,23 @@ contract EventRegistryTest is Test {
         // agreement from reaching threshold.
         vm.prank(resolverC);
         registry.submitObservation(eventId, abi.encode(false), keccak256("evidence-c"));
-        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ObservationsSubmitted));
+        assertEq(
+            uint8(registry.getEvent(eventId)),
+            uint8(IEventRegistry.EventStatus.ObservationsSubmitted)
+        );
 
         vm.prank(resolverA);
         registry.submitObservation(eventId, abi.encode(true), keccak256("evidence-a"));
-        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ObservationsSubmitted));
+        assertEq(
+            uint8(registry.getEvent(eventId)),
+            uint8(IEventRegistry.EventStatus.ObservationsSubmitted)
+        );
 
         vm.prank(resolverB);
         registry.submitObservation(eventId, abi.encode(true), keccak256("evidence-b"));
-        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ProposedOutcome));
+        assertEq(
+            uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ProposedOutcome)
+        );
 
         // Once quorum has proposed an outcome, the Registry stops accepting
         // further submissions for this event — a later resolver can't reopen

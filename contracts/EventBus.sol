@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IEventBus} from "./interfaces/IEventBus.sol";
-import {IEventRegistry} from "./interfaces/IEventRegistry.sol";
-import {IEventComposer} from "./interfaces/IEventComposer.sol";
+import { IEventBus } from "./interfaces/IEventBus.sol";
+import { IEventRegistry } from "./interfaces/IEventRegistry.sol";
+import { IEventComposer } from "./interfaces/IEventComposer.sol";
 
 /// @title EventBus
 /// @notice The single read surface applications (e.g. the derivatives Market) are

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IEventRegistry} from "./interfaces/IEventRegistry.sol";
+import { IEventRegistry } from "./interfaces/IEventRegistry.sol";
 
 /// @title EventRegistry
 /// @notice Canonical registry of event definitions and lifecycle state:
@@ -103,8 +103,11 @@ contract EventRegistry is IEventRegistry {
         }
 
         if (count >= _specs[eventId].quorumThreshold && _proposals[eventId].proposedAt == 0) {
-            _proposals[eventId] =
-                Proposal({outcomeHash: outcomeHash, outcomeData: outcomeData, proposedAt: uint64(block.timestamp)});
+            _proposals[eventId] = Proposal({
+                outcomeHash: outcomeHash,
+                outcomeData: outcomeData,
+                proposedAt: uint64(block.timestamp)
+            });
 
             EventStatus previous = _status[eventId];
             _status[eventId] = EventStatus.ProposedOutcome;
@@ -116,7 +119,9 @@ contract EventRegistry is IEventRegistry {
     // --- Finalization (undisputed path) ---
 
     function finalize(bytes32 eventId) external {
-        require(_status[eventId] == EventStatus.ProposedOutcome, "EventRegistry: nothing to finalize");
+        require(
+            _status[eventId] == EventStatus.ProposedOutcome, "EventRegistry: nothing to finalize"
+        );
         Proposal storage p = _proposals[eventId];
         require(
             block.timestamp >= p.proposedAt + _specs[eventId].disputeWindowSeconds,
@@ -127,8 +132,12 @@ contract EventRegistry is IEventRegistry {
     }
 
     function _finalize(bytes32 eventId, bytes32 outcomeHash, bytes memory outcomeData) private {
-        _outcomes[eventId] =
-            Outcome({exists: true, outcomeHash: outcomeHash, outcomeData: outcomeData, finalizedAt: uint64(block.timestamp)});
+        _outcomes[eventId] = Outcome({
+            exists: true,
+            outcomeHash: outcomeHash,
+            outcomeData: outcomeData,
+            finalizedAt: uint64(block.timestamp)
+        });
 
         EventStatus previous = _status[eventId];
         _status[eventId] = EventStatus.Finalized;
@@ -157,8 +166,7 @@ contract EventRegistry is IEventRegistry {
         // the caller blindly. Delegates the actual transition to the same
         // path a filed dispute uses.
         require(
-            _status[eventId] == EventStatus.ObservationsSubmitted,
-            "EventRegistry: not ambiguous"
+            _status[eventId] == EventStatus.ObservationsSubmitted, "EventRegistry: not ambiguous"
         );
         require(
             block.timestamp > _specs[eventId].observationDeadline,
@@ -184,7 +192,10 @@ contract EventRegistry is IEventRegistry {
         emit EventStatusChanged(eventId, previous, EventStatus.Disputed);
     }
 
-    function finalizeFromDispute(bytes32 eventId, bytes calldata outcomeData) external onlyDisputeManager {
+    function finalizeFromDispute(bytes32 eventId, bytes calldata outcomeData)
+        external
+        onlyDisputeManager
+    {
         require(_status[eventId] == EventStatus.Disputed, "EventRegistry: not disputed");
         _finalize(eventId, keccak256(outcomeData), outcomeData);
     }

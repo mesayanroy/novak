@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {EventRegistry} from "../../contracts/EventRegistry.sol";
-import {DisputeManager} from "../../contracts/DisputeManager.sol";
-import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
-import {IDisputeManager} from "../../contracts/interfaces/IDisputeManager.sol";
+import { Test } from "forge-std/Test.sol";
+import { EventRegistry } from "../../contracts/EventRegistry.sol";
+import { DisputeManager } from "../../contracts/DisputeManager.sol";
+import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
+import { IDisputeManager } from "../../contracts/interfaces/IDisputeManager.sol";
 
 /// @notice Covers Gap 2 (bonded tiered escalation) and the escalation half of
 ///         Gap 5 (concrete quorum numbers) from docs/protocol-spec.md: Tier-1
@@ -80,7 +80,7 @@ contract DisputeManagerTest is Test {
 
         vm.prank(attacker);
         vm.expectRevert(bytes("DisputeManager: not disputable"));
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
     }
 
     function test_dispute_revertsAfterWindowCloses() public {
@@ -89,7 +89,7 @@ contract DisputeManagerTest is Test {
 
         vm.prank(attacker);
         vm.expectRevert(bytes("DisputeManager: dispute window closed"));
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
     }
 
     function test_dispute_revertsOnIncorrectBond() public {
@@ -97,7 +97,7 @@ contract DisputeManagerTest is Test {
 
         vm.prank(attacker);
         vm.expectRevert(bytes("DisputeManager: incorrect bond"));
-        disputeManager.dispute{value: disputeBond - 1}(eventId);
+        disputeManager.dispute{ value: disputeBond - 1 }(eventId);
     }
 
     // --- Tier-1 convergence + bond math ---
@@ -111,7 +111,7 @@ contract DisputeManagerTest is Test {
         bytes32 eventId = _proposedTrueEvent();
 
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         address[] memory committee = disputeManager.getCommittee(eventId, 1);
         assertEq(committee.length, 3, "small pool -> committee is the whole pool");
@@ -128,11 +128,11 @@ contract DisputeManagerTest is Test {
         // C votes with the (losing) original outcome first, then A and B
         // vote to overturn it — B's vote is the one that crosses 66%.
         vm.prank(resolverC);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.prank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, false);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, false);
         vm.prank(resolverB);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, false);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, false);
 
         assertTrue(registry.isFinalized(eventId));
         IEventRegistry.Outcome memory outcome = registry.getOutcome(eventId);
@@ -162,15 +162,15 @@ contract DisputeManagerTest is Test {
         bytes32 eventId = _proposedTrueEvent();
 
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         uint256 treasuryBalanceBefore = treasury.balance;
         uint256 burnBalanceBefore = disputeManager.BURN_ADDRESS().balance;
 
         vm.prank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.prank(resolverB);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
 
         assertTrue(registry.isFinalized(eventId));
         IEventRegistry.Outcome memory outcome = registry.getOutcome(eventId);
@@ -187,13 +187,13 @@ contract DisputeManagerTest is Test {
     function test_tier1_nonConvergence_escalatesToTier2_refundsTier1BondsInFull() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         // 1/3 agreement on each side never reaches 66% of the 3-member committee.
         vm.prank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.prank(resolverB);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, false);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, false);
 
         vm.warp(block.timestamp + disputeManager.TIER1_WINDOW() + 1);
 
@@ -215,7 +215,7 @@ contract DisputeManagerTest is Test {
     function test_escalateTier2_revertsIfWindowStillOpen() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         vm.expectRevert(bytes("DisputeManager: tier1 window still open"));
         disputeManager.escalateTier2(eventId);
@@ -224,12 +224,12 @@ contract DisputeManagerTest is Test {
     function test_escalateTier2_revertsIfTier1AlreadyConverged() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         vm.prank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.prank(resolverB);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
 
         vm.warp(block.timestamp + disputeManager.TIER1_WINDOW() + 1);
         vm.expectRevert(bytes("DisputeManager: not escalatable"));
@@ -239,19 +239,19 @@ contract DisputeManagerTest is Test {
     function test_tier2_convergesAfterTier1Failure() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         vm.prank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.prank(resolverB);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, false);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, false);
         vm.warp(block.timestamp + disputeManager.TIER1_WINDOW() + 1);
         disputeManager.escalateTier2(eventId);
 
         vm.prank(resolverA);
-        disputeManager.submitTier2Vote{value: tier2Bond}(eventId, true);
+        disputeManager.submitTier2Vote{ value: tier2Bond }(eventId, true);
         vm.prank(resolverB);
-        disputeManager.submitTier2Vote{value: tier2Bond}(eventId, true);
+        disputeManager.submitTier2Vote{ value: tier2Bond }(eventId, true);
 
         assertTrue(registry.isFinalized(eventId));
     }
@@ -261,19 +261,19 @@ contract DisputeManagerTest is Test {
     function test_tier2_nonConvergence_voidsEventAndRefundsEveryBond() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         vm.prank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.prank(resolverB);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, false);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, false);
         vm.warp(block.timestamp + disputeManager.TIER1_WINDOW() + 1);
         disputeManager.escalateTier2(eventId);
 
         vm.prank(resolverA);
-        disputeManager.submitTier2Vote{value: tier2Bond}(eventId, true);
+        disputeManager.submitTier2Vote{ value: tier2Bond }(eventId, true);
         vm.prank(resolverC);
-        disputeManager.submitTier2Vote{value: tier2Bond}(eventId, false);
+        disputeManager.submitTier2Vote{ value: tier2Bond }(eventId, false);
         // Only 2 of 3 vote; 1/3 each side never reaches 66% of the committee.
 
         vm.warp(block.timestamp + disputeManager.TIER2_WINDOW() + 1);
@@ -294,7 +294,7 @@ contract DisputeManagerTest is Test {
     function test_voidAfterTier2Timeout_revertsIfWindowStillOpen() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
         vm.warp(block.timestamp + disputeManager.TIER1_WINDOW() + 1);
         disputeManager.escalateTier2(eventId);
 
@@ -331,9 +331,9 @@ contract DisputeManagerTest is Test {
         assertEq(committee.length, 3);
 
         vm.prank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.prank(resolverB);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
 
         assertTrue(registry.isFinalized(eventId));
         IEventRegistry.Outcome memory outcome = registry.getOutcome(eventId);
@@ -364,45 +364,45 @@ contract DisputeManagerTest is Test {
     function test_submitTier1Vote_revertsForNonCommitteeMember() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         address outsider = address(0xF00D);
         vm.deal(outsider, 1 ether);
         vm.prank(outsider);
         vm.expectRevert(bytes("DisputeManager: not on committee"));
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
     }
 
     function test_submitTier1Vote_revertsOnWrongBondAmount() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         vm.prank(resolverA);
         vm.expectRevert(bytes("DisputeManager: incorrect bond"));
-        disputeManager.submitTier1Vote{value: tier1Bond - 1}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond - 1 }(eventId, true);
     }
 
     function test_submitTier1Vote_revertsOnDoubleVote() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         vm.startPrank(resolverA);
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.expectRevert(bytes("DisputeManager: already voted"));
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
         vm.stopPrank();
     }
 
     function test_submitTier1Vote_revertsAfterWindowCloses() public {
         bytes32 eventId = _proposedTrueEvent();
         vm.prank(attacker);
-        disputeManager.dispute{value: disputeBond}(eventId);
+        disputeManager.dispute{ value: disputeBond }(eventId);
 
         vm.warp(block.timestamp + disputeManager.TIER1_WINDOW() + 1);
         vm.prank(resolverA);
         vm.expectRevert(bytes("DisputeManager: tier window closed"));
-        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
     }
 }

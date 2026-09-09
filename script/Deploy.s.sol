@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Script, console} from "forge-std/Script.sol";
-import {EventRegistry} from "../contracts/EventRegistry.sol";
-import {DisputeManager} from "../contracts/DisputeManager.sol";
-import {EventComposer} from "../contracts/EventComposer.sol";
-import {EventBus} from "../contracts/EventBus.sol";
-import {SubscriptionManager} from "../contracts/SubscriptionManager.sol";
-import {Market} from "../derivatives/Market.sol";
-import {Settlement} from "../derivatives/Settlement.sol";
-import {PositionManager} from "../derivatives/PositionManager.sol";
+import { Script, console } from "forge-std/Script.sol";
+import { EventRegistry } from "../contracts/EventRegistry.sol";
+import { DisputeManager } from "../contracts/DisputeManager.sol";
+import { EventComposer } from "../contracts/EventComposer.sol";
+import { EventBus } from "../contracts/EventBus.sol";
+import { SubscriptionManager } from "../contracts/SubscriptionManager.sol";
+import { Market } from "../derivatives/Market.sol";
+import { Settlement } from "../derivatives/Settlement.sol";
+import { PositionManager } from "../derivatives/PositionManager.sol";
 
 /// @notice Deploys the full stack in dependency order: Registry -> DisputeManager
 ///         (wired back into Registry via `setDisputeManager`, since the two have

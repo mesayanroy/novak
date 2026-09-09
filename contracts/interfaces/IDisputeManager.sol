@@ -30,8 +30,12 @@ interface IDisputeManager {
 
     event DisputeFiled(bytes32 indexed eventId, address indexed disputer, uint256 bond);
     event NonConvergenceEscalated(bytes32 indexed eventId);
-    event TierOpened(bytes32 indexed eventId, uint8 indexed tier, address[] committee, uint64 deadline);
-    event TierVoteSubmitted(bytes32 indexed eventId, uint8 indexed tier, address indexed member, bool outcome);
+    event TierOpened(
+        bytes32 indexed eventId, uint8 indexed tier, address[] committee, uint64 deadline
+    );
+    event TierVoteSubmitted(
+        bytes32 indexed eventId, uint8 indexed tier, address indexed member, bool outcome
+    );
     event TierConverged(bytes32 indexed eventId, uint8 indexed tier, bool outcome);
     event TierEscalated(bytes32 indexed eventId, uint8 indexed toTier);
     event DisputeVoided(bytes32 indexed eventId);
