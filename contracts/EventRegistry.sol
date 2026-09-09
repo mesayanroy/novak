@@ -6,41 +6,44 @@ import {IEventRegistry} from "./interfaces/IEventRegistry.sol";
 /// @title EventRegistry
 /// @notice Canonical registry of event definitions and lifecycle state:
 ///         CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME
-///         -> DISPUTE WINDOW -> FINALIZED (or VOIDED).
+///         -> DISPUTED -> FINALIZED (or VOIDED / EXPIRED).
 /// @dev Consumers must never call this contract directly — always go through
-///      EventBus. See IEventRegistry for the finalized MVP protocol decisions
-///      (quorum model, dispute arbitration, outcome payload schema).
+///      EventBus. This contract deliberately knows nothing about committees,
+///      tiers, or bonding economics — all of that lives in the configured
+///      `IDisputeManager`, which is the only address allowed to drive the
+///      `Disputed -> Finalized|Voided` transitions (`onlyDisputeManager`).
+///      See IEventRegistry for the finalized MVP protocol decisions.
 contract EventRegistry is IEventRegistry {
-    uint256 public constant DISPUTE_BOND = 0.01 ether;
-
     struct Proposal {
         bytes32 outcomeHash;
         bytes outcomeData;
         uint64 proposedAt;
     }
 
-    struct Dispute {
-        address disputer;
-        uint256 bond;
-        bool resolved;
-    }
-
     address public immutable owner;
+    address public disputeManager;
 
     mapping(bytes32 => EventSpec) private _specs;
     mapping(bytes32 => EventStatus) private _status;
     mapping(bytes32 => Outcome) private _outcomes;
     mapping(bytes32 => Proposal) private _proposals;
-    mapping(bytes32 => Dispute) private _disputes;
 
     mapping(bytes32 => mapping(address => bool)) private _hasSubmitted;
     mapping(bytes32 => mapping(bytes32 => uint256)) private _observationCount;
     mapping(address => bool) private _authorizedResolvers;
 
+    address[] private _authorizedResolverList;
+    mapping(address => uint256) private _resolverListIndex; // 1-based; 0 = absent
+
     uint256 private _nonce;
 
     modifier onlyOwner() {
         require(msg.sender == owner, "EventRegistry: not owner");
+        _;
+    }
+
+    modifier onlyDisputeManager() {
+        require(msg.sender == disputeManager, "EventRegistry: not dispute manager");
         _;
     }
 
@@ -110,53 +113,7 @@ contract EventRegistry is IEventRegistry {
         }
     }
 
-    // --- Dispute ---
-
-    function dispute(bytes32 eventId) external payable {
-        require(_status[eventId] == EventStatus.ProposedOutcome, "EventRegistry: not disputable");
-        require(_disputes[eventId].disputer == address(0), "EventRegistry: already disputed");
-
-        Proposal storage p = _proposals[eventId];
-        require(
-            block.timestamp < p.proposedAt + _specs[eventId].disputeWindowSeconds,
-            "EventRegistry: dispute window closed"
-        );
-        require(msg.value == DISPUTE_BOND, "EventRegistry: incorrect bond");
-
-        _disputes[eventId] = Dispute({disputer: msg.sender, bond: msg.value, resolved: false});
-
-        EventStatus previous = _status[eventId];
-        _status[eventId] = EventStatus.DisputeWindow;
-        emit EventStatusChanged(eventId, previous, EventStatus.DisputeWindow);
-        emit EventDisputed(eventId, msg.sender);
-    }
-
-    /// @dev MVP arbitration: the Registry owner decides. See IEventRegistry
-    ///      docs and docs/threat-model.md for why full decentralized dispute
-    ///      resolution is out of scope for this milestone.
-    function resolveDispute(bytes32 eventId, bool upholdProposal) external onlyOwner {
-        require(_status[eventId] == EventStatus.DisputeWindow, "EventRegistry: no active dispute");
-        Dispute storage d = _disputes[eventId];
-        require(!d.resolved, "EventRegistry: dispute already resolved");
-        d.resolved = true;
-
-        emit DisputeResolved(eventId, upholdProposal);
-
-        if (upholdProposal) {
-            Proposal storage p = _proposals[eventId];
-            _finalize(eventId, p.outcomeHash, p.outcomeData);
-            (bool sent,) = owner.call{value: d.bond}("");
-            require(sent, "EventRegistry: bond forfeiture transfer failed");
-        } else {
-            EventStatus previous = _status[eventId];
-            _status[eventId] = EventStatus.Voided;
-            emit EventStatusChanged(eventId, previous, EventStatus.Voided);
-            (bool sent,) = d.disputer.call{value: d.bond}("");
-            require(sent, "EventRegistry: bond refund failed");
-        }
-    }
-
-    // --- Finalization ---
+    // --- Finalization (undisputed path) ---
 
     function finalize(bytes32 eventId) external {
         require(_status[eventId] == EventStatus.ProposedOutcome, "EventRegistry: nothing to finalize");
@@ -165,7 +122,6 @@ contract EventRegistry is IEventRegistry {
             block.timestamp >= p.proposedAt + _specs[eventId].disputeWindowSeconds,
             "EventRegistry: dispute window still open"
         );
-        require(_disputes[eventId].disputer == address(0), "EventRegistry: disputed, awaiting arbitration");
 
         _finalize(eventId, p.outcomeHash, p.outcomeData);
     }
@@ -180,15 +136,101 @@ contract EventRegistry is IEventRegistry {
         emit EventFinalized(eventId, outcomeHash);
     }
 
+    // --- Terminal non-outcomes ---
+
+    function expire(bytes32 eventId) external {
+        require(_status[eventId] == EventStatus.Open, "EventRegistry: not expirable");
+        require(
+            block.timestamp > _specs[eventId].observationDeadline,
+            "EventRegistry: observation window still open"
+        );
+
+        EventStatus previous = _status[eventId];
+        _status[eventId] = EventStatus.Expired;
+        emit EventStatusChanged(eventId, previous, EventStatus.Expired);
+    }
+
+    function escalateNonConvergence(bytes32 eventId) external onlyDisputeManager {
+        // Kept as a thin, registry-owned status guard: the DisputeManager is
+        // the one deciding *when* to call this (see IDisputeManager), but the
+        // Registry still enforces its own precondition rather than trusting
+        // the caller blindly. Delegates the actual transition to the same
+        // path a filed dispute uses.
+        require(
+            _status[eventId] == EventStatus.ObservationsSubmitted,
+            "EventRegistry: not ambiguous"
+        );
+        require(
+            block.timestamp > _specs[eventId].observationDeadline,
+            "EventRegistry: observation window still open"
+        );
+        _setDisputed(eventId);
+    }
+
+    // --- DisputeManager-only state transitions ---
+
+    function escalateToDispute(bytes32 eventId) external onlyDisputeManager {
+        EventStatus status = _status[eventId];
+        require(
+            status == EventStatus.ProposedOutcome || status == EventStatus.ObservationsSubmitted,
+            "EventRegistry: not escalatable"
+        );
+        _setDisputed(eventId);
+    }
+
+    function _setDisputed(bytes32 eventId) private {
+        EventStatus previous = _status[eventId];
+        _status[eventId] = EventStatus.Disputed;
+        emit EventStatusChanged(eventId, previous, EventStatus.Disputed);
+    }
+
+    function finalizeFromDispute(bytes32 eventId, bytes calldata outcomeData) external onlyDisputeManager {
+        require(_status[eventId] == EventStatus.Disputed, "EventRegistry: not disputed");
+        _finalize(eventId, keccak256(outcomeData), outcomeData);
+    }
+
+    function voidEvent(bytes32 eventId) external onlyDisputeManager {
+        require(_status[eventId] == EventStatus.Disputed, "EventRegistry: not disputed");
+        EventStatus previous = _status[eventId];
+        _status[eventId] = EventStatus.Voided;
+        emit EventStatusChanged(eventId, previous, EventStatus.Voided);
+    }
+
     // --- Resolver authorization ---
 
     function setResolverAuthorization(address resolver, bool authorized) external onlyOwner {
+        bool currentlyAuthorized = _authorizedResolvers[resolver];
         _authorizedResolvers[resolver] = authorized;
+
+        if (authorized && !currentlyAuthorized) {
+            _authorizedResolverList.push(resolver);
+            _resolverListIndex[resolver] = _authorizedResolverList.length;
+        } else if (!authorized && currentlyAuthorized) {
+            uint256 idx = _resolverListIndex[resolver]; // 1-based
+            uint256 lastIdx = _authorizedResolverList.length;
+            address lastAddr = _authorizedResolverList[lastIdx - 1];
+            _authorizedResolverList[idx - 1] = lastAddr;
+            _resolverListIndex[lastAddr] = idx;
+            _authorizedResolverList.pop();
+            delete _resolverListIndex[resolver];
+        }
+
         emit ResolverAuthorizationChanged(resolver, authorized);
+    }
+
+    function setDisputeManager(address disputeManager_) external onlyOwner {
+        require(disputeManager == address(0), "EventRegistry: dispute manager already set");
+        require(disputeManager_ != address(0), "EventRegistry: zero address");
+        disputeManager = disputeManager_;
+        emit DisputeManagerSet(disputeManager_);
     }
 
     function isAuthorizedResolver(address resolver) external view returns (bool) {
         return _authorizedResolvers[resolver];
+    }
+
+    function getAuthorizedResolvers() external view returns (address[] memory) {
+        return _authorizedResolverList;
     }
 
     // --- Views ---
@@ -207,5 +249,14 @@ contract EventRegistry is IEventRegistry {
 
     function isFinalized(bytes32 eventId) external view returns (bool) {
         return _status[eventId] == EventStatus.Finalized;
+    }
+
+    function getProposal(bytes32 eventId)
+        external
+        view
+        returns (bytes32 outcomeHash, bytes memory outcomeData, uint64 proposedAt)
+    {
+        Proposal storage p = _proposals[eventId];
+        return (p.outcomeHash, p.outcomeData, p.proposedAt);
     }
 }

@@ -3,32 +3,35 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {EventRegistry} from "../../contracts/EventRegistry.sol";
+import {DisputeManager} from "../../contracts/DisputeManager.sol";
 import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
 
 /// @notice Adversarial scenarios against the resolver <-> Registry submission
 ///         and dispute flow. See docs/threat-model.md for the full adversary
 ///         list this suite tracks; items not yet covered here (colluding
-///         resolver majority beating the dispute bond economically, dispute
-///         spam pricing) require real quorum weighting / staking economics
-///         that are explicitly out of MVP scope (see docs/protocol-spec.md).
+///         resolver majority beating committee bonds economically at scale,
+///         dispute spam pricing beyond the flat MVP bonds) require real
+///         staking economics that are explicitly out of MVP scope (see
+///         docs/protocol-spec.md).
 contract MaliciousResolverTest is Test {
     EventRegistry internal registry;
+    DisputeManager internal disputeManager;
 
     address internal resolverA = address(0xA11CE);
     address internal resolverB = address(0xB0B);
     address internal resolverC = address(0xC0FFEE);
     address internal attacker = address(0xBAD);
+    address internal treasury = address(0x7EA5);
 
     function setUp() public {
         registry = new EventRegistry();
+        disputeManager = new DisputeManager(address(registry), treasury);
+        registry.setDisputeManager(address(disputeManager));
+
         registry.setResolverAuthorization(resolverA, true);
         registry.setResolverAuthorization(resolverB, true);
         registry.setResolverAuthorization(resolverC, true);
     }
-
-    // Registry.owner() is this test contract (the deployer) — needs to accept
-    // forfeited dispute bonds sent via a low-level call.
-    receive() external payable {}
 
     function _createEvent(uint8 quorumThreshold) internal returns (bytes32 eventId) {
         eventId = registry.createEvent(
@@ -118,11 +121,12 @@ contract MaliciousResolverTest is Test {
     }
 
     /// @dev Dispute griefing: a griefer disputes a correct proposed outcome.
-    ///      The dispute bond is forfeited to the protocol owner once the
-    ///      arbitrator upholds the original proposal, so repeated frivolous
-    ///      disputes cost the griefer real ETH each time (full decentralized,
-    ///      trust-minimized arbitration/slashing economics are deferred — see
-    ///      docs/threat-model.md item 4).
+    ///      With only 3 authorized resolvers, the Tier-1 committee is the
+    ///      entire pool (committee = min(N1, poolSize)); once 2 of the 3
+    ///      re-affirm the original "true" outcome (>= 66% of a 3-member
+    ///      committee), the event finalizes and the griefer's DISPUTE_BOND is
+    ///      forfeited (burn/treasury split — see DisputeManager) since the
+    ///      committee upheld the proposal the attacker challenged.
     function test_disputeGriefing_frivolousDisputeCostsBond() public {
         bytes32 eventId = _createEvent(2);
         vm.prank(resolverA);
@@ -130,14 +134,20 @@ contract MaliciousResolverTest is Test {
         vm.prank(resolverB);
         registry.submitObservation(eventId, abi.encode(true), keccak256("ev-b"));
 
-        uint256 bond = registry.DISPUTE_BOND();
+        uint256 bond = disputeManager.DISPUTE_BOND();
         vm.deal(attacker, 1 ether);
         uint256 balanceBefore = attacker.balance;
 
         vm.prank(attacker);
-        registry.dispute{value: bond}(eventId);
+        disputeManager.dispute{value: bond}(eventId);
 
-        registry.resolveDispute(eventId, true); // owner upholds the correct proposal
+        uint256 tier1Bond = disputeManager.TIER1_BOND();
+        vm.deal(resolverA, 1 ether);
+        vm.deal(resolverB, 1 ether);
+        vm.prank(resolverA);
+        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true);
+        vm.prank(resolverB);
+        disputeManager.submitTier1Vote{value: tier1Bond}(eventId, true); // 2/3 >= 66% -> converges, upholds "true"
 
         assertTrue(registry.isFinalized(eventId));
         assertEq(attacker.balance, balanceBefore - bond);
@@ -153,19 +163,19 @@ contract MaliciousResolverTest is Test {
         vm.prank(resolverB);
         registry.submitObservation(eventId, abi.encode(true), keccak256("ev-b"));
 
-        uint256 bond = registry.DISPUTE_BOND();
+        uint256 bond = disputeManager.DISPUTE_BOND();
         vm.deal(attacker, 1 ether);
         vm.prank(attacker);
-        registry.dispute{value: bond}(eventId);
+        disputeManager.dispute{value: bond}(eventId);
 
         address secondDisputer = address(0xDEAD);
         vm.deal(secondDisputer, 1 ether);
         vm.prank(secondDisputer);
-        // The event has already left ProposedOutcome (it's in DisputeWindow),
-        // so a second dispute attempt is rejected before the "already
-        // disputed" check is even reached.
-        vm.expectRevert(bytes("EventRegistry: not disputable"));
-        registry.dispute{value: bond}(eventId);
+        // A dispute case already exists for this event (opened by the first
+        // disputer above), so a second attempt — from anyone — is rejected
+        // up front, before even checking the Registry's status.
+        vm.expectRevert(bytes("DisputeManager: already escalated"));
+        disputeManager.dispute{value: bond}(eventId);
     }
 
     /// @dev Finalizing a disputed event before arbitration must be blocked,
@@ -178,10 +188,10 @@ contract MaliciousResolverTest is Test {
         vm.prank(resolverB);
         registry.submitObservation(eventId, abi.encode(true), keccak256("ev-b"));
 
-        uint256 bond = registry.DISPUTE_BOND();
+        uint256 bond = disputeManager.DISPUTE_BOND();
         vm.deal(attacker, 1 ether);
         vm.prank(attacker);
-        registry.dispute{value: bond}(eventId);
+        disputeManager.dispute{value: bond}(eventId);
 
         vm.warp(block.timestamp + 1 hours + 1);
         vm.expectRevert(bytes("EventRegistry: nothing to finalize"));

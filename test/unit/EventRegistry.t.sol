@@ -16,10 +16,6 @@ contract EventRegistryTest is Test {
         registry = new EventRegistry();
     }
 
-    // Registry.owner() is this test contract (the deployer) — needs to accept
-    // forfeited dispute bonds sent via a low-level call.
-    receive() external payable {}
-
     function _defaultSpec(uint8 quorumThreshold) internal view returns (IEventRegistry.EventSpec memory) {
         return IEventRegistry.EventSpec({
             specVersion: 1,
@@ -137,55 +133,77 @@ contract EventRegistryTest is Test {
         assertTrue(abi.decode(outcome.outcomeData, (bool)));
     }
 
-    function test_dispute_thenUpheldProposal_finalizesAndForfeitsBond() public {
-        registry.setResolverAuthorization(resolverA, true);
-        registry.setResolverAuthorization(resolverB, true);
+    // Dispute-flow tests (filing a dispute, tiered committee escalation,
+    // bond slashing/refunds) now live in test/unit/DisputeManager.t.sol —
+    // arbitration is no longer an EventRegistry concern at all; the Registry
+    // only exposes the onlyDisputeManager transitions those tests exercise.
+
+    function test_expire_marksExpiredWhenNoObservationsEverSubmitted() public {
         bytes32 eventId = registry.createEvent(_defaultSpec(2));
 
-        vm.prank(resolverA);
-        registry.submitObservation(eventId, abi.encode(true), keccak256("evidence-a"));
-        vm.prank(resolverB);
-        registry.submitObservation(eventId, abi.encode(true), keccak256("evidence-b"));
+        vm.warp(block.timestamp + 2 days);
+        registry.expire(eventId);
 
-        address disputer = address(0xD15C);
-        uint256 bond = registry.DISPUTE_BOND();
-        vm.deal(disputer, 1 ether);
-        uint256 ownerBalanceBefore = registry.owner().balance;
-
-        vm.prank(disputer);
-        registry.dispute{value: bond}(eventId);
-
-        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.DisputeWindow));
-
-        registry.resolveDispute(eventId, true);
-
-        assertTrue(registry.isFinalized(eventId));
-        assertEq(registry.owner().balance, ownerBalanceBefore + bond);
-        assertEq(disputer.balance, 1 ether - bond);
+        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.Expired));
+        assertFalse(registry.isFinalized(eventId));
     }
 
-    function test_dispute_thenRejectedProposal_voidsAndRefundsBond() public {
+    function test_expire_revertsBeforeObservationDeadline() public {
+        bytes32 eventId = registry.createEvent(_defaultSpec(2));
+
+        vm.expectRevert(bytes("EventRegistry: observation window still open"));
+        registry.expire(eventId);
+    }
+
+    function test_expire_revertsIfObservationsAlreadySubmitted() public {
+        registry.setResolverAuthorization(resolverA, true);
+        bytes32 eventId = registry.createEvent(_defaultSpec(2));
+
+        vm.prank(resolverA);
+        registry.submitObservation(eventId, abi.encode(true), keccak256("evidence-a"));
+
+        vm.warp(block.timestamp + 2 days);
+        vm.expectRevert(bytes("EventRegistry: not expirable"));
+        registry.expire(eventId);
+    }
+
+    function test_setDisputeManager_canOnlyBeSetOnce() public {
+        registry.setDisputeManager(address(0xD15C));
+
+        vm.expectRevert(bytes("EventRegistry: dispute manager already set"));
+        registry.setDisputeManager(address(0xBEEF));
+    }
+
+    function test_onlyDisputeManager_rejectsDirectCallsToPrivilegedTransitions() public {
         registry.setResolverAuthorization(resolverA, true);
         registry.setResolverAuthorization(resolverB, true);
         bytes32 eventId = registry.createEvent(_defaultSpec(2));
-
         vm.prank(resolverA);
         registry.submitObservation(eventId, abi.encode(true), keccak256("evidence-a"));
         vm.prank(resolverB);
         registry.submitObservation(eventId, abi.encode(true), keccak256("evidence-b"));
 
-        address disputer = address(0xD15C);
-        uint256 bond = registry.DISPUTE_BOND();
-        vm.deal(disputer, 1 ether);
-        uint256 balanceBefore = disputer.balance;
+        // No DisputeManager configured at all yet -> disputeManager == address(0),
+        // so even a call that happens to originate from address(0) semantics
+        // (impossible in practice) is still rejected; here we just confirm an
+        // arbitrary caller can't drive dispute-only transitions directly.
+        vm.expectRevert(bytes("EventRegistry: not dispute manager"));
+        registry.escalateToDispute(eventId);
+    }
 
-        vm.prank(disputer);
-        registry.dispute{value: bond}(eventId);
+    function test_getAuthorizedResolvers_reflectsAuthorizeAndDeauthorize() public {
+        registry.setResolverAuthorization(resolverA, true);
+        registry.setResolverAuthorization(resolverB, true);
+        registry.setResolverAuthorization(resolverC, true);
 
-        registry.resolveDispute(eventId, false);
+        address[] memory all = registry.getAuthorizedResolvers();
+        assertEq(all.length, 3);
 
-        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.Voided));
-        assertFalse(registry.isFinalized(eventId));
-        assertEq(disputer.balance, balanceBefore);
+        registry.setResolverAuthorization(resolverB, false);
+        address[] memory afterRemoval = registry.getAuthorizedResolvers();
+        assertEq(afterRemoval.length, 2);
+        for (uint256 i = 0; i < afterRemoval.length; i++) {
+            assertTrue(afterRemoval[i] != resolverB);
+        }
     }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateQuorum } from "../consensus/quorum.js";
+import { evaluateQuorum, evaluateEscalationQuorum } from "../consensus/quorum.js";
 import { hashEvidence, encodeOutcomeData } from "../evidence/evidence.js";
 
 describe("quorum", () => {
@@ -35,6 +35,37 @@ describe("quorum", () => {
     expect(result.reached).toBe(true);
     expect(result.agreedOutcomeData).toBe(false);
     expect(result.agreeingCount).toBe(2);
+  });
+});
+
+describe("escalation quorum (DisputeManager Tier-1/Tier-2 mirror)", () => {
+  it("reaches 66% agreement against the committee size, not the vote count", () => {
+    // 2 of 3 committee seats voted true; the third never votes — 2/3 = 66.7%.
+    const votes = [
+      { member: "0xA", outcome: true },
+      { member: "0xB", outcome: true },
+    ];
+    const result = evaluateEscalationQuorum(votes, 3);
+    expect(result.reached).toBe(true);
+    expect(result.agreedOutcome).toBe(true);
+  });
+
+  it("does not reach quorum below 66% of committee size even with unanimous participants", () => {
+    // 2 of 7 committee seats have voted so far — unanimous among
+    // participants, but nowhere near 66% of the full committee.
+    const votes = [
+      { member: "0xA", outcome: true },
+      { member: "0xB", outcome: true },
+    ];
+    const result = evaluateEscalationQuorum(votes, 7);
+    expect(result.reached).toBe(false);
+  });
+
+  it("a handful of early votes can never manufacture 66% on a large committee", () => {
+    const votes = [{ member: "0xA", outcome: true }];
+    const result = evaluateEscalationQuorum(votes, 15);
+    expect(result.reached).toBe(false);
+    expect(result.trueCount).toBe(1);
   });
 });
 

@@ -34,21 +34,31 @@ internals.
 ## Event lifecycle (the thing everything else hangs off)
 
 ```
-CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTE WINDOW
-       -> FINALIZED (or VOIDED) -> AVAILABLE TO CONSUMERS
+CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTED
+       -> FINALIZED (or VOIDED / EXPIRED) -> AVAILABLE TO CONSUMERS
 ```
 
 - **Registry** (`contracts/EventRegistry.sol`) owns this state machine:
-  `createEvent`, `submitObservation` (quorum-gated auto-proposal),
-  `dispute`/`resolveDispute` (bonded, owner-arbitrated for the MVP),
-  `finalize`. Fully implemented.
+  `createEvent`, `submitObservation` (quorum-gated auto-proposal), `finalize`
+  (undisputed path), `expire` (nobody ever observed it). It deliberately
+  knows nothing about committees or bonds — dispute-side transitions
+  (`escalateToDispute`/`finalizeFromDispute`/`voidEvent`) are gated
+  `onlyDisputeManager`.
+- **DisputeManager** (`contracts/DisputeManager.sol`) — bonded, two-tier
+  committee escalation ladder: `dispute`/`escalateNonConvergence` open
+  Tier-1 (≤7 resolvers, ≥66% agreement); failing to converge escalates to
+  Tier-2 (≤15); failing there marks the event permanently `Voided` (bonds
+  refunded) — **never** a token-weighted vote. Fully implemented.
 - **Resolver network** (`resolver/`) — independent off-chain processes that
   fetch source data (adapters), hash it into evidence, encode a boolean
   outcome, and submit directly to `EventRegistry.submitObservation`.
 - **Composer** (`contracts/EventComposer.sol`) — builds composite events from
   primitive event IDs (AND/OR/NOT/BEFORE/WITHIN), deterministically, without
-  duplicating Registry state. `tryResolve` caches its result forever once
-  computed.
+  duplicating Registry state. Composite identity is canonicalized for every
+  order-independent operator (not `BEFORE`); composition depth/fan-in are
+  structurally bounded; a `Voided`/`Expired` operand propagates instead of
+  stalling a dependent composite forever. `tryResolve` caches its result
+  forever once computed.
 - **Bus** (`contracts/EventBus.sol`) — the only pull-based read surface
   consumers should use. Transparently serves both primitive (Registry) and
   composite (Composer) event outcomes.
@@ -59,15 +69,16 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTE WINDOW
 ## Repo layout
 
 ```
-contracts/       Foundry workspace: EventRegistry, EventBus, EventComposer,
-                  SubscriptionManager + interfaces/ (I*.sol)
+contracts/       Foundry workspace: EventRegistry, DisputeManager, EventBus,
+                  EventComposer, SubscriptionManager + interfaces/ (I*.sol)
 derivatives/      Market (parimutuel pools), PositionManager, Settlement —
                   IEventBus consumers only (via Settlement)
 resolver/         Node/TS resolver daemon: node/ adapters/ evidence/ consensus/
 sdk/              @novak/sdk — TS client wrapping contract calls (viem-based)
 frontend/         Next.js + Tailwind + wagmi/viem demo UI
-test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 44 tests, all passing
-script/           Deploy.s.sol (Registry -> Composer -> Bus -> Settlement -> Market)
+test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 80 tests, all passing
+script/           Deploy.s.sol (Registry -> DisputeManager -> Composer -> Bus
+                  -> Settlement -> Market)
 examples/         end-to-end-flow.ts — canonical create->compose->settle demo,
                   verified running against a live local anvil chain
 docs/             architecture.md, protocol-spec.md, threat-model.md,
@@ -76,12 +87,13 @@ docs/             architecture.md, protocol-spec.md, threat-model.md,
 
 ## Current status: backend is MVP-complete, verified end-to-end
 
-`forge test` → 44/44 passing (unit/integration/fuzz/adversarial). The full
+`forge test` → 80/80 passing (unit/integration/fuzz/adversarial). The full
 canonical flow (create two events → resolvers reach quorum → dispute window
 elapses → finalize → compose WITHIN(48h) → resolve composite → create market
 → two opposing deposits → settle → claim) runs successfully against a live
 local anvil chain via `examples/end-to-end-flow.ts` — this was actually
-executed and verified, not just written.
+executed and verified (in a prior pass; the flow itself is unaffected by the
+`DisputeManager` addition below, since it never disputes).
 
 **What's still genuinely incomplete** (see `docs/SPEC_AND_TASKS.md` for the
 full checklist with reasoning per item):
@@ -96,33 +108,56 @@ full checklist with reasoning per item):
   env var, not a real API. There's also no on-chain event-discovery/indexer;
   a resolver is told which event IDs to watch via
   `RESOLVER_WATCHED_EVENT_IDS`.
-- **Dispute arbitration is owner-controlled**, not decentralized — a
-  deliberate MVP simplification, not a bug. Don't "fix" this without
-  discussing the staking/jury design it would require first.
+- **Dispute arbitration is a bonded committee ladder, not full
+  decentralization.** This changed: single-owner arbitration
+  (`resolveDispute`) is gone, replaced by `DisputeManager`'s two-tier
+  committee escalation (see above) — a real structural change, not a
+  relabeling, and it never falls back to a token-weighted vote. What's
+  still genuinely missing: committee selection is block-data
+  pseudo-randomness (not VRF-based), and there's no on-chain
+  staking/reputation token behind committee membership (every member posts
+  the same flat bond). Don't present this as "solved" — see
+  `docs/protocol-spec.md` and `docs/threat-model.md` item 10 for the
+  precise residual gap before changing it further.
+- **The resolver daemon (`resolver/node/index.ts`) doesn't yet drive
+  `DisputeManager`** — the on-chain tiered-escalation mechanism and its pure
+  off-chain quorum math (`evaluateEscalationQuorum`) are done, but nothing
+  listens for `TierOpened` events and auto-submits committee votes yet.
 - **No fees, no market expiry/cancellation path** in the derivatives market.
 
 **Protocol semantics that were open TODOs are now FINALIZED** — event ID
-derivation, composite ID derivation (operand-order sensitive, not
-canonicalized), outcome payload schema (`abi.encode(bool)`, specVersion 1),
-quorum model (N-of-M exact-match, authorized resolvers, no staking), temporal
-op timestamp source (`Outcome.finalizedAt` for primitives, resolution-time
-for nested composites). See `docs/protocol-spec.md` for the reasoning behind
-each. **If you need to change one of these, update both the code and that
-doc together** — they're cross-referenced.
+derivation, composite ID derivation (**canonicalized/sorted for every
+order-independent operator** — `AND`, `OR`, `NOT`, `WITHIN` — except
+`BEFORE`, where operand order is semantic and deliberately preserved),
+outcome payload schema (`abi.encode(bool)`, specVersion 1), quorum model
+(N-of-M exact-match, authorized resolvers, no staking, with a defined
+escalation path for a non-converging/ambiguous quorum), temporal op
+timestamp source (`Outcome.finalizedAt` for primitives, resolution-time for
+nested composites), structural DAG bounds (`MAX_CHILDREN_PER_NODE` = 10,
+`MAX_DAG_DEPTH` = 8) with a stated cycle-impossibility proof, and
+terminal-state (`Voided`/`Expired`) propagation through composition. See
+`docs/protocol-spec.md` for the reasoning behind each. **If you need to
+change one of these, update both the code and that doc together** — they're
+cross-referenced.
 
 ## MVP scope boundaries
 
 **In scope (implemented):** Event Registry, event spec format, resolver
-network with multiple observations, quorum, dispute mechanism, finalization,
-pull-based on-chain Event Bus (primitive + composite), AND/OR/NOT +
-BEFORE/WITHIN composition, derivatives market with event-based settlement, TS
-SDK, local deployment scripts, end-to-end demo.
+network with multiple observations, quorum (incl. the ambiguous-split
+escalation path), bonded two-tier committee dispute escalation
+(`DisputeManager`), finalization, terminal non-outcomes (`Voided`/`Expired`)
+with propagation through composition, structural DAG bounds, pull-based
+on-chain Event Bus (primitive + composite), AND/OR/NOT + BEFORE/WITHIN
+composition with canonicalized identity, derivatives market with
+event-based settlement, TS SDK, local deployment scripts, end-to-end demo.
 
 **Explicitly out of scope — do not add complexity for these:** cross-chain
 events, ZK oracle proofs, permissionless resolver marketplace (staking
 tokens), MEV mechanisms, high-frequency event streams, perpetual
 derivatives, complex liquidation systems, production-scale token economics,
-decentralized dispute arbitration.
+*full* stake-weighted/VRF-selected decentralized dispute arbitration (the
+bonded committee ladder above is real progress on this, not the final
+design — see `docs/protocol-spec.md`).
 
 ## Toolchain / environment notes
 
@@ -145,12 +180,16 @@ decentralized dispute arbitration.
   connector). Don't remove that alias without checking `next build` still
   passes.
 - **`vm.prank` + inline value expressions in Foundry tests**: writing
-  `vm.prank(x); registry.dispute{value: registry.DISPUTE_BOND()}(id)` is a
-  bug — `registry.DISPUTE_BOND()` is itself an external call that consumes
-  the prank before `dispute()` runs. Always hoist the value into a local
-  variable first. This bit three tests during the backend completion pass;
-  see the git history on `test/unit/EventRegistry.t.sol` /
-  `test/adversarial/MaliciousResolver.t.sol` if you need the worked example.
+  `vm.prank(x); disputeManager.dispute{value: disputeManager.DISPUTE_BOND()}(id)`
+  is a bug — `disputeManager.DISPUTE_BOND()` is itself an external call that
+  consumes the prank before `dispute()` runs, so `dispute()` actually
+  executes as the default test-contract caller, not `x`. Always hoist the
+  value into a local variable first. This has bitten tests across two
+  separate passes now (originally on `EventRegistry.dispute`, again on
+  `DisputeManager.dispute` during the Gap 1–5 protocol-layer pass); see the
+  git history on `test/unit/EventRegistry.t.sol` /
+  `test/adversarial/MaliciousResolver.t.sol` / `test/unit/EventComposer.t.sol`
+  (`_createVoidedPrimitive`) if you need a worked example.
 
 ## Commands
 

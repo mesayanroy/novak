@@ -6,11 +6,22 @@ written). This mirrors the original milestone breakdown; see
 `docs/architecture.md`, `docs/protocol-spec.md`, and `docs/threat-model.md`
 for the narrative versions of the same decisions.
 
-**Verification snapshot (last updated after the backend completion pass):**
-`forge test` → 44/44 passing across unit/integration/fuzz/adversarial suites;
-`examples/end-to-end-flow.ts` runs the full canonical flow (create → resolve
-→ quorum → dispute-window → finalize → compose → settle → claim) against a
-live local anvil chain, verified in this pass.
+**Verification snapshot (updated after the protocol-layer gap-closing pass —
+see `docs/protocol-spec.md` for what "Gap 1–5" refers to):**
+`forge test` → 80/80 passing across unit/integration/fuzz/adversarial suites
+(new: `test/unit/DisputeManager.t.sol`,
+`test/adversarial/CompositeGriefing.t.sol`, plus expanded
+`EventComposer.t.sol`/`EventRegistry.t.sol`/`MaliciousResolver.t.sol`
+coverage for canonicalization, DAG bounds, terminal-state propagation, and
+the tiered dispute ladder); `pnpm --filter @novak/sdk test` and
+`pnpm --filter novak-resolver test` both green after syncing the SDK's ABI/
+types to the new `EventRegistry`/`DisputeManager` surface.
+`examples/end-to-end-flow.ts` doesn't exercise disputes and is unaffected by
+this pass; it was verified against a live local anvil chain in the prior
+backend-completion pass, not re-run live in this one — the equivalent
+canonical flow, now wired through `DisputeManager` (undisputed path, so its
+assertions are unchanged), is covered by
+`test/integration/EndToEndFlow.t.sol`, which passes.
 
 ---
 
@@ -122,6 +133,13 @@ live local anvil chain, verified in this pass.
       resolvers must submit the identical `outcomeData`)
 - [x] Event moves OPEN → OBSERVATIONS SUBMITTED → PROPOSED OUTCOME
       automatically once threshold is met (`EventRegistry.submitObservation`)
+- [x] Ambiguous/non-converging quorum has a defined path forward —
+      `IDisputeManager.escalateNonConvergence` routes a split observation
+      set (deadline passed, nobody reached `quorumThreshold`) directly into
+      Tier-1 committee review, instead of leaving the event stuck with no
+      way forward at all. `resolver/consensus/quorum.ts` gained
+      `evaluateEscalationQuorum` as the off-chain mirror of the on-chain
+      66%-of-committee-size rule. See `docs/protocol-spec.md` Gap 5.
 - [ ] Stake-weighted quorum — **deliberately out of MVP scope**. Resolvers
       are individually authorized by the Registry owner
       (`setResolverAuthorization`), not staked/slashed by a token; see
@@ -134,17 +152,28 @@ live local anvil chain, verified in this pass.
 
 ### Issue #7 — Event Dispute Mechanism
 **Owner:** skyyycodes · **Priority:** P0
-- [x] `dispute(eventId)` implemented with a fixed bond (`DISPUTE_BOND`,
-      0.01 ETH) and dispute window
-- [x] `resolveDispute(eventId, upholdProposal)` — bond forfeited to protocol
-      owner if the proposal is upheld, refunded to the disputer if not
+- [x] `IDisputeManager.dispute(eventId)` implemented with a fixed bond
+      (`DISPUTE_BOND`, 0.01 ETH) and dispute window, replacing the old
+      `EventRegistry.dispute`
+- [x] Bonded, two-tier **committee** escalation replaces single-owner
+      arbitration: Tier-1 (≤7 resolvers, `TIER1_BOND` 0.03 ETH, ≥66%
+      agreement) → Tier-2 (≤15, `TIER2_BOND` 0.08 ETH) → permanently
+      `Voided` (full bond refunds, no slashing) if neither converges. A
+      converging tier splits the losing side's bonds burn/reward/treasury;
+      the original disputer's bond rides on whether the committee agreed
+      with them. Implemented in `contracts/DisputeManager.sol`.
 - [x] A proposed outcome can be challenged before finalization — verified in
-      `test/unit/EventRegistry.t.sol` and `test/adversarial/MaliciousResolver.t.sol`
-- [ ] Decentralized dispute arbitration — **MVP simplification**: the
-      Registry owner arbitrates disputes directly rather than a
-      decentralized voting/jury mechanism. See `docs/threat-model.md` item 2
-      and `IEventRegistry` docs for why this is called out explicitly rather
-      than silently assumed.
+      `test/unit/DisputeManager.t.sol` and
+      `test/adversarial/MaliciousResolver.t.sol`
+- [x] ~~Decentralized dispute arbitration~~ — **materially improved, not
+      fully closed.** The single-owner arbitrator is gone; arbitration is
+      now a bonded committee process with a hard `Voided` floor and no
+      governance-vote fallback. What remains genuinely undone: committee
+      selection is block-data pseudo-randomness (not VRF-based), and there
+      is no on-chain staking/reputation token behind committee membership
+      (every member posts the same flat bond rather than a variable stake).
+      See `docs/threat-model.md` item 2 and item 10 for the precise residual
+      gap — don't present this as "solved."
 
 ### Issue #8 — Adversarial Resolver Test Suite
 **Owner:** skyyycodes · **Priority:** P0
@@ -153,14 +182,24 @@ live local anvil chain, verified in this pass.
 - [x] Duplicate submission / replay (`test_duplicateSubmission_...`,
       `test_disputeReplay_...`)
 - [x] Stale/late evidence (`test_lateSubmission_afterDeadline_...`)
-- [x] Dispute griefing cost analysis (`test_disputeGriefing_...`)
+- [x] Dispute griefing cost analysis (`test_disputeGriefing_...`, now against
+      the tiered `DisputeManager`)
 - [x] Finalize-while-disputed guard (`test_finalize_blockedWhileDisputePending`)
 - [x] Composer determinism fuzzing, including the WITHIN boundary
       (`test/fuzz/EventComposer.fuzz.t.sol`)
-- [ ] Colluding resolver majority (economically) beating the dispute bond —
-      requires stake-weighted quorum (deferred, see Issue #6)
+- [x] Composite DAG griefing: oversized fan-in/depth reverts, cycle
+      self-reference is unconstructible, a `Voided` operand no longer
+      stalls a dependent composite forever
+      (`test/adversarial/CompositeGriefing.t.sol`)
+- [x] Tiered dispute escalation: Tier-1 convergence (both directions — upholds
+      and overturns the original proposal), Tier-1 → Tier-2 escalation with
+      full bond refunds, Tier-2 non-convergence → `Voided`, committee-vote
+      guards (non-member, wrong bond, double-vote, window-closed)
+      (`test/unit/DisputeManager.t.sol`)
+- [ ] Colluding resolver majority (economically) beating committee bonds at
+      scale — requires stake-weighted quorum (deferred, see Issue #6)
 - [ ] Dispute-spam-at-scale pricing — requires a real bonding/slashing
-      economy beyond the flat MVP bond (deferred, see Issue #7)
+      economy beyond the flat MVP bonds (deferred, see Issue #7)
 
 ---
 
@@ -194,6 +233,21 @@ live local anvil chain, verified in this pass.
       (fuzz-tested: `testFuzz_createComposite_isDeterministicAcrossCallers`)
       and the same resolved result once cached
       (`test_tryResolve_cachesResultOnSubsequentCalls`)
+- [x] Composite identity is canonicalized for every order-independent
+      operator (`AND`, `OR`, `NOT`, `WITHIN`) — `AND(a,b)` and `AND(b,a)`
+      dedupe to the same composite automatically; `BEFORE` is the
+      deliberate exception since its operand order is semantic. See
+      `docs/protocol-spec.md` Gap 1 (this reverses the original "operand
+      order is always significant" decision).
+- [x] Structural DAG bounds (`MAX_CHILDREN_PER_NODE` = 10,
+      `MAX_DAG_DEPTH` = 8) and a stated cycle-impossibility proof close the
+      "composability is Novak's own biggest griefing surface" gap — see
+      `docs/threat-model.md`.
+- [x] Terminal-state propagation: a `Voided`/`Expired` operand resolves a
+      dependent composite to `Voided` instead of stalling it as
+      "unresolved" forever, via the precedence table in
+      `docs/threat-model.md`. New `IEventComposer.getStatus` exposes the
+      full 4-state read (`Unresolved`/`True`/`False`/`Voided`).
 - [ ] `SEQUENCE`, `COUNT`, `THRESHOLD` (3-of-5 style) operators — **not
       implemented**. The MVP checklist explicitly scopes composition to
       "AND / OR / NOT" + "basic temporal condition"; these are natural
@@ -299,11 +353,22 @@ live local anvil chain, verified in this pass.
 - [x] `docs/threat-model.md` covers: single/lone malicious resolver,
       conflicting resolvers, unauthorized submission, duplicate submission,
       late submission, dispute griefing, dispute replay, Bus-bypass,
-      composite griefing, non-deterministic composition, front-running —
-      each with a stated mitigation and status
-- [ ] Colluding resolver majority and dispute-spam-at-scale remain
-      explicitly "unresolved" in the threat model pending the
-      stake-weighting/bonding economics deferred in Milestones 2–3
+      composite (incl. DAG fan-in/depth) griefing, non-deterministic
+      composition, front-running, malicious outcome decoding, and (new)
+      committee-selection pseudo-randomness — each with a stated mitigation
+      and status
+- [x] Cycle-impossibility proof and the full terminal-state propagation
+      table are written up explicitly (`docs/threat-model.md`), not just
+      implied by the code — these are the two claims most likely to get
+      pressure-tested by judges or auditors
+- [x] The "colluding resolver majority" item is updated to reflect the
+      tiered `DisputeManager` — materially improved (no single owner
+      arbitrating), with its residual gap (committee selection draws from
+      the same resolver pool it's meant to check; no real staking) stated
+      precisely rather than left vague
+- [ ] Dispute-spam-at-scale pricing remains explicitly "unresolved" in the
+      threat model pending the stake-weighting/bonding economics deferred
+      in Milestones 2–3
 
 ### Issue #20 — End-to-End Testnet Deployment
 **Owner:** mesayanroy · **Contributors:** all · **Priority:** P0
@@ -323,16 +388,37 @@ live local anvil chain, verified in this pass.
 
 ## What's genuinely done vs. what's next
 
-**Backend (contracts + resolver + SDK) is functionally MVP-complete:**
-event lifecycle, quorum, disputes, composition (AND/OR/NOT/BEFORE/WITHIN),
-the Bus serving both primitive and composite outcomes, and a settling
-derivatives market are all implemented, unit/integration/fuzz/adversarial
-tested (44/44 passing), and verified end-to-end against a running chain.
+**Backend (contracts + resolver + SDK) is functionally MVP-complete, and the
+five protocol-layer gaps that used to separate "design claim" from "code"
+are now closed:** event lifecycle (incl. `Voided`/`Expired` terminal
+states), quorum (base + the ambiguous-split escalation path), the bonded
+two-tier `DisputeManager` committee ladder, composition
+(AND/OR/NOT/BEFORE/WITHIN with canonicalized identity, structural DAG
+bounds, and terminal-state propagation), the Bus serving both primitive and
+composite outcomes, and a settling derivatives market are all implemented,
+unit/integration/fuzz/adversarial tested (80/80 passing), with the SDK's
+ABI/types kept in sync.
 
 **Left for a deliberate next pass, not silently skipped:**
 1. Real testnet deployment (needs your funded key/RPC — see Issue #20).
 2. The relayer/trigger service (Issue #13, P1) — currently zero code.
 3. A real price-feed data source for the example adapter.
 4. On-chain event discovery for resolvers (currently env-var configured).
-5. Anything requiring token economics or decentralized dispute arbitration
-   — deliberately deferred per the MVP scope boundary, not forgotten.
+5. `resolver/node/index.ts` daemon integration for the new
+   `DisputeManager` flow — listening for Tier-1/Tier-2 escalation events and
+   auto-submitting committee votes. The on-chain mechanism and its pure
+   off-chain quorum math (`evaluateEscalationQuorum`) are done; wiring the
+   daemon's event loop to actually call `submitTier1Vote`/`submitTier2Vote`
+   is a separate follow-on task, same shape as `submitObservation`'s
+   existing wiring.
+6. New `sdk/` client write methods for the tiered dispute flow — the ABI is
+   exposed (`disputeManagerAbi`) but `NovakClient` doesn't wrap it yet, by
+   the same design choice that already excludes `submitObservation` (this
+   is resolver/committee-member territory, not a consumer read/write path).
+7. Full stake-weighted, VRF-selected, reputation-gated dispute arbitration —
+   the MVP replaced single-owner arbitration with a bonded committee ladder
+   (a real structural change), but committee selection is still block-data
+   pseudo-randomness and every committee member posts the same flat bond
+   rather than a variable stake. Deliberately deferred per the MVP scope
+   boundary (no on-chain staking/reputation token), not forgotten — see
+   `docs/protocol-spec.md` and `docs/threat-model.md` item 10.

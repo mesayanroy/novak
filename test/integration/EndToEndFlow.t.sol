@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {EventRegistry} from "../../contracts/EventRegistry.sol";
+import {DisputeManager} from "../../contracts/DisputeManager.sol";
 import {EventComposer} from "../../contracts/EventComposer.sol";
 import {EventBus} from "../../contracts/EventBus.sol";
 import {Settlement} from "../../derivatives/Settlement.sol";
@@ -19,6 +20,7 @@ import {IEventComposer} from "../../contracts/interfaces/IEventComposer.sol";
 ///         against the resulting composite event.
 contract EndToEndFlowTest is Test {
     EventRegistry internal registry;
+    DisputeManager internal disputeManager;
     EventComposer internal composer;
     EventBus internal bus;
     Settlement internal settlement;
@@ -34,6 +36,8 @@ contract EndToEndFlowTest is Test {
 
     function setUp() public {
         registry = new EventRegistry();
+        disputeManager = new DisputeManager(address(registry), address(this));
+        registry.setDisputeManager(address(disputeManager));
         composer = new EventComposer(address(registry));
         bus = new EventBus(address(registry), address(composer));
         settlement = new Settlement(address(bus));

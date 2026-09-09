@@ -14,9 +14,15 @@ export enum EventStatus {
   Open = 1,
   ObservationsSubmitted = 2,
   ProposedOutcome = 3,
-  DisputeWindow = 4,
+  /** Under bonded committee escalation — see IDisputeManager. Renamed from
+   *  the old `DisputeWindow` now that arbitration is no longer a single
+   *  dispute-window-then-owner-decides step. */
+  Disputed = 4,
   Finalized = 5,
   Voided = 6,
+  /** Nobody ever observed the event (or observations never reached quorum)
+   *  before its deadline — a terminal non-outcome, distinct from `Voided`. */
+  Expired = 7,
 }
 
 export interface EventSpecInput {
@@ -55,6 +61,10 @@ export interface MarketDef {
 
 export interface NovakAddresses {
   eventRegistry: Address;
+  /** Optional: only needed by a resolver/committee node driving the
+   *  IDisputeManager tiered-escalation calls directly — NovakClient (the
+   *  consumer SDK) never reads or writes to it. */
+  disputeManager?: Address;
   eventBus: Address;
   eventComposer: Address;
   subscriptionManager: Address;

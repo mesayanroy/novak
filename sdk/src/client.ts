@@ -23,9 +23,11 @@ import type {
  * contracts; market interaction goes through Market (which itself only
  * depends on Settlement -> EventBus).
  *
- * This SDK is CONSUMER-facing: it does not expose resolver submission
- * methods (`submitObservation`, `dispute`, `resolveDispute`,
- * `setResolverAuthorization`) — those belong to the resolver network's own
+ * This SDK is CONSUMER-facing: it does not expose resolver/committee-member
+ * write methods (`submitObservation`, `setResolverAuthorization`, or the
+ * `IDisputeManager` tiered-escalation calls — `dispute`, `submitTier1Vote`,
+ * `submitTier2Vote`, `escalateTier2`, `voidAfterTier2Timeout`,
+ * `escalateNonConvergence`) — those belong to the resolver network's own
  * on-chain calls (see resolver/node/index.ts), which intentionally uses its
  * own thin viem calls against the same ABI rather than going through this
  * consumer SDK, keeping the resolver/consumer boundary visible in the code

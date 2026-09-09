@@ -38,3 +38,42 @@ export function evaluateQuorum(observations: Observation[], quorumThreshold: num
   }
   return { reached: false, agreeingCount: Math.max(trueCount, falseCount), totalCount: observations.length };
 }
+
+/**
+ * A vote cast by one committee member during dispute-escalation review (see
+ * contracts/DisputeManager.sol's Tier-1/Tier-2 ladder — Gap 2 of
+ * docs/protocol-spec.md's tiered-arbitration design).
+ */
+export interface TierVote {
+  member: string;
+  outcome: boolean;
+}
+
+export interface EscalationQuorumResult {
+  reached: boolean;
+  agreedOutcome?: boolean;
+  trueCount: number;
+  falseCount: number;
+}
+
+/**
+ * Mirrors `DisputeManager._hasConverged` / the on-chain check in
+ * `_submitTierVote`: agreement is `>= 66%` of the fixed COMMITTEE SIZE
+ * decided at selection time — never of however many members happened to
+ * vote — so a handful of early votes can never manufacture a false
+ * convergence. Lets a resolver locally check whether its own vote would
+ * (or already did) push a tier over the line before spending gas on-chain,
+ * the same purpose `evaluateQuorum` serves for base-layer quorum.
+ */
+export function evaluateEscalationQuorum(votes: TierVote[], committeeSize: number): EscalationQuorumResult {
+  const trueCount = votes.filter((v) => v.outcome === true).length;
+  const falseCount = votes.filter((v) => v.outcome === false).length;
+
+  if (committeeSize > 0 && trueCount * 100 >= committeeSize * 66) {
+    return { reached: true, agreedOutcome: true, trueCount, falseCount };
+  }
+  if (committeeSize > 0 && falseCount * 100 >= committeeSize * 66) {
+    return { reached: true, agreedOutcome: false, trueCount, falseCount };
+  }
+  return { reached: false, trueCount, falseCount };
+}

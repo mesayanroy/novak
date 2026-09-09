@@ -68,24 +68,14 @@ export const eventRegistryAbi = [
   },
   {
     type: "function",
-    name: "dispute",
-    stateMutability: "payable",
+    name: "finalize",
+    stateMutability: "nonpayable",
     inputs: [{ name: "eventId", type: "bytes32" }],
     outputs: [],
   },
   {
     type: "function",
-    name: "resolveDispute",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "eventId", type: "bytes32" },
-      { name: "upholdProposal", type: "bool" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "finalize",
+    name: "expire",
     stateMutability: "nonpayable",
     inputs: [{ name: "eventId", type: "bytes32" }],
     outputs: [],
@@ -102,6 +92,13 @@ export const eventRegistryAbi = [
   },
   {
     type: "function",
+    name: "setDisputeManager",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "disputeManager_", type: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function",
     name: "isAuthorizedResolver",
     stateMutability: "view",
     inputs: [{ name: "resolver", type: "address" }],
@@ -109,10 +106,17 @@ export const eventRegistryAbi = [
   },
   {
     type: "function",
-    name: "DISPUTE_BOND",
+    name: "getAuthorizedResolvers",
     stateMutability: "view",
     inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
+    outputs: [{ name: "", type: "address[]" }],
+  },
+  {
+    type: "function",
+    name: "disputeManager",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
   },
   {
     type: "function",
@@ -206,6 +210,127 @@ export const eventComposerAbi = [
       { name: "resolved", type: "bool" },
       { name: "outcome", type: "bool" },
     ],
+  },
+  {
+    type: "function",
+    name: "getStatus",
+    stateMutability: "view",
+    inputs: [{ name: "compositeId", type: "bytes32" }],
+    outputs: [{ name: "", type: "uint8" }], // Unresolved=0, True=1, False=2, Voided=3
+  },
+  {
+    type: "function",
+    name: "getDepth",
+    stateMutability: "view",
+    inputs: [{ name: "compositeId", type: "bytes32" }],
+    outputs: [{ name: "", type: "uint32" }],
+  },
+] as const;
+
+/**
+ * DisputeManager ABI fragment. Exposed here so the SDK/tests can see the
+ * new tiered-escalation surface exists; the consumer-facing `NovakClient`
+ * deliberately does NOT wrap these in write methods yet (same reasoning as
+ * why it never wrapped `submitObservation`/`dispute`/`resolveDispute` on
+ * the old Registry ABI — this is resolver/committee-member territory, not
+ * a plain consumer read/write path). A resolver node wiring up Tier-1/
+ * Tier-2 voting should call these directly with its own thin viem calls,
+ * same as `resolver/node/index.ts` already does for `submitObservation`.
+ */
+export const disputeManagerAbi = [
+  {
+    type: "function",
+    name: "dispute",
+    stateMutability: "payable",
+    inputs: [{ name: "eventId", type: "bytes32" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "escalateNonConvergence",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "eventId", type: "bytes32" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "submitTier1Vote",
+    stateMutability: "payable",
+    inputs: [
+      { name: "eventId", type: "bytes32" },
+      { name: "outcome", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "submitTier2Vote",
+    stateMutability: "payable",
+    inputs: [
+      { name: "eventId", type: "bytes32" },
+      { name: "outcome", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "escalateTier2",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "eventId", type: "bytes32" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "voidAfterTier2Timeout",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "eventId", type: "bytes32" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "getCommittee",
+    stateMutability: "view",
+    inputs: [
+      { name: "eventId", type: "bytes32" },
+      { name: "tier", type: "uint8" },
+    ],
+    outputs: [{ name: "", type: "address[]" }],
+  },
+  {
+    type: "function",
+    name: "getTierTally",
+    stateMutability: "view",
+    inputs: [
+      { name: "eventId", type: "bytes32" },
+      { name: "tier", type: "uint8" },
+    ],
+    outputs: [
+      { name: "trueVotes", type: "uint256" },
+      { name: "falseVotes", type: "uint256" },
+      { name: "deadline", type: "uint64" },
+      { name: "bondAmount", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "DISPUTE_BOND",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "TIER1_BOND",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "TIER2_BOND",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
   },
 ] as const;
 
