@@ -9,12 +9,24 @@ export enum CompositeOp {
   Within = 4,
 }
 
+export enum EventStatus {
+  None = 0,
+  Open = 1,
+  ObservationsSubmitted = 2,
+  ProposedOutcome = 3,
+  DisputeWindow = 4,
+  Finalized = 5,
+  Voided = 6,
+}
+
 export interface EventSpecInput {
   specVersion: number;
   sourceId: Hex;
   openTimestamp: bigint;
   observationDeadline: bigint;
   disputeWindowSeconds: bigint;
+  /** Number of matching authorized-resolver observations required for quorum. */
+  quorumThreshold: number;
   spec: Hex;
 }
 
@@ -32,9 +44,21 @@ export interface Outcome {
   finalizedAt: bigint;
 }
 
+export interface MarketDef {
+  eventId: Hex;
+  createdAt: bigint;
+  settled: boolean;
+  outcome: boolean;
+  yesPool: bigint;
+  noPool: bigint;
+}
+
 export interface NovakAddresses {
   eventRegistry: Address;
   eventBus: Address;
   eventComposer: Address;
+  subscriptionManager: Address;
+  settlement: Address;
+  positionManager: Address;
   market: Address;
 }

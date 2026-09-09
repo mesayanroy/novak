@@ -22,9 +22,10 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTE WINDOW
 ```
 
 **Hard invariant: applications depend on the Event Bus, never directly on a
-resolver.** See `docs/architecture.md` for the full breakdown and
+resolver.** See `docs/architecture.md` for the full breakdown,
 `docs/threat-model.md` / `docs/protocol-spec.md` for the adversary list and
-open protocol decisions.
+finalized protocol decisions, and `docs/SPEC_AND_TASKS.md` for the
+milestone-by-milestone deliverables checklist.
 
 ## Repository layout
 
@@ -39,18 +40,27 @@ novak/
 ├── sdk/                 @novak/sdk — TypeScript client wrapping contract calls
 ├── frontend/            Next.js + Tailwind + wagmi/viem demo UI
 ├── test/                unit/ integration/ fuzz/ adversarial/ (Foundry)
-├── docs/                architecture.md, protocol-spec.md, threat-model.md
+├── docs/                architecture.md, protocol-spec.md, threat-model.md,
+│                        SPEC_AND_TASKS.md (deliverables checklist)
 ├── examples/             end-to-end-flow.ts walking the canonical demo flow
 └── script/               Foundry deployment scripts
 ```
 
 ## Status
 
-This is a scaffold: interfaces and contract shapes are wired up and compile
-(once dependencies are installed — see below), but resolver
-submission/quorum/dispute logic and composite resolution are intentionally
-left as `TODO`s pending protocol-semantic decisions tracked in
-`docs/protocol-spec.md`. Do not guess these — resolve them there first.
+The backend is MVP-complete and verified end-to-end: event creation,
+multi-resolver quorum, bonded disputes, finalization, AND/OR/NOT/BEFORE/WITHIN
+composition, and a settling parimutuel derivatives market are all implemented
+and tested (`forge test` → 44/44 passing across unit/integration/fuzz/
+adversarial suites). The full canonical demo runs successfully against a
+local anvil chain — see "End-to-end demo script" below.
+
+Still open: a real testnet deployment (needs your own funded key/RPC), the
+push/relayer execution layer (zero code — pull-based consumption is what's
+implemented), and real (non-mocked) resolver data sources. See
+`docs/SPEC_AND_TASKS.md` for the full breakdown of what's done vs. deferred,
+and `docs/protocol-spec.md` for the finalized protocol-semantic decisions
+(event/composite ID derivation, quorum model, outcome payload schema).
 
 ## Setup
 
@@ -126,18 +136,25 @@ pnpm test      # forge test + all TS workspace tests
 ### End-to-end demo script
 
 After deploying contracts locally and populating `.env` with the deployed
-addresses:
+addresses (`EVENT_REGISTRY_ADDRESS`, `EVENT_BUS_ADDRESS`,
+`EVENT_COMPOSER_ADDRESS`, `SUBSCRIPTION_MANAGER_ADDRESS`,
+`SETTLEMENT_ADDRESS`, `POSITION_MANAGER_ADDRESS`, `MARKET_ADDRESS`, plus
+`DEPLOYER_PRIVATE_KEY`):
 
 ```bash
-pnpm tsx examples/end-to-end-flow.ts
+pnpm example:e2e
 ```
 
-See the script's header comment for exactly which steps are live today vs.
-pending resolver/quorum implementation.
+This runs the full canonical flow live against your local chain: create two
+primitive events, authorize resolvers and reach quorum on both, advance past
+the dispute window and finalize, compose `WITHIN(48h)`, resolve the
+composite, create a market, take two opposing positions, settle, and claim.
 
 ## Contributing to the protocol design
 
-Several protocol semantics are intentionally left as `TODO` rather than
-guessed at (quorum math, composite/event ID derivation, outcome payload
-schema, temporal-op timestamp source). See `docs/protocol-spec.md` for the
-full list of open decisions before implementing around them.
+Protocol semantics that could lock in irreversible on-chain identity/economic
+decisions (event/composite ID derivation, quorum model, outcome payload
+schema, temporal-op timestamp source) have been finalized for the MVP — see
+`docs/protocol-spec.md` for what was decided and why. If you need to change
+one of these, update the code and that document together; they're
+cross-referenced.

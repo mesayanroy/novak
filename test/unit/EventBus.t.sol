@@ -6,11 +6,15 @@ import {EventRegistry} from "../../contracts/EventRegistry.sol";
 import {EventComposer} from "../../contracts/EventComposer.sol";
 import {EventBus} from "../../contracts/EventBus.sol";
 import {IEventRegistry} from "../../contracts/interfaces/IEventRegistry.sol";
+import {IEventComposer} from "../../contracts/interfaces/IEventComposer.sol";
 
 contract EventBusTest is Test {
     EventRegistry internal registry;
     EventComposer internal composer;
     EventBus internal bus;
+
+    address internal resolverA = address(0xA11CE);
+    address internal resolverB = address(0xB0B);
 
     function setUp() public {
         registry = new EventRegistry();
@@ -18,17 +22,31 @@ contract EventBusTest is Test {
         bus = new EventBus(address(registry), address(composer));
     }
 
-    function test_isAvailable_falseForUnfinalizedEvent() public {
-        IEventRegistry.EventSpec memory spec = IEventRegistry.EventSpec({
+    function _defaultSpec() internal view returns (IEventRegistry.EventSpec memory) {
+        return IEventRegistry.EventSpec({
             specVersion: 1,
             sourceId: keccak256("example.price-feed"),
             openTimestamp: uint64(block.timestamp),
             observationDeadline: uint64(block.timestamp + 1 days),
             disputeWindowSeconds: 1 hours,
+            quorumThreshold: 2,
             spec: abi.encode("placeholder")
         });
-        bytes32 eventId = registry.createEvent(spec);
+    }
 
+    function _finalize(bytes32 eventId, bool outcome) internal {
+        registry.setResolverAuthorization(resolverA, true);
+        registry.setResolverAuthorization(resolverB, true);
+        vm.prank(resolverA);
+        registry.submitObservation(eventId, abi.encode(outcome), keccak256("ev-a"));
+        vm.prank(resolverB);
+        registry.submitObservation(eventId, abi.encode(outcome), keccak256("ev-b"));
+        vm.warp(block.timestamp + 1 hours + 1);
+        registry.finalize(eventId);
+    }
+
+    function test_isAvailable_falseForUnfinalizedEvent() public {
+        bytes32 eventId = registry.createEvent(_defaultSpec());
         assertFalse(bus.isAvailable(eventId));
     }
 
@@ -38,7 +56,33 @@ contract EventBusTest is Test {
         bus.readOutcome(fakeEventId);
     }
 
-    // TODO: once EventRegistry exposes a finalize() path, add a test that a
-    // finalized event's outcome is readable through the Bus (and that the Bus never
-    // requires a resolver reference to do so).
+    function test_readOutcome_returnsFinalizedPrimitiveOutcome() public {
+        bytes32 eventId = registry.createEvent(_defaultSpec());
+        _finalize(eventId, true);
+
+        assertTrue(bus.isAvailable(eventId));
+        IEventRegistry.Outcome memory outcome = bus.readOutcome(eventId);
+        assertTrue(abi.decode(outcome.outcomeData, (bool)));
+    }
+
+    function test_readOutcome_returnsResolvedCompositeOutcome() public {
+        bytes32 eventA = registry.createEvent(_defaultSpec());
+        bytes32 eventB = registry.createEvent(_defaultSpec());
+        _finalize(eventA, true);
+        _finalize(eventB, true);
+
+        bytes32[] memory operands = new bytes32[](2);
+        operands[0] = eventA;
+        operands[1] = eventB;
+        bytes32 compositeId = composer.createComposite(
+            IEventComposer.CompositeSpec({op: IEventComposer.Op.And, operands: operands, window: 0})
+        );
+
+        assertFalse(bus.isAvailable(compositeId));
+        composer.tryResolve(compositeId);
+        assertTrue(bus.isAvailable(compositeId));
+
+        IEventRegistry.Outcome memory outcome = bus.readOutcome(compositeId);
+        assertTrue(abi.decode(outcome.outcomeData, (bool)));
+    }
 }

@@ -15,7 +15,12 @@
     "test:contracts": "forge test -vvv",
     "build:contracts": "forge build",
     "dev:frontend": "pnpm --filter novak-frontend dev",
-    "dev:resolver": "pnpm --filter novak-resolver dev"
+    "dev:resolver": "pnpm --filter novak-resolver dev",
+    "example:e2e": "tsx examples/end-to-end-flow.ts"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "viem": "^2.21.0"
+  }
 }

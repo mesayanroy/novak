@@ -1,6 +1,7 @@
 import { ConnectWallet } from "@/components/ConnectWallet";
 import { EventStatusCard } from "@/components/EventStatusCard";
 import { CreateMarketCard } from "@/components/CreateMarketCard";
+import { MarketPositionCard } from "@/components/MarketPositionCard";
 
 export default function Home() {
   return (
@@ -16,6 +17,7 @@ export default function Home() {
       <div className="grid gap-6 sm:grid-cols-2">
         <EventStatusCard />
         <CreateMarketCard />
+        <MarketPositionCard />
       </div>
 
       <p className="mt-10 text-xs text-slate-500">

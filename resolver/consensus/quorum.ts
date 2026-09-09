@@ -1,37 +1,40 @@
 import type { Observation } from "../adapters/types.js";
 
 /**
- * Quorum logic stub: decides whether a set of resolver observations for the same
- * event agree closely enough to propose a single outcome on-chain.
- *
- * TODO(protocol semantics — confirm before implementing for real): exact quorum
- * threshold (e.g. N-of-M resolvers, or 2/3 by stake), what counts as "agreement"
- * for non-boolean outcome payloads (exact match vs. tolerance band for numeric
- * data), and how ties/no-quorum are handled (re-poll vs. dispute-eligible
- * void). This file intentionally implements only a trivial placeholder so the
- * resolver <-> Registry submission flow is wireable end-to-end for the demo.
+ * Quorum logic: decides whether a set of resolver observations for the same
+ * event agree, for this resolver's own off-chain sanity-checking before it
+ * bothers submitting (or to decide whether enough of its peers likely already
+ * agree). The actual quorum enforcement that finalizes an event's outcome
+ * lives on-chain in EventRegistry.submitObservation — see
+ * contracts/EventRegistry.sol and IEventRegistry docs for the FINALIZED MVP
+ * decision this mirrors: no on-chain staking/reputation weighting, just an
+ * exact-match count of `EventSpec.quorumThreshold` authorized resolvers
+ * agreeing on the identical `outcomeData`. This module exists so a resolver
+ * node can locally simulate that same rule (e.g. before spending gas on a
+ * submission it doesn't expect to help reach quorum).
  */
 export interface QuorumResult {
   reached: boolean;
-  agreedOutcomeData?: unknown;
+  agreedOutcomeData?: boolean;
   agreeingCount: number;
   totalCount: number;
 }
 
-/** Placeholder: naive unanimous-match quorum over JSON-stringified outcomes. */
-export function evaluateQuorum(observations: Observation[]): QuorumResult {
+/** Exact-match quorum: every MVP outcome is a boolean, so "agreement" is
+ *  identity, not a tolerance band — see docs/protocol-spec.md for why. */
+export function evaluateQuorum(observations: Observation[], quorumThreshold: number): QuorumResult {
   if (observations.length === 0) {
     return { reached: false, agreeingCount: 0, totalCount: 0 };
   }
 
-  const serialized = observations.map((o) => JSON.stringify(o.outcomeData));
-  const first = serialized[0];
-  const allAgree = serialized.every((s) => s === first);
+  const trueCount = observations.filter((o) => o.outcomeData === true).length;
+  const falseCount = observations.length - trueCount;
 
-  return {
-    reached: allAgree,
-    agreedOutcomeData: allAgree ? observations[0].outcomeData : undefined,
-    agreeingCount: allAgree ? observations.length : 0,
-    totalCount: observations.length,
-  };
+  if (trueCount >= quorumThreshold) {
+    return { reached: true, agreedOutcomeData: true, agreeingCount: trueCount, totalCount: observations.length };
+  }
+  if (falseCount >= quorumThreshold) {
+    return { reached: true, agreedOutcomeData: false, agreeingCount: falseCount, totalCount: observations.length };
+  }
+  return { reached: false, agreeingCount: Math.max(trueCount, falseCount), totalCount: observations.length };
 }

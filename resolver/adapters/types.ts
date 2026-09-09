@@ -3,14 +3,17 @@
  * `sourceId`, matching IEventRegistry.EventSpec.sourceId on-chain) and turns it
  * into an Observation the resolver can submit. Adapters do all "heavy" retrieval
  * and processing off-chain — the chain only ever sees the resulting evidence hash
- * and outcome commitment (see evidence/ and docs/architecture.md, "minimize
+ * and a boolean outcome (see evidence/ and docs/architecture.md, "minimize
  * on-chain computation").
+ *
+ * `outcomeData` is a plain `boolean`, matching the finalized MVP outcome-payload
+ * schema (IEventRegistry docs, specVersion 1: `abi.encode(bool)`) — every MVP
+ * event is a yes/no condition.
  */
 export interface Observation {
   /** The event this observation is about (on-chain event ID). */
   eventId: `0x${string}`;
-  /** Decodable per the event's EventSpec.specVersion. */
-  outcomeData: unknown;
+  outcomeData: boolean;
   /** Unix ms timestamp the adapter fetched the source data. */
   observedAt: number;
   /** Raw evidence the adapter used to produce outcomeData (see evidence/). */

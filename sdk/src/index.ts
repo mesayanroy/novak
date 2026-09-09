@@ -1,3 +1,11 @@
 export { NovakClient } from "./client.js";
 export * from "./types.js";
-export { eventBusAbi, eventRegistryAbi, eventComposerAbi, marketAbi } from "./abis.js";
+export { encodeBoolOutcome, decodeBoolOutcome } from "./outcome.js";
+export {
+  eventBusAbi,
+  eventRegistryAbi,
+  eventComposerAbi,
+  subscriptionManagerAbi,
+  settlementAbi,
+  marketAbi,
+} from "./abis.js";

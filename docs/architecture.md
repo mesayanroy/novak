@@ -48,27 +48,37 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTE WINDOW
 ```
 
 **Hard architectural invariant: applications depend on the Event Bus, never
-directly on a resolver.** `derivatives/Market.sol` and `derivatives/Settlement.sol`
-hold an `IEventBus` reference only — see the regression test
-`test/unit/Market.t.sol::test_market_onlyHoldsEventBusReference`.
+directly on a resolver.** `derivatives/Market.sol` depends only on
+`derivatives/Settlement.sol`, which itself holds only an `IEventBus`
+reference — see the regression test
+`test/unit/Market.t.sol::test_market_onlyHoldsSettlementReference`.
 
-- **Event Registry** — canonical event definitions and lifecycle state. Owns the
-  state machine above.
-- **Resolver Network** — independent off-chain processes that submit
-  observations + evidence and participate in quorum. Never called by consumer
+- **Event Registry** — canonical event definitions and lifecycle state
+  (`contracts/EventRegistry.sol`). Owns the full state machine: quorum
+  counting, proposal, dispute bonding/arbitration, and finalization.
+- **Resolver Network** — independent off-chain processes
+  (`resolver/node/index.ts`) that submit observations + evidence hashes
+  directly to `EventRegistry.submitObservation`. Never called by consumer
   contracts.
-- **Dispute Mechanism** — the challenge window between a proposed outcome and
-  finalization. Lives in the Registry's state machine (unimplemented in this
-  scaffold — see TODOs in `contracts/EventRegistry.sol`).
-- **On-chain Event Bus** — pull-based read access to finalized events. The only
-  contract applications should import.
-- **Event Composer** — builds composite events (logical + temporal operators)
-  from primitive event IDs, deterministically, without duplicating Registry
-  state.
-- **Subscription Layer** — pull model for the MVP (`SubscriptionManager` is a
-  stub); push delivery is explicitly deferred.
-- **Derivatives Market** — first consumer application; settles positions
-  against composite (or primitive) event outcomes read through the Bus.
+- **Dispute Mechanism** — a bonded challenge window
+  (`EventRegistry.dispute`/`resolveDispute`) between a proposed outcome and
+  finalization. Implemented with MVP-simplified (owner-arbitrated, not
+  decentralized) arbitration — see `docs/protocol-spec.md`.
+- **On-chain Event Bus** (`contracts/EventBus.sol`) — pull-based read access
+  to finalized events. Transparently serves **both** primitive events
+  (finalized in the Registry) and composite events (resolved in the
+  Composer) — the only contract applications should import.
+- **Event Composer** (`contracts/EventComposer.sol`) — builds composite
+  events (AND/OR/NOT/BEFORE/WITHIN) from primitive event IDs, deterministically,
+  without duplicating Registry state. `tryResolve` caches its result forever
+  once computed.
+- **Subscription Layer** — pull model for the MVP (`SubscriptionManager`
+  records subscription intent only); push delivery is explicitly deferred
+  (see Issue #13 in `docs/SPEC_AND_TASKS.md` — zero code so far).
+- **Derivatives Market** (`derivatives/Market.sol` + `Settlement.sol` +
+  `PositionManager.sol`) — first consumer application; a parimutuel YES/NO
+  pool that settles against composite (or primitive) event outcomes read
+  through `Settlement` → `EventBus`.
 
 ## Design principles
 
@@ -85,4 +95,6 @@ hold an `IEventBus` reference only — see the regression test
 
 ## MVP scope
 
-See `docs/protocol-spec.md` for the full in-scope / deferred list.
+See `docs/protocol-spec.md` for the full in-scope / deferred list, and
+`docs/SPEC_AND_TASKS.md` for the milestone-by-milestone deliverables tracker
+with what's verified done vs. explicitly left for later.

@@ -7,11 +7,17 @@ import {IEventComposer} from "./interfaces/IEventComposer.sol";
 
 /// @title EventBus
 /// @notice The single read surface applications (e.g. the derivatives Market) are
-///         allowed to depend on. Wraps the Registry (for primitive events) and the
-///         Composer (for composite events) behind one pull-based interface so
-///         consumers never need to know which one produced a given event ID.
+///         allowed to depend on. Transparently serves BOTH primitive events
+///         (finalized in the Registry) and composite events (resolved in the
+///         Composer) behind one pull-based interface, so consumers never need to
+///         know or care which one produced a given event ID.
 /// @dev Architectural invariant: this contract may read from EventRegistry and
-///      EventComposer. Nothing downstream of this contract may reference a resolver.
+///      EventComposer. Nothing downstream of this contract may reference a
+///      resolver. Composite outcomes must already be resolved via
+///      `IEventComposer.tryResolve` by someone (any account may call it) before
+///      they become available here — the Bus itself never triggers resolution,
+///      it only reads the cached result. That keeps `isAvailable`/`readOutcome`
+///      pure `view` functions, consistent with the pull model.
 contract EventBus is IEventBus {
     IEventRegistry public immutable registry;
     IEventComposer public immutable composer;
@@ -26,14 +32,25 @@ contract EventBus is IEventBus {
         view
         returns (IEventRegistry.Outcome memory outcome)
     {
-        require(registry.isFinalized(eventId), "EventBus: not finalized");
-        return registry.getOutcome(eventId);
+        if (registry.isFinalized(eventId)) {
+            return registry.getOutcome(eventId);
+        }
+
+        (bool resolved, bool outcome_) = composer.getResolvedOutcome(eventId);
+        require(resolved, "EventBus: not finalized");
+
+        return IEventRegistry.Outcome({
+            exists: true,
+            outcomeHash: keccak256(abi.encode(outcome_)),
+            outcomeData: abi.encode(outcome_),
+            finalizedAt: composer.getResolvedAt(eventId)
+        });
     }
 
     function isAvailable(bytes32 eventId) external view returns (bool) {
-        // TODO: once composite events carry their own outcome storage (rather than
-        // being derived on-demand via IEventComposer.tryResolve), this should also
-        // check composite availability without requiring a state-changing call.
-        return registry.isFinalized(eventId);
+        if (registry.isFinalized(eventId)) {
+            return true;
+        }
+        return composer.isResolved(eventId);
     }
 }
