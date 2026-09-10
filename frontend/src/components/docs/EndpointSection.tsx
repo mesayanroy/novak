@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import { CodeBlock } from "@/components/CodeBlock";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 const methodStyles: Record<string, string> = {
-  GET: "border-ink text-ink",
+  GET: "border-ink text-ink bg-gray-100",
   POST: "border-ink bg-ink text-paper",
 };
 
@@ -30,48 +29,48 @@ export function EndpointSection({
   children?: ReactNode;
 }) {
   return (
-    <section className="border border-gray-300">
-      <div className="flex flex-wrap items-center gap-3 border-b border-gray-300 p-4">
-        <span className={cn("border px-2 py-0.5 font-mono text-xs font-semibold", methodStyles[method])}>
+    <section className="border border-gray-300 bg-paper rounded-sm overflow-hidden shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 border-b border-gray-300 bg-gray-50/80 p-4">
+        <span className={cn("border px-2 py-0.5 font-mono text-xs font-semibold rounded-sm", methodStyles[method])}>
           {method}
         </span>
-        <code className="font-mono text-sm">{path}</code>
+        <code className="font-mono text-sm font-semibold text-ink">{path}</code>
         {permissioned && (
-          <span className="border border-dashed border-gray-400 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-gray-600">
+          <span className="border border-dashed border-gray-400 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-gray-600 rounded-sm">
             {permissioned}
           </span>
         )}
       </div>
 
-      <div className="p-4">
-        <p className="text-sm text-gray-700">{summary}</p>
+      <div className="p-5">
+        <p className="text-sm text-gray-700 leading-relaxed">{summary}</p>
         {children}
 
         {params && params.length > 0 && (
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-5 overflow-x-auto border border-gray-200 rounded-sm">
             <table className="w-full border-collapse text-sm">
-              <thead className="border-b border-gray-300">
+              <thead className="border-b border-gray-200 bg-gray-50">
                 <tr>
-                  <th className="px-2 py-1.5 text-left font-mono text-xs uppercase tracking-wide text-gray-500">
+                  <th className="px-3 py-2 text-left font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">
                     Param
                   </th>
-                  <th className="px-2 py-1.5 text-left font-mono text-xs uppercase tracking-wide text-gray-500">
+                  <th className="px-3 py-2 text-left font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">
                     Type
                   </th>
-                  <th className="px-2 py-1.5 text-left font-mono text-xs uppercase tracking-wide text-gray-500">
+                  <th className="px-3 py-2 text-left font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">
                     Description
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100 font-sans">
                 {params.map((p) => (
-                  <tr key={p.name} className="border-b border-gray-100 last:border-0">
-                    <td className="px-2 py-2 font-mono text-xs">
+                  <tr key={p.name} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-3 py-2.5 font-mono text-xs font-semibold text-ink">
                       {p.name}
-                      {p.required && <span className="ml-1 text-gray-500">*</span>}
+                      {p.required && <span className="ml-1 text-ink font-bold">*</span>}
                     </td>
-                    <td className="px-2 py-2 font-mono text-xs text-gray-500">{p.type}</td>
-                    <td className="px-2 py-2 text-gray-700">{p.description}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-gray-500">{p.type}</td>
+                    <td className="px-3 py-2.5 text-xs text-gray-700">{p.description}</td>
                   </tr>
                 ))}
               </tbody>
@@ -79,24 +78,22 @@ export function EndpointSection({
           </div>
         )}
 
-        <div className="mt-4">
-          <p className="mb-2 font-mono text-xs uppercase tracking-wide text-gray-500">Example response</p>
-          <CodeBlock code={responseJson} />
-        </div>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div>
+            <p className="mb-2 font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">JSON Response Schema</p>
+            <CodeBlock code={responseJson} label="200 OK Response" />
+          </div>
 
-        <div className="mt-4">
-          <Tabs defaultValue="curl">
-            <TabsList>
-              <TabsTrigger value="curl">curl</TabsTrigger>
-              <TabsTrigger value="ts">TypeScript</TabsTrigger>
-            </TabsList>
-            <TabsContent value="curl">
-              <CodeBlock variant="dark" code={curl} />
-            </TabsContent>
-            <TabsContent value="ts">
-              <CodeBlock variant="dark" code={typescript} />
-            </TabsContent>
-          </Tabs>
+          <div>
+            <p className="mb-2 font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">Invocation Example</p>
+            <CodeBlock
+              variant="dark"
+              tabs={[
+                { id: "curl", label: "cURL", code: curl },
+                { id: "ts", label: "TypeScript SDK", code: typescript },
+              ]}
+            />
+          </div>
         </div>
       </div>
     </section>

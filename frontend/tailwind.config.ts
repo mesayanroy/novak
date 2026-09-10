@@ -48,6 +48,30 @@ const config: Config = {
       maxWidth: {
         prose: "68ch",
       },
+      backgroundImage: {
+        "grid-pattern": "linear-gradient(to right, rgba(10, 9, 8, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(10, 9, 8, 0.05) 1px, transparent 1px)",
+        "grid-pattern-dark": "linear-gradient(to right, rgba(253, 253, 252, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(253, 253, 252, 0.08) 1px, transparent 1px)",
+        "dot-pattern": "radial-gradient(circle, rgba(10, 9, 8, 0.12) 1px, transparent 1px)",
+      },
+      backgroundSize: {
+        "grid-sm": "16px 16px",
+        "grid-md": "24px 24px",
+        "grid-lg": "32px 32px",
+        "dot-sm": "12px 12px",
+      },
+      keyframes: {
+        "pulse-subtle": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.4" },
+        },
+        "shimmer": {
+          "100%": { transform: "translateX(100%)" },
+        },
+      },
+      animation: {
+        "pulse-subtle": "pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "shimmer": "shimmer 1.5s infinite",
+      },
     },
   },
   plugins: [],

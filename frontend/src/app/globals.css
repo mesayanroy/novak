@@ -37,4 +37,33 @@
   :focus-visible {
     @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-paper;
   }
+
+  /* Custom subtle scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #c9c6c1;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #78746e;
+  }
 }
+
+/* Technical Matrix Grid Lines */
+.matrix-grid-border {
+  position: relative;
+}
+.matrix-grid-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(10, 9, 8, 0.08);
+  pointer-events: none;
+}
+
