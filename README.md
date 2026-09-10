@@ -1,4 +1,4 @@
-# Novak — Neural Event Network.
+# Novak — Neural Event Oracle Network.
 
 [![CI](https://github.com/mesayanroy/novak/actions/workflows/ci.yml/badge.svg)](https://github.com/mesayanroy/novak/actions/workflows/ci.yml)
 [![Built with Foundry](https://img.shields.io/badge/built%20with-Foundry-4a4a4a)](https://book.getfoundry.sh/)
