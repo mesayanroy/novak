@@ -17,7 +17,7 @@ import {PositionManager} from "./PositionManager.sol";
 ///         exceed total deposits.
 /// @dev ARCHITECTURAL INVARIANT: settlement is delegated to `Settlement`, which
 ///      itself only depends on IEventBus. This contract MUST NOT import or call
-///      a resolver, the Registry, or the Composer directly.
+///      a resolver, the Registry, or the Composer directly
 contract Market {
     Settlement public immutable settlement;
     PositionManager public immutable positionManager;
