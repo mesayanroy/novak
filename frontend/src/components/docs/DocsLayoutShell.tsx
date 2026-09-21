@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Menu, BookOpen, Layers } from "lucide-react";
 import { motion, useScroll, useSpring } from "framer-motion";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -67,7 +67,7 @@ export function DocsLayoutShell({ children }: { children: ReactNode }) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="min-w-0 max-w-prose"
+            className="min-w-0 w-full"
           >
             {children}
           </motion.div>

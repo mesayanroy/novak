@@ -7,6 +7,12 @@ import { ExampleDataBadge } from "@/components/ExampleDataBadge";
 import { MarketCard, type MarketUnderlying } from "@/components/markets/MarketCard";
 import { CreateMarketCard } from "@/components/CreateMarketCard";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";
+import {
+  PriceHistoryChart,
+  OutcomeDistributionPieChart,
+  VolumeHistogram,
+  LivePositionsTable,
+} from "@/components/markets/MarketAnalyticsCharts";
 import { mockCompositeEvent, mockMarkets, mockPrimitiveEvents, findMockPrimitiveEvent } from "@/lib/mock-data";
 import { shortHex } from "@/lib/utils";
 import {
@@ -18,8 +24,9 @@ import {
   ShieldAlert,
   ArrowUpRight,
   TrendingUp,
-  Clock,
-  Layers,
+  Activity,
+  PieChart,
+  Zap,
 } from "lucide-react";
 
 function underlyingFor(compositeId: string): MarketUnderlying {
@@ -31,7 +38,7 @@ function underlyingFor(compositeId: string): MarketUnderlying {
 }
 
 export default function MarketsPage() {
-  const [activeTab, setActiveTab] = useState<"markets" | "events" | "create">("markets");
+  const [activeTab, setActiveTab] = useState<"markets" | "positions" | "events" | "create">("markets");
   const [filter, setFilter] = useState<"all" | "primitive" | "composite">("all");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -54,14 +61,14 @@ export default function MarketsPage() {
         <div>
           <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
             <span className="h-2 w-2 rounded-full bg-ink animate-pulse-subtle" />
-            Derivative Market Hub
+            Derivative Market Hub &amp; Live Telemetry
           </div>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl text-ink">
             Prediction &amp; Derivative Markets
           </h1>
-          <p className="mt-2 text-gray-600 max-w-2xl">
+          <p className="mt-2 text-gray-600 max-w-2xl text-sm leading-relaxed">
             Derivatives markets settle trustlessly against finalized composite events via{" "}
-            <code className="font-mono text-xs bg-gray-100 border border-gray-300 px-1.5 py-0.5 rounded text-ink">
+            <code className="font-mono text-xs bg-gray-100 border border-gray-300 px-1.5 py-0.5 rounded text-ink font-semibold">
               Settlement → EventBus
             </code>.
           </p>
@@ -71,25 +78,25 @@ export default function MarketsPage() {
 
       {/* Protocol Statistics Bar */}
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="border border-gray-300 bg-paper p-4 rounded-sm">
+        <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
           <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
-            <span>Total Pooled</span>
+            <span>Total Pooled Collateral</span>
             <TrendingUp className="h-3.5 w-3.5 text-gray-400" />
           </div>
           <p className="mt-2 text-2xl font-semibold font-mono text-ink">{totalEthPooled} ETH</p>
-          <p className="mt-1 text-[11px] text-gray-500">Parimutuel Collateral</p>
+          <p className="mt-1 text-[11px] text-emerald-700 font-mono font-semibold">+14.2% Uplift</p>
         </div>
 
-        <div className="border border-gray-300 bg-paper p-4 rounded-sm">
+        <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
           <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
             <span>Active Markets</span>
             <BarChart3 className="h-3.5 w-3.5 text-gray-400" />
           </div>
           <p className="mt-2 text-2xl font-semibold font-mono text-ink">{mockMarkets.length}</p>
-          <p className="mt-1 text-[11px] text-gray-500">1 Primitive, 1 Composite</p>
+          <p className="mt-1 text-[11px] text-gray-500 font-mono">1 Primitive, 1 Composite</p>
         </div>
 
-        <div className="border border-gray-300 bg-paper p-4 rounded-sm">
+        <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
           <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
             <span>Event Bus Feeds</span>
             <Radio className="h-3.5 w-3.5 text-gray-400" />
@@ -97,22 +104,22 @@ export default function MarketsPage() {
           <p className="mt-2 text-2xl font-semibold font-mono text-ink">
             {mockPrimitiveEvents.length + 1} Feeds
           </p>
-          <p className="mt-1 text-[11px] text-gray-500">Finalized &amp; Observed</p>
+          <p className="mt-1 text-[11px] text-emerald-700 font-mono font-semibold">100% Operational</p>
         </div>
 
-        <div className="border border-gray-300 bg-paper p-4 rounded-sm">
+        <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
           <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
             <span>Dispute Guard</span>
             <ShieldAlert className="h-3.5 w-3.5 text-gray-400" />
           </div>
           <p className="mt-2 text-2xl font-semibold font-mono text-ink">Tier 1 &amp; 2</p>
-          <p className="mt-1 text-[11px] text-gray-500">Bonded Challenge Ladder</p>
+          <p className="mt-1 text-[11px] text-gray-500 font-mono">Bonded Challenge Ladder</p>
         </div>
       </div>
 
       {/* Main Navigation Tabs */}
       <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setActiveTab("markets")}
             className={`link-plain flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
@@ -121,6 +128,16 @@ export default function MarketsPage() {
           >
             <BarChart3 className="h-4 w-4" />
             Explore Markets
+          </button>
+
+          <button
+            onClick={() => setActiveTab("positions")}
+            className={`link-plain flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
+              activeTab === "positions" ? "bg-ink text-paper" : "text-gray-600 hover:text-ink hover:bg-gray-100"
+            }`}
+          >
+            <Activity className="h-4 w-4" />
+            Live Positions &amp; Telemetry
           </button>
 
           <button
@@ -147,7 +164,7 @@ export default function MarketsPage() {
         {activeTab === "markets" && (
           <div className="flex items-center gap-3">
             {/* Category Filter Pills */}
-            <div className="flex items-center border border-gray-300 rounded p-0.5 text-xs font-mono">
+            <div className="flex items-center border border-gray-300 rounded p-0.5 text-xs font-mono bg-gray-50">
               <button
                 onClick={() => setFilter("all")}
                 className={`px-2.5 py-1 rounded-sm transition-colors ${
@@ -175,7 +192,7 @@ export default function MarketsPage() {
             </div>
 
             {/* Grid vs Table View Switcher */}
-            <div className="flex items-center border border-gray-300 rounded p-0.5">
+            <div className="flex items-center border border-gray-300 rounded p-0.5 bg-gray-50">
               <button
                 onClick={() => setViewMode("grid")}
                 title="Grid view"
@@ -199,77 +216,100 @@ export default function MarketsPage() {
         )}
       </div>
 
-      {/* Tab Content: Markets */}
+      {/* Tab Content 1: Explore Markets */}
       {activeTab === "markets" && (
-        <div className="mt-6">
-          <p className="mb-4 text-xs font-mono text-gray-500">
-            Showing {filteredMarkets.length} market{filteredMarkets.length !== 1 ? "s" : ""} settled against EventBus finalized state.
-          </p>
+        <div className="mt-6 flex flex-col gap-8">
+          {/* Top Live Interactive Chart */}
+          <PriceHistoryChart marketTitle="Featured: WITHIN(48h) Composite Market (Fed Holds & ETH > $5,000)" />
 
-          {viewMode === "grid" ? (
-            <div className="grid gap-5 md:grid-cols-2">
-              {filteredMarkets.map((market) => (
-                <MarketCard
-                  key={market.id}
-                  market={market}
-                  underlying={underlyingFor(market.compositeId)}
-                />
-              ))}
-            </div>
-          ) : (
-            /* Technical Matrix Table View */
-            <div className="overflow-x-auto border border-gray-300 rounded-sm">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-100 font-mono text-gray-600 uppercase tracking-wider border-b border-gray-300">
-                  <tr>
-                    <th className="p-3 font-semibold">Market ID</th>
-                    <th className="p-3 font-semibold">Question</th>
-                    <th className="p-3 font-semibold">Underlying Feed</th>
-                    <th className="p-3 font-semibold">YES Pool</th>
-                    <th className="p-3 font-semibold">NO Pool</th>
-                    <th className="p-3 font-semibold">Total Collateral</th>
-                    <th className="p-3 font-semibold text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 font-mono bg-paper">
-                  {filteredMarkets.map((market) => {
-                    const total = Number(market.yesPoolEth) + Number(market.noPoolEth);
-                    return (
-                      <tr key={market.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="p-3 font-bold text-ink">{shortHex(market.id, 6, 4)}</td>
-                        <td className="p-3 font-sans font-medium text-ink max-w-xs truncate">
-                          {market.question}
-                        </td>
-                        <td className="p-3 text-gray-600">{shortHex(market.compositeId, 6, 4)}</td>
-                        <td className="p-3 text-ink font-semibold">{market.yesPoolEth} ETH</td>
-                        <td className="p-3 text-ink font-semibold">{market.noPoolEth} ETH</td>
-                        <td className="p-3 text-ink font-bold">{total.toFixed(2)} ETH</td>
-                        <td className="p-3 text-right">
-                          <Link
-                            href={`/markets/${market.id}`}
-                            className="link-plain inline-flex items-center gap-1 border border-ink bg-ink text-paper px-2.5 py-1 text-[11px] font-mono uppercase tracking-wide hover:bg-gray-800 rounded-sm"
-                          >
-                            Trade <ArrowUpRight className="h-3 w-3" />
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div>
+            <p className="mb-4 text-xs font-mono text-gray-500">
+              Showing {filteredMarkets.length} market{filteredMarkets.length !== 1 ? "s" : ""} settled against EventBus finalized state.
+            </p>
+
+            {viewMode === "grid" ? (
+              <div className="grid gap-5 md:grid-cols-2">
+                {filteredMarkets.map((market) => (
+                  <MarketCard
+                    key={market.id}
+                    market={market}
+                    underlying={underlyingFor(market.compositeId)}
+                  />
+                ))}
+              </div>
+            ) : (
+              /* Technical Matrix Table View */
+              <div className="overflow-x-auto border border-gray-300 rounded-sm">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-100 font-mono text-gray-600 uppercase tracking-wider border-b border-gray-300">
+                    <tr>
+                      <th className="p-3 font-semibold">Market ID</th>
+                      <th className="p-3 font-semibold">Question</th>
+                      <th className="p-3 font-semibold">Underlying Feed</th>
+                      <th className="p-3 font-semibold">YES Pool</th>
+                      <th className="p-3 font-semibold">NO Pool</th>
+                      <th className="p-3 font-semibold">Total Collateral</th>
+                      <th className="p-3 font-semibold text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 font-mono bg-paper">
+                    {filteredMarkets.map((market) => {
+                      const total = Number(market.yesPoolEth) + Number(market.noPoolEth);
+                      return (
+                        <tr key={market.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="p-3 font-bold text-ink">{shortHex(market.id, 6, 4)}</td>
+                          <td className="p-3 font-sans font-medium text-ink max-w-xs truncate">
+                            {market.question}
+                          </td>
+                          <td className="p-3 text-gray-600">{shortHex(market.compositeId, 6, 4)}</td>
+                          <td className="p-3 text-ink font-semibold">{market.yesPoolEth} ETH</td>
+                          <td className="p-3 text-ink font-semibold">{market.noPoolEth} ETH</td>
+                          <td className="p-3 text-ink font-bold">{total.toFixed(2)} ETH</td>
+                          <td className="p-3 text-right">
+                            <Link
+                              href={`/markets/${market.id}`}
+                              className="link-plain inline-flex items-center gap-1 border border-ink bg-ink text-paper px-2.5 py-1 text-[11px] font-mono uppercase tracking-wide hover:bg-gray-800 rounded-sm"
+                            >
+                              Trade <ArrowUpRight className="h-3 w-3" />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Tab Content: Event Stream Monitor */}
+      {/* Tab Content 2: Live Positions & Telemetry */}
+      {activeTab === "positions" && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 flex flex-col gap-8"
+        >
+          {/* Active Positions Table */}
+          <LivePositionsTable />
+
+          {/* Side-by-side Analytics Charts */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <OutcomeDistributionPieChart yesPoolEth={3.4} noPoolEth={1.15} />
+            <VolumeHistogram />
+          </div>
+        </motion.div>
+      )}
+
+      {/* Tab Content 3: Event Stream Monitor */}
       {activeTab === "events" && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           className="mt-6 flex flex-col gap-6"
         >
-          <div className="border border-gray-300 bg-paper p-5 rounded-sm">
+          <div className="border border-gray-300 bg-paper p-5 rounded-sm shadow-sm">
             <h3 className="font-semibold text-lg text-ink flex items-center gap-2">
               <Radio className="h-4 w-4 text-ink" />
               EventBus Feed Monitor &amp; Registry Stream
@@ -324,7 +364,7 @@ export default function MarketsPage() {
         </motion.div>
       )}
 
-      {/* Tab Content: Create Market */}
+      {/* Tab Content 4: Create Market */}
       {activeTab === "create" && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}

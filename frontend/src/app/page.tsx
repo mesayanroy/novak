@@ -4,21 +4,38 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { LayerDiagram } from "@/components/architecture/LayerDiagram";
-import { ArrowRight, Layers, ShieldCheck, Cpu, Terminal, Sparkles } from "lucide-react";
+import { ArrowRight, Layers, ShieldCheck, Cpu, Terminal, Sparkles, Activity, Radio, TrendingUp } from "lucide-react";
 
 export default function Home() {
   return (
     <main className="overflow-hidden">
+      {/* Live Market Ticker Banner */}
+      <div className="border-b border-gray-200 bg-gray-900 text-paper py-2 overflow-hidden">
+        <div className="mx-auto max-w-6xl px-6 flex items-center justify-between text-xs font-mono">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 font-bold text-emerald-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /> LIVE STREAM:
+            </span>
+            <span className="text-gray-300">
+              BTC &gt; $100k AND Fed Rate Cut within 48h → <strong className="text-paper">74.7% YES Odds (+14.2% ↑)</strong>
+            </span>
+          </div>
+          <Link href="/markets" className="hidden sm:flex items-center gap-1 text-gray-400 hover:text-paper transition-colors font-semibold">
+            View Live Telemetry <ArrowRight className="h-3 w-3" />
+          </Link>
+        </div>
+      </div>
+
       {/* Hero Section */}
-      <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-20 text-center sm:pt-28 bg-grid-pattern bg-grid-md">
+      <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-16 text-center sm:pt-24 bg-grid-pattern bg-grid-md">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="mx-auto flex w-fit items-center gap-2 border border-gray-300 bg-paper px-3 py-1 text-xs font-mono uppercase tracking-wider text-ink rounded-full shadow-sm"
+          className="mx-auto flex w-fit items-center gap-2 border border-gray-300 bg-paper px-3.5 py-1 text-xs font-mono uppercase tracking-wider text-ink rounded-full shadow-sm"
         >
           <span className="h-2 w-2 rounded-full bg-ink animate-pulse-subtle" />
-          <span>Ethereum Oracle Primitive v1.0</span>
+          <span>Ethereum Oracle Primitive v1.0 • Neural Event Bus</span>
         </motion.div>
 
         <motion.h1

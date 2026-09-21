@@ -5,9 +5,14 @@ import { CompositeStatusPill } from "@/components/StatusPill";
 import { CompositionTree, type CompositionNode } from "@/components/markets/CompositionTree";
 import { MarketPositionCard } from "@/components/MarketPositionCard";
 import { SettlementSimulator } from "@/components/markets/SettlementSimulator";
+import {
+  PriceHistoryChart,
+  OutcomeDistributionPieChart,
+  VolumeHistogram,
+} from "@/components/markets/MarketAnalyticsCharts";
 import { findMockMarket, findMockPrimitiveEvent, mockCompositeEvent } from "@/lib/mock-data";
 import { shortHex } from "@/lib/utils";
-import { Layers, ShieldCheck, GitBranch, Terminal } from "lucide-react";
+import { Layers, ShieldCheck, GitBranch, Terminal, Activity, PieChart, BarChart2 } from "lucide-react";
 
 export function generateMetadata({ params }: { params: { id: string } }) {
   return { title: `Market ${shortHex(params.id)} — Novak` };
@@ -68,6 +73,20 @@ export default function MarketDetailPage({ params }: { params: { id: string } })
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="flex flex-col gap-10">
+          {/* Interactive Price & Odds Chart */}
+          <section>
+            <PriceHistoryChart marketTitle={market.question} />
+          </section>
+
+          {/* Collateral Distribution & Volume Analytics */}
+          <section className="grid gap-6 md:grid-cols-2">
+            <OutcomeDistributionPieChart
+              yesPoolEth={Number(market.yesPoolEth)}
+              noPoolEth={Number(market.noPoolEth)}
+            />
+            <VolumeHistogram />
+          </section>
+
           {/* Interactive Settlement Simulator */}
           <section>
             <SettlementSimulator
@@ -89,7 +108,7 @@ export default function MarketDetailPage({ params }: { params: { id: string } })
                 </p>
               </div>
             </div>
-            <div className="mt-4 border border-gray-300 bg-paper p-5 rounded-sm">
+            <div className="mt-4 border border-gray-300 bg-paper p-5 rounded-sm shadow-sm">
               <CompositionTree node={tree} />
             </div>
           </section>
@@ -100,7 +119,7 @@ export default function MarketDetailPage({ params }: { params: { id: string } })
               <Terminal className="h-4 w-4 text-ink" />
               Settlement Protocol Specification
             </h2>
-            <div className="mt-3 border border-gray-300 bg-paper p-5 text-sm text-gray-700 leading-relaxed rounded-sm space-y-3">
+            <div className="mt-3 border border-gray-300 bg-paper p-5 text-sm text-gray-700 leading-relaxed rounded-sm space-y-3 shadow-sm">
               <p>
                 Once the underlying event above reaches a terminal <code className="font-mono text-xs bg-gray-100 border border-gray-300 px-1 py-0.5 rounded text-ink font-semibold">Finalized</code> state on <code className="font-mono text-xs font-semibold">EventBus</code>,
                 anyone can invoke <code className="font-mono text-xs bg-gray-100 border border-gray-300 px-1 py-0.5 rounded text-ink font-semibold">Market.settle()</code>, which reads
