@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { LayerDiagram } from "@/components/architecture/LayerDiagram";
+import { BentoIdeaSection } from "@/components/BentoIdeaSection";
 import { ArrowRight, Layers, ShieldCheck, Cpu, Terminal, Sparkles, Activity, Radio, TrendingUp } from "lucide-react";
 
 export default function Home() {
@@ -100,7 +101,7 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* The Idea Comparison */}
+      {/* The Idea Comparison & Bento Grid Section */}
       <section className="border-y border-gray-200 bg-gray-50 py-16">
         <div className="mx-auto max-w-5xl px-6">
           <p className="font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">The idea</p>
@@ -134,6 +135,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Bento Grid Architecture Features */}
+      <BentoIdeaSection />
 
       {/* Architecture Section */}
       <section className="mx-auto max-w-5xl px-6 py-16">
