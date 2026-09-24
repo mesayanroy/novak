@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { novakAddresses } from "@/lib/addresses";
+import { Availability, explorerUrl } from "@novak/sdk";
+import { NOVAK_CHAIN_ID, deployment, novakAddresses } from "@/lib/addresses";
+import { useEvents, useMarkets } from "@/lib/novak";
 import { shortHex } from "@/lib/utils";
 import {
   Activity,
@@ -38,8 +40,8 @@ const footerColumns = [
     heading: "Markets & Hub",
     links: [
       { href: "/markets", label: "Explore Markets" },
-      { href: "/markets", label: "Event Feed Monitor" },
-      { href: "/markets", label: "Create Market" },
+      { href: "/calendar", label: "Corporate-Action Calendar" },
+      { href: "/guard", label: "Lending Guard Demo" },
     ],
   },
 ];
@@ -50,12 +52,16 @@ const contractRows: Array<{ label: string; address: string }> = [
   { label: "EventComposer", address: novakAddresses.eventComposer },
   { label: "EventBus", address: novakAddresses.eventBus },
   { label: "Market", address: novakAddresses.market },
+  { label: "StockLendingGuard", address: novakAddresses.stockLendingGuard },
 ];
 
 export function SiteFooter() {
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [subscribed, setSubscribed] = useState(false);
+  const events = useEvents();
+  const markets = useMarkets();
+  const explorer = explorerUrl(NOVAK_CHAIN_ID);
+  const networkName = NOVAK_CHAIN_ID === 46630 ? "Robinhood Chain testnet" : NOVAK_CHAIN_ID === 31337 ? "Local anvil" : `Chain ${NOVAK_CHAIN_ID}`;
+  const decided = (events.data ?? []).filter((e) => e.availability !== Availability.Pending).length;
 
   const hasAnyAddress = contractRows.some((row) => row.address !== "0x");
 
@@ -65,13 +71,6 @@ export function SiteFooter() {
     setTimeout(() => setCopiedAddress(null), 2000);
   };
 
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setSubscribed(true);
-      setEmail("");
-    }
-  };
 
   return (
     <footer className="border-t border-gray-200 bg-paper">
@@ -79,17 +78,19 @@ export function SiteFooter() {
       <div className="border-b border-gray-200 bg-gray-50 py-3">
         <div className="mx-auto max-w-6xl px-6 flex flex-wrap items-center justify-between gap-4 font-mono text-xs text-gray-600">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold text-ink">Oracle Status:</span>
-            <span>All 5 Layers Nominal (12ms latency)</span>
+            <span className={`h-2 w-2 rounded-full ${deployment ? "bg-emerald-500" : "bg-gray-400"}`} />
+            <span className="font-semibold text-ink">Network:</span>
+            <span>{networkName}{deployment ? "" : " — no deployment configured"}</span>
           </div>
-          <div className="flex items-center gap-5 text-gray-500">
-            <span className="flex items-center gap-1">
-              <Zap className="h-3 w-3 text-ink" /> Gas: <strong className="text-ink">12 Gwei</strong>
-            </span>
-            <span>Active Disputes: <strong className="text-ink">0</strong></span>
-            <span>Finalized Events: <strong className="text-ink">1,482</strong></span>
-          </div>
+          {deployment && (
+            <div className="flex items-center gap-5 text-gray-500">
+              <span className="flex items-center gap-1">
+                <Zap className="h-3 w-3 text-ink" /> Events: <strong className="text-ink">{events.data?.length ?? "…"}</strong>
+              </span>
+              <span>Decided: <strong className="text-ink">{events.data ? decided : "…"}</strong></span>
+              <span>Markets: <strong className="text-ink">{markets.data?.length ?? "…"}</strong></span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -97,40 +98,25 @@ export function SiteFooter() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand & Newsletter Column */}
           <div className="lg:col-span-2">
-            <Link href="/" className="text-xl font-bold tracking-tight text-ink flex items-center gap-2">
-              <span className="h-3 w-3 bg-ink rounded-sm" /> Novak
+            <Link href="/" className="text-xl font-bold tracking-tight text-ink flex items-center gap-2.5">
+              <img src="/novak-logo.png" alt="Novak" className="h-6 w-6 rounded-md object-contain" />
+              <span>Novak</span>
             </Link>
             <p className="mt-3 max-w-sm text-sm text-gray-600 leading-relaxed">
-              Neural Event Network — A decentralized, composable event bus for Ethereum. Events resolved once, composed deterministically, and read by many.
+              The event layer for tokenized stocks on Robinhood Chain. Chainlink prices the tokens; Novak finalizes what happens to them — resolved once, disputable, composable, and read by every protocol.
             </p>
 
             {/* Event Alert Newsletter Form */}
             <div className="mt-6 border border-gray-300 bg-paper p-3.5 rounded-sm">
               <p className="font-mono text-xs font-semibold text-ink uppercase tracking-wide">
-                Protocol Updates &amp; Event Feed Alerts
+                Open source · MIT
               </p>
-              {subscribed ? (
-                <div className="mt-2 text-xs font-mono text-emerald-700 font-semibold flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4" /> Subscribed to EventBus updates!
-                </div>
-              ) : (
-                <form onSubmit={handleSubscribe} className="mt-2 flex items-center gap-2">
-                  <input
-                    type="email"
-                    required
-                    placeholder="dev@ethereum.org"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full border border-gray-300 px-3 py-1.5 text-xs font-mono rounded-sm text-ink focus:outline-none focus:border-ink"
-                  />
-                  <button
-                    type="submit"
-                    className="link-plain border border-ink bg-ink text-paper px-3 py-1.5 text-xs font-mono font-semibold uppercase tracking-wider rounded-sm hover:bg-gray-800 transition-colors shrink-0"
-                  >
-                    Subscribe
-                  </button>
-                </form>
-              )}
+              <a
+                href="https://github.com/mesayanroy/novak"
+                className="mt-2 inline-flex text-xs font-mono text-ink underline"
+              >
+                Follow development on GitHub →
+              </a>
             </div>
           </div>
 
@@ -164,7 +150,7 @@ export function SiteFooter() {
                 Core Protocol Contract Deployments
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Deterministic addresses on Local Anvil (Chain ID 31337)
+                {networkName} (chain ID {NOVAK_CHAIN_ID}){explorer ? " · verified on Blockscout" : ""}
               </p>
             </div>
             <Link href="/docs/sdk" className="link-plain font-mono text-xs text-ink underline font-semibold">
@@ -181,7 +167,18 @@ export function SiteFooter() {
                     key={row.label}
                     className="border border-gray-200 bg-gray-50 p-2.5 rounded-sm flex flex-col justify-between"
                   >
-                    <span className="text-[10px] uppercase text-gray-500 font-semibold">{row.label}</span>
+                    {explorer ? (
+                      <a
+                        href={`${explorer}/address/${row.address}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] uppercase text-gray-500 font-semibold hover:text-ink"
+                      >
+                        {row.label} ↗
+                      </a>
+                    ) : (
+                      <span className="text-[10px] uppercase text-gray-500 font-semibold">{row.label}</span>
+                    )}
                     <div className="mt-1 flex items-center justify-between text-ink font-bold">
                       <span>{shortHex(row.address, 6, 4)}</span>
                       <button
@@ -204,7 +201,7 @@ export function SiteFooter() {
 
         {/* Bottom Legal & Copyright */}
         <div className="mt-10 pt-6 border-t border-gray-100 flex flex-wrap items-center justify-between gap-4 text-xs text-gray-500 font-mono">
-          <p>© 2026 Novak Protocol — Neural Event Network. Open-source Ethereum Oracle Primitive.</p>
+          <p>© 2026 Novak — Neural Event Network. Open-source event layer, built on Robinhood Chain (an Arbitrum L2 on Ethereum). Not affiliated with Robinhood.</p>
           <div className="flex items-center gap-4">
             <Link href="/docs/threat-model" className="hover:text-ink">
               Threat Model &amp; Security Assumptions

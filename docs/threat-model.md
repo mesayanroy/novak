@@ -153,6 +153,12 @@ determinism) unless marked unresolved.
      or silently misdecode. Treat any `specVersion` bump as requiring a
      matching audit of every `abi.decode(..., (bool))` call site
      (`derivatives/Settlement.sol`, `contracts/EventComposer.sol`).
+   - *Update (specVersion 2):* the audit was done when v2 (`abi.encode(bool,
+     uint64 occurredAt)`) shipped. The bool stays the first ABI word, so every
+     `(bool)` decode site — now also `consumers/StockLendingGuard.sol` and
+     `DisputeManager` — reads v2 correctly (tested in
+     `test/unit/OutcomeV2.t.sol`); the Registry rejects v2 payloads that
+     aren't exactly 64 bytes or whose `occurredAt` is in the future.
 
 10. **Committee-selection manipulation.** A miner/validator (or, on a
     proposer-builder-separation chain, whoever controls block building)
@@ -171,6 +177,78 @@ determinism) unless marked unresolved.
       pool — there's nothing to manipulate a selection *into*, since
       everyone is already on it. The risk only becomes live once the
       resolver pool meaningfully exceeds 7 (Tier-1) or 15 (Tier-2).
+    - *Robinhood Chain specifics (Arbitrum Orbit):* the weakness is sharper
+      here. On Arbitrum chains `block.number` is an *estimate of the L1 block
+      number*, `blockhash` is "a cryptographically insecure, pseudo-random
+      hash", and `prevrandao` is the constant 1 (Arbitrum docs, "Solidity
+      support"). Many L2 transactions share one L1 block number, so the seed
+      `keccak256(eventId, tier, blockhash(block.number - 1), block.timestamp)`
+      is **predictable in advance** by anyone, and the (centralized)
+      sequencer controls ordering. Chainlink VRF is **not** available on
+      Robinhood Chain (verified 2026-09-25: VRF v2.5 lists Arbitrum One and
+      Arbitrum Sepolia only). Planned mitigation: seed from a block *after*
+      the escalation transaction plus committee-revealed salts
+      (commit-reveal). Until then, keep the resolver pool ≤ 7 so the
+      committee is the whole pool.
+
+11. **Losing side exits after the outcome is public** *(fixed, was a real
+    fund-loss bug)*. `Market.closePosition`/`depositCollateral` only checked
+    `!settled`, so between an event finalizing and someone calling
+    `settle()`, the losing side could withdraw its full stake (and anyone
+    could deposit on the known winner). Proven with a Foundry test before the
+    fix.
+    - *Status:* **fixed.** Markets have `tradingClosesAt`; deposits and
+      withdrawals revert at or after it, and deposits also revert as soon as
+      the Bus reports the event decided. Regression tests:
+      `test_regression_loserCannotWithdrawAfterOutcomeKnown`,
+      `test_regression_cannotDepositAfterTradingCloses`,
+      `test_regression_cannotDepositOnceOutcomeAvailable_evenBeforeClose`.
+      Residual: the Market can't read the Registry, so a creator could set
+      `tradingClosesAt` after the event's `openTimestamp`; the frontend
+      templates always set it equal, and depositors can see both.
+
+12. **Voided/expired event locks market funds forever** *(fixed)*. `settle`
+    required an `Available` outcome, which a voided event never has.
+    - *Status:* **fixed.** `IEventBus.getAvailability` distinguishes
+      `Voided`; `Market.settle` enters `Refunding` and every depositor
+      reclaims their own stake (`test_voidedEvent_marketRefundsEveryone`).
+
+13. **Observations before the event happens** *(fixed)*.
+    `submitObservation` didn't check `openTimestamp`, so a quorum could
+    resolve "earnings beat" to `false` before the earnings existed.
+    - *Status:* **fixed** (`test_submitObservation_revertsBeforeOpenTimestamp`);
+      resolvers also refuse to observe before `openTimestamp`.
+
+14. **Reverting recipient freezes a dispute** *(fixed)*. `dispute()` is
+    permissionless; with push payments, a disputer contract that reverts on
+    receiving ETH made every resolution path that refunded it revert,
+    leaving the event — and every composite and market depending on it —
+    `Disputed` forever.
+    - *Status:* **fixed** with pull payments (`pendingWithdrawals` +
+      `withdraw()`); only the burn share is pushed (to a code-less address).
+      Tests: `test_revertingDisputer_cannotBlockConvergence`,
+      `test_revertingDisputer_cannotBlockVoid`.
+
+15. **Unauthenticated position ledger** *(fixed)*.
+    `PositionManager.recordPosition` accepted writes from anyone, so "my
+    positions" views could be spoofed. Now only the wired Market can record.
+
+16. **Sequencer and timestamp trust (Robinhood Chain).** The sequencer sets
+    `block.timestamp` within Arbitrum's bounds and can go down. Dispute
+    windows, trading windows and `occurredAt <= block.timestamp` all use
+    chain time; a sequencer outage could let a dispute window lapse while
+    users can't transact.
+    - *Status:* **accepted for the testnet MVP; mitigation noted.** Dispute
+      windows are minutes-to-hours, not seconds. Chainlink lists no L2
+      sequencer-uptime feed for Robinhood Chain (checked 2026-09-25), so the
+      price-at adapter relies on round staleness (`maxStaleness`) instead.
+
+17. **Source-data trust.** Resolvers read Robinhood Chain mainnet (Chainlink
+    rounds, ERC-8056 token logs) and Robinhood's asset API. A compromised or
+    wrong source makes every honest resolver agree on a wrong answer — the
+    dispute ladder is the backstop, and every observation's raw evidence is
+    served at `/evidence/:hash` so a disputer can check it against the
+    on-chain commitment.
 
 ## Cycle-impossibility proof (Gap 3)
 

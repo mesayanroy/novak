@@ -1,70 +1,84 @@
 # Novak Resolver Node
 
-A resolver is an independent process that:
+An independent process that turns live Robinhood Chain data into finalized
+Novak events. Every poll interval it:
 
-1. Is told which event IDs to watch (see "Known limitation" below).
-2. Uses a **source adapter** (`adapters/`) to fetch the underlying real-world or
-   on-chain data and turn it into a boolean `Observation`.
-3. Hashes the evidence (`evidence/`) so only a commitment — not raw data — needs
-   to go on-chain, and encodes the outcome per the MVP schema
-   (`abi.encode(bool)`).
-4. Submits the observation directly to `EventRegistry.submitObservation`. The
-   Registry itself counts matching submissions from *authorized* resolvers and
-   auto-proposes an outcome once `EventSpec.quorumThreshold` of them agree —
-   see `consensus/quorum.ts` for the local mirror of that same rule and
-   `contracts/EventRegistry.sol` for the on-chain enforcement.
-5. The proposed outcome then sits in the dispute window before anyone can call
-   `finalize()`.
+1. **Discovers** events — scans the Registry's `EventCreated` and the
+   Composer's `CompositeEventCreated` logs from the deployment's `startBlock`
+   (`node/discovery.ts`). No hand-maintained watch list.
+2. **Resolves** (`node/resolve.ts`) — for each event whose `sourceId` it has
+   an adapter for, once `openTimestamp` has passed: the adapter observes the
+   source, the node builds an evidence record, and submits
+   `(outcome[, occurredAt])` + the evidence hash to
+   `EventRegistry.submitObservation`. Quorum, proposal and the dispute window
+   are enforced on-chain.
+3. **Votes in disputes** (`node/voter.ts`) — if drawn onto a Tier-1/Tier-2
+   committee, it re-observes with the same adapter and votes, posting the tier
+   bond. Abstains when its adapter abstains.
+4. **Keeps** (`node/keeper.ts`, `RESOLVER_KEEPER=true` on ONE node) — calls
+   every permissionless transition as soon as it's valid: `finalize`,
+   `expire`, `escalateNonConvergence`, `escalateTier2`,
+   `voidAfterTier2Timeout`, `tryResolve` (only when it would change state),
+   `Market.settle`, and `withdraw` of its own credited bonds. This is not push
+   delivery — consumers still pull from the Bus.
+5. **Serves** `GET /health` and `GET /evidence/:hash` (`RESOLVER_HTTP_PORT`),
+   so anyone can check exactly what a resolver saw behind an on-chain
+   evidence hash.
 
-Resolvers never talk to consumer contracts (like the derivatives `Market`)
-directly — consumers only ever read finalized events through the `EventBus`.
-See `docs/architecture.md` for the full lifecycle.
+It **writes** to the chain Novak is deployed on (Robinhood Chain testnet
+46630, or anvil 31337) and **reads** its data from Robinhood Chain **mainnet**
+— Chainlink stock feeds and ERC-8056 stock tokens only exist there. Reads are
+free; no mainnet funds are involved.
 
-## Layout
+## Adapters (the event catalog)
 
-- `node/` — daemon entrypoint (`index.ts`): for each watched event ID, runs
-  every adapter and submits the resulting observation on-chain.
-- `adapters/` — one module per event source class (e.g. price feeds). Implement
-  `SourceAdapter` (`adapters/types.ts`) to add a new source.
-- `evidence/` — hashing/encoding helpers so evidence and outcome data are
-  committed deterministically.
-- `consensus/` — quorum evaluation logic, mirroring the on-chain rule (exact
-  agreement, N-of-M authorized resolvers — see `consensus/quorum.ts`).
+| sourceId | Spec (SDK encoder) | Source | Outcome / occurredAt |
+|---|---|---|---|
+| `chainlink.price-at.v1` (v2) | `encodePriceAtSpec` — feed, threshold, ≥/≤, `at`, `maxStaleness` | Chainlink `Robinhood <TICKER> / USD` on mainnet; binary search for the round in effect at `at` | comparison result / `at`. Abstains if the round is staler than `maxStaleness` |
+| `rh.corporate-action.v1` (v2) | `encodeCorporateActionSpec` — stock token, window, `minChangeBps` | the token's ERC-8056 `UIMultiplierUpdated(old, new, effectiveAt)` logs (logs, not state: the public RPC isn't an archive node) | a qualifying change took effect in the window / its `effectiveAt`; false after the window / `windowEnd` |
+| `rh.trading-status.v1` (v1) | `encodeTradingStatusSpec` — symbol, session | `api.robinhood.com/rhj/assets` `tradingCapabilities` | session NOT tradable when observed |
+
+Adapters must be **deterministic** (quorum is exact-match on the full
+payload): derive `occurredAt` from the source, never the local clock. Return
+`null` to abstain — always safe; a wrong vote is not. Add a source by
+implementing `SourceAdapter` (`adapters/types.ts`), registering it in
+`adapters/index.ts`, and adding its spec encoder to `sdk/src/sources.ts`.
 
 ## Running
 
-A resolver's address must first be authorized by the Registry owner
-(`EventRegistry.setResolverAuthorization(resolverAddress, true)`) before it
-can submit anything — `submitObservation` reverts otherwise.
-
 ```bash
-pnpm install
-pnpm --filter novak-resolver dev     # watch mode
-pnpm --filter novak-resolver build   # compile to dist/
-pnpm --filter novak-resolver test    # vitest
+pnpm --filter @novak/sdk build && pnpm --filter novak-resolver build
+RESOLVER_ID=r1 RESOLVER_PRIVATE_KEY=0x... RESOLVER_KEEPER=true RESOLVER_HTTP_PORT=8787 \
+  pnpm --filter novak-resolver start
 ```
 
-Configure via `.env` (see root `.env.example`): `RESOLVER_PRIVATE_KEY`,
-`EVENT_REGISTRY_ADDRESS`, `RESOLVER_WATCHED_EVENT_IDS` (comma-separated),
-`RESOLVER_POLL_INTERVAL_MS`, an RPC URL, and (for the example price adapter)
-`PRICE_FEED_THRESHOLD` / `PRICE_FEED_MOCK_PRICE`.
+Run three nodes with different keys for a 2-of-3 quorum. Each key must be
+authorized (`RESOLVER_ADDRESSES` at deploy time, or
+`setResolverAuthorization`) and hold a little testnet ETH for gas — plus the
+Tier-1 bond (0.03 ETH) to vote in disputes.
 
-## Known limitation: no event discovery
+| Env | Default | |
+|---|---|---|
+| `NOVAK_CHAIN_ID` | `46630` | chain to write to (`31337` = anvil) |
+| `RPC_URL_ROBINHOOD_TESTNET` / `RPC_URL_LOCAL` | public endpoints | write RPC |
+| `RESOLVER_SOURCE_RPC_URL` | `https://rpc.mainnet.chain.robinhood.com` | read-only data RPC (an Alchemy URL avoids rate limits) |
+| `RESOLVER_PRIVATE_KEY` | — | required |
+| `RESOLVER_KEEPER` | `false` | enable keeper duties on one node |
+| `RESOLVER_VOTER` | `true` | vote in dispute committees |
+| `RESOLVER_HTTP_PORT` | off | `/health`, `/evidence/:hash` |
+| `RESOLVER_POLL_INTERVAL_MS` | `15000` | |
+| `RESOLVER_LOG_CHUNK` | `500000` | log-scan chunk; halves automatically on RPC limits |
 
-There is no on-chain indexer/subgraph here — a resolver is told exactly which
-event IDs to watch via `RESOLVER_WATCHED_EVENT_IDS` rather than scanning the
-Registry for all `Open` events matching its adapters' `sourceId`s. Building a
-real indexer is deferred (it would only change how the watched-event list is
-populated, not the submission logic in `node/index.ts`).
+Addresses come from `deployments/<chainId>.json` via `@novak/sdk` — no
+per-contract env vars.
 
-## Status
+## Tools
 
-Submission is wired end-to-end: `submitObservation` is a real on-chain write.
-What's still a deliberate MVP simplification:
+```bash
+pnpm --filter novak-resolver probe   # run every adapter against live sources, print what it would vote
+pnpm --filter novak-resolver test    # decision logic, evidence determinism, quorum mirrors
+```
 
-- The `PriceFeedAdapter` reads a mock price from an env var instead of a real
-  price API (see the TODO in `adapters/priceFeedAdapter.ts`).
-- `consensus/quorum.ts` mirrors the Registry's exact-match rule locally but
-  doesn't drive submission timing — the daemon submits unconditionally on
-  every poll; the Registry itself is the source of truth on whether quorum
-  was reached.
+`consensus/quorum.ts` mirrors the on-chain exact-match quorum and the
+DisputeManager's 66%-of-committee rule for local sanity checks; the chain is
+the source of truth.

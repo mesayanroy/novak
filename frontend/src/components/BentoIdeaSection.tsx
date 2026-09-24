@@ -25,39 +25,39 @@ import { Calendar } from "@/components/ui/calendar";
 // --- Demo 1: Canonical Events Marquee ---
 const canonicalEvents = [
   {
-    id: "EVT_BTC_100K",
-    hash: "0x7f3a...b91c",
-    title: "BTC > $100k",
+    id: "NVDA_MULTIPLIER",
+    hash: "rh.corporate-action.v1",
+    title: "NVDA multiplier +0.0775%",
     status: "FINALIZED",
-    detail: "Resolved once at block #2194012. Standing reference for 14 active markets.",
+    detail: "ERC-8056 update effective Sep 10 2026 — detected by resolvers from the token's own logs.",
   },
   {
-    id: "EVT_FED_RATE_CUT",
-    hash: "0x4e21...89fa",
-    title: "Fed Rate Cut 25bps",
+    id: "NVDA_GTE_224",
+    hash: "chainlink.price-at.v1",
+    title: "NVDA ≥ $224 at T",
     status: "FINALIZED",
-    detail: "FOMC statement verified via multi-oracle consensus. Zero dispute flags.",
+    detail: "Chainlink Robinhood NVDA/USD round in effect at T, read on Robinhood Chain.",
   },
   {
-    id: "EVT_ETH_STAKED_30M",
-    hash: "0x9c00...55de",
-    title: "ETH Staked > 30M",
-    status: "VERIFIED",
-    detail: "Beacon chain state snapshot locked at epoch #294000.",
+    id: "TSLA_OVERNIGHT",
+    hash: "rh.trading-status.v1",
+    title: "TSLA not tradable overnight",
+    status: "OPEN",
+    detail: "Snapshot of Robinhood's asset registry, agreed by a resolver quorum.",
   },
   {
-    id: "EVT_BLOB_GAS_SPIKE",
-    hash: "0x11ab...67cd",
-    title: "Blob Gas > 500k",
-    status: "FINALIZED",
-    detail: "EIP-4844 telemetry trigger satisfied within 12h horizon.",
+    id: "AAPL_SPLIT",
+    hash: "rh.corporate-action.v1",
+    title: "AAPL split-size action",
+    status: "OPEN",
+    detail: "minChangeBps ≥ 5000 separates real splits from dividend reinvestment.",
   },
   {
-    id: "EVT_USDC_PEG_STABLE",
-    hash: "0x88ff...0012",
-    title: "USDC > $0.999",
-    status: "VERIFIED",
-    detail: "Chainlink + Uniswap TWAP dual-source verification passed.",
+    id: "FED_BEFORE_EARNINGS",
+    hash: "composite · BEFORE",
+    title: "Fed cut BEFORE NVDA earnings",
+    status: "COMPOSED",
+    detail: "Two facts, one canonical ID — every market composing them reads the same answer.",
   },
 ];
 
@@ -100,28 +100,28 @@ const telemetryNotifications = [
     icon: ShieldCheck,
     title: "Tier-1 Committee Quorum Reached",
     description: "66% consensus achieved on Event EVT_0x7f3a",
-    time: "2m ago",
+    time: "step 4",
     badge: "PASSED",
   },
   {
     icon: Lock,
     title: "Challenger Bond Posted",
-    description: "+10.0 ETH locked in DisputeManager vault #42",
-    time: "5m ago",
+    description: "0.01 ETH dispute bond posted — a Tier-1 committee is drawn",
+    time: "step 3",
     badge: "BONDED",
   },
   {
     icon: Cpu,
     title: "Safety Floor Enforced",
-    description: "VOID state triggered — impossible condition averted",
-    time: "12m ago",
+    description: "Never converged → VOIDED; dependent markets switch to refunds",
+    time: "step 5",
     badge: "HARD FLOOR",
   },
   {
     icon: CheckCircle2,
     title: "Canonical Fact Stored",
-    description: "Ready for standing reads by downstream markets",
-    time: "18m ago",
+    description: "Readable by every market and lending guard via EventBus",
+    time: "step 6",
     badge: "FINALIZED",
   },
 ];
@@ -180,14 +180,14 @@ function TopologyBeamDemo({ className }: { className?: string }) {
           className="flex items-center gap-2 rounded-md border border-gray-300 bg-paper px-3 py-1.5 text-xs font-mono text-ink shadow-xs"
         >
           <Database className="h-3.5 w-3.5 text-gray-600" />
-          <span>Oracle A: BTC &gt; $100k</span>
+          <span>Chainlink: NVDA ≥ $224</span>
         </div>
         <div
           ref={oracleBRef}
           className="flex items-center gap-2 rounded-md border border-gray-300 bg-paper px-3 py-1.5 text-xs font-mono text-ink shadow-xs"
         >
           <Database className="h-3.5 w-3.5 text-gray-600" />
-          <span>Oracle B: Fed Cut</span>
+          <span>ERC-8056: NVDA split</span>
         </div>
       </div>
 
@@ -210,14 +210,14 @@ function TopologyBeamDemo({ className }: { className?: string }) {
           className="flex items-center gap-2 rounded-md border border-gray-300 bg-paper px-3 py-1.5 text-xs font-mono text-ink shadow-xs"
         >
           <ArrowUpRight className="h-3.5 w-3.5 text-gray-600" />
-          <span>Derivatives Market</span>
+          <span>Event Market</span>
         </div>
         <div
           ref={vaultRef}
           className="flex items-center gap-2 rounded-md border border-gray-300 bg-paper px-3 py-1.5 text-xs font-mono text-ink shadow-xs"
         >
           <ShieldCheck className="h-3.5 w-3.5 text-gray-600" />
-          <span>Insurance Vault</span>
+          <span>Lending Guard</span>
         </div>
       </div>
 
@@ -309,11 +309,11 @@ export function BentoIdeaSection() {
               The Idea • Bento Architecture
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl text-ink">
-              A composable event primitive for Ethereum
+              A composable event primitive for Robinhood Chain
             </h2>
           </div>
           <p className="max-w-md text-xs text-gray-600 font-mono leading-relaxed">
-            Instead of single-purpose oracle calls, Novak resolves facts once and exposes them as a standing, composable event topology.
+            Chainlink gives Robinhood Chain prices. Novak resolves the facts around them — corporate actions, halts, price-at-time conditions — once, and exposes them as standing, composable events.
           </p>
         </div>
 

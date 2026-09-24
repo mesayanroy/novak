@@ -7,6 +7,7 @@ import { EventComposer } from "../../contracts/EventComposer.sol";
 import { EventBus } from "../../contracts/EventBus.sol";
 import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 import { IEventComposer } from "../../contracts/interfaces/IEventComposer.sol";
+import { IEventBus } from "../../contracts/interfaces/IEventBus.sol";
 
 contract EventBusTest is Test {
     EventRegistry internal registry;
@@ -63,6 +64,49 @@ contract EventBusTest is Test {
         assertTrue(bus.isAvailable(eventId));
         IEventRegistry.Outcome memory outcome = bus.readOutcome(eventId);
         assertTrue(abi.decode(outcome.outcomeData, (bool)));
+    }
+
+    function test_getAvailability_pendingThenAvailable() public {
+        bytes32 eventId = registry.createEvent(_defaultSpec());
+        assertEq(uint8(bus.getAvailability(eventId)), uint8(IEventBus.Availability.Pending));
+        _finalize(eventId, false);
+        assertEq(uint8(bus.getAvailability(eventId)), uint8(IEventBus.Availability.Available));
+    }
+
+    function test_getAvailability_unknownIdIsPending() public view {
+        assertEq(
+            uint8(bus.getAvailability(keccak256("nope"))), uint8(IEventBus.Availability.Pending)
+        );
+    }
+
+    function test_getAvailability_expiredPrimitiveIsVoided() public {
+        bytes32 eventId = registry.createEvent(_defaultSpec());
+        vm.warp(block.timestamp + 1 days + 1);
+        registry.expire(eventId);
+        assertEq(uint8(bus.getAvailability(eventId)), uint8(IEventBus.Availability.Voided));
+    }
+
+    function test_getAvailability_compositeOverExpiredOperandIsVoidedAfterTryResolve() public {
+        bytes32 eventA = registry.createEvent(_defaultSpec());
+        bytes32 eventB = registry.createEvent(_defaultSpec());
+        _finalize(eventA, true);
+
+        bytes32[] memory operands = new bytes32[](2);
+        operands[0] = eventA;
+        operands[1] = eventB;
+        bytes32 compositeId = composer.createComposite(
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.And, operands: operands, window: 0
+            })
+        );
+
+        vm.warp(block.timestamp + 1 days + 1);
+        registry.expire(eventB);
+        // Still Pending until someone pokes the Composer.
+        assertEq(uint8(bus.getAvailability(compositeId)), uint8(IEventBus.Availability.Pending));
+        composer.tryResolve(compositeId);
+        assertEq(uint8(bus.getAvailability(compositeId)), uint8(IEventBus.Availability.Voided));
+        assertFalse(bus.isAvailable(compositeId));
     }
 
     function test_readOutcome_returnsResolvedCompositeOutcome() public {

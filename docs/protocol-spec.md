@@ -13,7 +13,7 @@ together.
 |------------------------|---------|----------------------------------------------------------------|
 | `specVersion`          | uint16  | Schema version for `spec` and outcome payload decoding.        |
 | `sourceId`             | bytes32 | Identifies which resolver adapter class can serve this event.  |
-| `openTimestamp`        | uint64  | When observation may begin.                                    |
+| `openTimestamp`        | uint64  | When observation may begin — **enforced**: `submitObservation` reverts before it. |
 | `observationDeadline`  | uint64  | Last time a resolver may submit an observation.                |
 | `disputeWindowSeconds` | uint64  | Challenge window after a proposed outcome, before finalization. |
 | `quorumThreshold`      | uint8   | Number of matching authorized-resolver observations required.  |
@@ -34,6 +34,29 @@ bool covers the MVP without needing a schema registry per `specVersion`.
 directly. A future `specVersion` could introduce richer payloads (e.g. an
 enumerated outcome set like `NO_CHANGE`/`CUT_25`/`CUT_50`), but that requires
 updating both the decode sites and this document before shipping.
+
+**FINALIZED — outcome payload schema (specVersion 2).** `outcomeData` is
+`abi.encode(bool outcome, uint64 occurredAt)` — exactly 64 bytes, and
+`occurredAt <= block.timestamp` at submission (both enforced by
+`EventRegistry.submitObservation`). `occurredAt` is the real-world time the
+fact became true (e.g. the earnings release, the multiplier's `effectiveAt`).
+Because quorum is exact-match on the full payload, resolvers must agree on it
+exactly — adapters derive it deterministically from the source (a filing
+timestamp, a Chainlink round's `updatedAt`, a token's `effectiveAt`), never
+from local clock time. The bool is the first ABI word in both versions, so
+every `abi.decode(outcomeData, (bool))` consumer (`Settlement`,
+`StockLendingGuard`, `DisputeManager`) reads v2 unchanged. Dispute
+committees vote on the boolean only, so a v2 event finalized via
+`finalizeFromDispute` stores a 32-byte v1-shaped payload; the Composer
+detects this by length and falls back to `finalizedAt` (see temporal ops
+below).
+
+**FINALIZED — consumer availability.** `IEventBus.getAvailability` returns
+`Pending` / `Available` / `Voided`. `Voided` covers a Registry `Voided` or
+`Expired` primitive, and a composite that propagated `Voided` (once someone
+has called `tryResolve` on it). Any consumer holding funds against an event
+must give users an exit for `Voided`: `Market` enters `Refunding`;
+`StockLendingGuard` treats it as "no risk signal".
 
 ## Resolver network
 
@@ -217,9 +240,14 @@ had to define what "an assertion that never resolved" means to a
 *downstream* assertion, because no such downstream relationship exists on
 UMA. Full table: `docs/threat-model.md`.
 
-**FINALIZED — timestamp source for temporal ops.** For a primitive operand,
-the timestamp is `IEventRegistry.Outcome.finalizedAt` (set when
-`EventRegistry.finalize`/`finalizeFromDispute` runs). For a **nested
+**FINALIZED — timestamp source for temporal ops.** For a **specVersion 2**
+primitive operand, the timestamp is the quorum-agreed `occurredAt` from its
+payload — when the fact happened, independent of resolver latency and
+dispute-window length. For a **specVersion 1** primitive (or a v2 primitive
+finalized by a dispute committee, whose payload is 32 bytes), it falls back
+to `IEventRegistry.Outcome.finalizedAt` (set when
+`EventRegistry.finalize`/`finalizeFromDispute` runs) — use v2 for any event
+that will feed BEFORE/WITHIN. For a **nested
 composite** operand, the timestamp is when that composite's own `tryResolve`
 call first cached a result (`EventComposer._resolvedAt`). This is a known
 simplification: a composite's effective "occurred at" time is *resolution*
@@ -235,12 +263,27 @@ precedence above.)
 ## Derivatives market outcome model
 
 **FINALIZED — parimutuel pools, no token economics.** `Market.sol` is a
-binary YES/NO pool: everyone backing a side pools ETH together, and once
-settled, the winning pool splits the losing pool pro-rata to stake (plus
-gets its own stake back). If nobody backed the winning side, everyone is
-refunded their own stake. This is trivially solvent (total payout ≤ total
-deposit) without needing an AMM, leverage, or liquidation logic — all
-explicitly deferred (see MVP scope below).
+binary YES/NO pool collateralized in an ERC-20 stablecoin (USDG on Robinhood
+Chain; `MockUSDG` on testnet): everyone backing a side pools collateral
+together, and once settled, the winning pool splits the losing pool — minus a
+protocol fee (`feeBps`, capped at 5%, sent to the treasury) — pro-rata to
+stake, plus gets its own stake back. If nobody backed the winning side,
+everyone is refunded their own stake and no fee is taken. This is trivially
+solvent (payouts + fee ≤ deposits, fuzz-tested) without needing an AMM,
+leverage, or liquidation logic — all explicitly deferred (see MVP scope below).
+
+**FINALIZED — trading window.** Each market has a `tradingClosesAt`; deposits
+**and withdrawals** revert at or after it, and deposits also revert as soon as
+the Bus reports the event decided. Without this, the losing side could
+withdraw its stake once the outcome was public but before `settle` ran (a
+real exploit in the first version, now a regression test). The Market can't
+read the Registry, so it can't check `tradingClosesAt <= openTimestamp`
+itself; market creators (the frontend templates) set it to the underlying
+event's `openTimestamp`.
+
+**FINALIZED — voided events refund.** If the Bus reports `Voided`, `settle`
+moves the market to `Refunding` and every depositor claims back exactly their
+own stake — funds are never locked behind an event that can never resolve.
 
 ## MVP scope
 

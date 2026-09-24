@@ -52,6 +52,28 @@ contract EventRegistryTest is Test {
         registry.submitObservation(eventId, abi.encode(true), keccak256("evidence"));
     }
 
+    /// @dev Regression: observations used to be accepted before the event's
+    ///      window opened, letting a quorum resolve an event that hadn't
+    ///      happened yet.
+    function test_submitObservation_revertsBeforeOpenTimestamp() public {
+        registry.setResolverAuthorization(resolverA, true);
+        IEventRegistry.EventSpec memory spec = _defaultSpec(1);
+        spec.openTimestamp = uint64(block.timestamp + 1 days);
+        spec.observationDeadline = uint64(block.timestamp + 2 days);
+        bytes32 eventId = registry.createEvent(spec);
+
+        vm.prank(resolverA);
+        vm.expectRevert(bytes("EventRegistry: event not open yet"));
+        registry.submitObservation(eventId, abi.encode(false), keccak256("too-early"));
+
+        vm.warp(spec.openTimestamp);
+        vm.prank(resolverA);
+        registry.submitObservation(eventId, abi.encode(true), keccak256("on-time"));
+        assertEq(
+            uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.ProposedOutcome)
+        );
+    }
+
     function test_quorum_reachedAfterThresholdMatchingObservations() public {
         registry.setResolverAuthorization(resolverA, true);
         registry.setResolverAuthorization(resolverB, true);

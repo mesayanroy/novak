@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount, useSwitchChain } from "wagmi";
+import { activeChain } from "@/lib/wagmi";
 import { Button } from "@/components/ui/button";
 import { shortHex } from "@/lib/utils";
 import { Wallet, ChevronDown, ExternalLink, Zap, ShieldCheck, CheckCircle2 } from "lucide-react";
 
 export function ConnectButton() {
   const [showPopover, setShowPopover] = useState(false);
+  const { chainId: walletChainId } = useAccount();
+  const { switchChain, isPending: isSwitching } = useSwitchChain();
 
   return (
     <RainbowConnectButton.Custom>
@@ -40,9 +44,22 @@ export function ConnectButton() {
 
               if (chain.unsupported) {
                 return (
-                  <Button variant="secondary" size="sm" onClick={openChainModal} className="gap-2 text-rose-700 bg-rose-50 border-rose-200">
-                    Wrong network
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <span className="hidden font-mono text-[11px] text-rose-700 md:inline">
+                      Wallet on chain {walletChainId ?? chain.id}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={isSwitching}
+                      // wagmi's switchChain adds the network to the wallet
+                      // (wallet_addEthereumChain) if it doesn't know it yet.
+                      onClick={() => switchChain({ chainId: activeChain.id })}
+                      className="gap-2 text-rose-700 bg-rose-50 border-rose-200"
+                    >
+                      {isSwitching ? "Switching…" : `Switch to ${activeChain.name}`}
+                    </Button>
+                  </div>
                 );
               }
 

@@ -135,6 +135,27 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTED
   pool that settles against composite (or primitive) event outcomes read
   through `Settlement` → `EventBus`.
 
+## Robinhood Chain topology
+
+Novak is deployed on **Robinhood Chain testnet (46630)**, an Arbitrum Orbit
+L2. Its resolvers read their data from **Robinhood Chain mainnet (4663)**,
+where Chainlink stock feeds and ERC-8056 stock tokens actually live (the
+testnet has neither — see `docs/ROBINHOOD_CHAIN_PLAN.md` §0).
+
+| Piece | Where | Role |
+|---|---|---|
+| Source adapters (`resolver/adapters/`) | off-chain, read mainnet | `chainlink.price-at` (Chainlink round at time T), `rh.corporate-action` (ERC-8056 `UIMultiplierUpdated` logs), `rh.trading-status` (Robinhood asset registry) |
+| Resolver duty | off-chain → testnet | discover events from logs, observe, submit outcome + evidence hash |
+| Voter duty | off-chain → testnet | re-observe and vote when drawn onto a dispute committee |
+| Keeper duty | off-chain → testnet | call permissionless transitions (finalize, escalate, tryResolve, settle). Not push delivery: consumers still pull |
+| `Market` | testnet | USDG parimutuel markets, the first Bus consumer |
+| `StockLendingGuard` | testnet | liquidation circuit-breaker, the second Bus consumer, reading the same events |
+| Frontend `/calendar` | server route, reads mainnet | ERC-8056 state of all stock tokens, the corporate-action calendar Chainlink doesn't provide |
+
+Chainlink is a **data source** of Novak, not something Novak replaces: price
+feeds answer "what is the price"; Novak answers "what happened, when, and in
+what combination", with finality, disputes and composition.
+
 ## End-to-end trace (the same architecture as one flow)
 
 This is the exact path verified against a live local anvil chain in

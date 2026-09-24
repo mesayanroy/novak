@@ -9,9 +9,10 @@ optimizer_runs = 200
 via_ir = false
 fs_permissions = [{ access = "read", path = "./" }]
 
-# NOTE: `derivatives/` is not listed as a Foundry `src` root — Foundry only
-# has one src dir. Its contracts are picked up via the import graph because
-# test/ files import them directly (e.g. "../../derivatives/Market.sol").
+# NOTE: `derivatives/` and `consumers/` are not listed as Foundry `src`
+# roots — Foundry only has one src dir. Their contracts are picked up via the
+# import graph because test/ files (and script/Deploy.s.sol) import them
+# directly (e.g. "../../derivatives/Market.sol").
 # This keeps one toolchain/one `forge build` for both contracts/ and
 # derivatives/ without duplicating config.
 
@@ -30,7 +31,10 @@ bracket_spacing = true
 
 [rpc_endpoints]
 local = "${RPC_URL_LOCAL}"
-testnet = "${RPC_URL_TESTNET}"
+robinhood_testnet = "${RPC_URL_ROBINHOOD_TESTNET}"
 
+# Contract verification on Robinhood Chain goes through Blockscout, which
+# accepts any non-empty key:
+#   forge script script/Deploy.s.sol --rpc-url robinhood_testnet --broadcast --verify
 [etherscan]
-testnet = { key = "${ETHERSCAN_API_KEY}" }
+robinhood_testnet = { key = "blockscout", chain = 46630, url = "https://explorer.testnet.chain.robinhood.com/api" }

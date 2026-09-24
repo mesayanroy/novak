@@ -25,7 +25,25 @@ export enum EventStatus {
   Expired = 7,
 }
 
+/** Consumer-facing status from `IEventBus.getAvailability`. */
+export enum Availability {
+  /** No outcome yet; may still get one. */
+  Pending = 0,
+  /** A finalized true/false outcome exists. */
+  Available = 1,
+  /** Will never resolve (voided/expired primitive, or a composite that propagated it). */
+  Voided = 2,
+}
+
+export enum MarketStatus {
+  Open = 0,
+  Settled = 1,
+  /** The underlying event was voided — every depositor reclaims their own stake. */
+  Refunding = 2,
+}
+
 export interface EventSpecInput {
+  /** 1: outcome = abi.encode(bool). 2: abi.encode(bool, uint64 occurredAt) — use for anything feeding BEFORE/WITHIN. */
   specVersion: number;
   sourceId: Hex;
   openTimestamp: bigint;
@@ -52,18 +70,22 @@ export interface Outcome {
 
 export interface MarketDef {
   eventId: Hex;
+  creator: Address;
   createdAt: bigint;
-  settled: boolean;
+  tradingClosesAt: bigint;
+  status: MarketStatus;
   outcome: boolean;
   yesPool: bigint;
   noPool: bigint;
+  feeTaken: bigint;
+  question: string;
 }
 
 export interface NovakAddresses {
   eventRegistry: Address;
   /** Optional: only needed by a resolver/committee node driving the
    *  IDisputeManager tiered-escalation calls directly — NovakClient (the
-   *  consumer SDK) never reads or writes to it. */
+   *  consumer SDK) never writes to it. */
   disputeManager?: Address;
   eventBus: Address;
   eventComposer: Address;
@@ -71,4 +93,18 @@ export interface NovakAddresses {
   settlement: Address;
   positionManager: Address;
   market: Address;
+  /** ERC-20 collateral (MockUSDG on testnet, USDG on mainnet). */
+  collateral: Address;
+  stockLendingGuard?: Address;
+}
+
+/** Shape of deployments/<chainId>.json (script/export-deployment.mjs). */
+export interface NovakDeployment extends NovakAddresses {
+  chainId: number;
+  /** L2 block of the first deployment tx — start point for log scans. */
+  startBlock: number;
+  deployedAt: string;
+  collateralIsMock: boolean;
+  disputeManager: Address;
+  stockLendingGuard: Address;
 }

@@ -1,199 +1,175 @@
-# Novak - Neural Event Oracle Network
+# Novak — the event layer for tokenized stocks on Robinhood Chain
 
 [![CI](https://github.com/mesayanroy/novak/actions/workflows/ci.yml/badge.svg)](https://github.com/mesayanroy/novak/actions/workflows/ci.yml)
 [![Built with Foundry](https://img.shields.io/badge/built%20with-Foundry-4a4a4a)](https://book.getfoundry.sh/)
 [![pnpm workspaces](https://img.shields.io/badge/pnpm-workspaces-f9ad00)](https://pnpm.io/workspaces)
 
-A decentralized, composable event bus for Ethereum. On-chain and real-world
-events are resolved, finalized, and stored once, then composed (AND/OR/NOT,
-BEFORE/WITHIN) and consumed by many independent smart contracts — instead of
-every application building its own oracle integration. The first application
-built on top of it is a derivatives market that settles against composite
-events.
+> **Chainlink tells your contract the price. Novak tells it what happened.**
+
+Robinhood Chain ships Chainlink price feeds for ~95 tokenized stocks. It does
+**not** ship the facts around those prices: Chainlink's own docs say it
+"does not provide corporate-action calendar data or automated pause
+triggers", Robinhood's docs call the token's `oraclePaused()` flag "advisory
+and not enforced on-chain", and every lending/DEX integrator is told to track
+ERC-8056 multiplier changes on its own.
+
+Novak turns those facts — splits and dividend adjustments, trading halts,
+"NVDA ≥ $X at time T" — into **finalized on-chain events**: resolved once by
+independent resolvers from live Robinhood Chain data, disputable by bonded
+committees (never a token-weighted vote), composable with AND / OR / NOT /
+BEFORE / WITHIN, and read by every protocol through one `EventBus`. Chainlink
+is one of Novak's data sources, not a competitor.
+
+Two consumers ship in this repo and read the **same** events:
+
+- **`Market`** — USDG parimutuel markets that settle on any Novak event.
+- **`StockLendingGuard`** — a liquidation circuit-breaker: a lending protocol
+  calls `canLiquidate(stockToken)` and liquidations pause while a finalized
+  corporate-action/halt event is true.
 
 ## Contents
 
+- [What's verified](#whats-verified)
 - [Architecture](#architecture)
 - [Repository layout](#repository-layout)
 - [Status](#status)
-- [Setup](#setup)
+- [Quickstart: Robinhood Chain testnet](#quickstart-robinhood-chain-testnet)
+- [Local development](#local-development)
 - [Testing & CI](#testing--ci)
 - [Contributing](#contributing)
 - [Documentation](#documentation)
 - [License](#license)
 
+## What's verified
+
+- **Contracts:** `forge test` → **112/112** passing (unit / integration / fuzz
+  / adversarial), including regression tests for the market fund-loss bug
+  fixed in this pass (see `docs/threat-model.md`).
+- **Deployment:** the full stack simulates cleanly against the live Robinhood
+  Chain testnet (46630); total cost ≈ 0.0003 ETH of faucet ETH.
+- **Resolvers on live data:** the three adapters were run against Robinhood
+  Chain mainnet and Robinhood's asset API (`pnpm --filter novak-resolver
+  probe`): Chainlink `Robinhood NVDA / USD` rounds, NVDA's real ERC-8056
+  multiplier update (effective 2026-09-10), and per-session tradability.
+- **Autonomous pipeline:** on a local chain, three resolver processes +
+  keeper resolved seeded events from live mainnet data, reached quorum with
+  identical evidence hashes, finalized, resolved an AND composite, settled
+  three markets, paused NVDA liquidations in the guard, and handled a filed
+  dispute (committee re-observed and voted; bond forfeited) — no manual steps.
+
 ## Architecture
 
 ```
-CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTED
-       -> FINALIZED (or VOIDED / EXPIRED) -> AVAILABLE TO CONSUMERS
-
-  resolver network  →  EventRegistry  →  EventComposer  →  EventBus  →  apps
-  (off-chain nodes)    + DisputeManager   (AND/OR/NOT,       (pull-only     (Market /
-                        (canonical state   BEFORE/WITHIN)     read API)      PositionManager /
-                        machine + bonded                                     Settlement)
-                        committee ladder)
+            Robinhood Chain MAINNET (read-only data sources)
+   Chainlink stock feeds · ERC-8056 stock tokens · api.robinhood.com/rhj/assets
+                                   │
+                        resolver network (≥3 nodes)
+          observe → evidence hash → submitObservation · vote in disputes
+                                   │
+   ┌─────────── Robinhood Chain TESTNET (where Novak is deployed) ────────────┐
+   │ EventRegistry + DisputeManager → EventComposer → EventBus → consumers     │
+   │ (state machine,  (bonded 2-tier  (AND/OR/NOT,     (pull     Market (USDG) │
+   │  quorum)          committees)     BEFORE/WITHIN)   reads)   StockLending- │
+   │                                                             Guard         │
+   └───────────────────────────────────────────────────────────────────────────┘
+                     keeper: finalize · tryResolve · settle
 ```
 
+Lifecycle: `CREATE → OPEN → OBSERVATIONS SUBMITTED → PROPOSED OUTCOME →
+(DISPUTED) → FINALIZED | VOIDED | EXPIRED → AVAILABLE TO CONSUMERS`.
+
 **Hard invariant: applications depend on the Event Bus, never directly on a
-resolver, the Registry, the DisputeManager, or the Composer.** This is
-enforced by a regression test
-(`test/unit/Market.t.sol::test_market_onlyHoldsSettlementReference`); any new
-consumer contract should add an equivalent guard. See `docs/architecture.md`
-for the full component breakdown, `docs/threat-model.md` /
-`docs/protocol-spec.md` for the adversary list and finalized protocol
-decisions, and `docs/SPEC_AND_TASKS.md` for the milestone-by-milestone
-deliverables checklist.
+resolver, the Registry, the DisputeManager, or the Composer.** Enforced by
+regression tests (`test_market_onlyHoldsSettlementReference`,
+`test_guard_onlyHoldsEventBusReference`). See `docs/architecture.md`,
+`docs/protocol-spec.md`, `docs/threat-model.md`, and
+`docs/ROBINHOOD_CHAIN_PLAN.md` (track plan + verified environment facts).
 
 ## Repository layout
 
 ```
 novak/
-├── contracts/            Foundry workspace: EventRegistry, DisputeManager, EventBus,
-│                          EventComposer, SubscriptionManager + interfaces/
-├── resolver/              Node/TypeScript resolver daemon: adapters, evidence,
-│                          consensus (quorum)
-├── derivatives/           Market, PositionManager, Settlement — consume events
-│                          only through IEventBus
-├── sdk/                   @novak/sdk — TypeScript client wrapping contract calls
-├── frontend/               Next.js + Tailwind + wagmi/viem/RainbowKit demo site:
-│                          landing page, a full /docs hub, /markets + /markets/[id]
-├── test/                   unit/ integration/ fuzz/ adversarial/ (Foundry)
-├── docs/                   architecture.md, protocol-spec.md, threat-model.md,
-│                          SPEC_AND_TASKS.md (deliverables checklist),
-│                          FRONTEND_SPEC.md (frontend stack/route map)
-├── examples/               end-to-end-flow.ts walking the canonical demo flow
-├── script/                 Foundry deployment scripts
-└── .github/workflows/      CI pipeline (contracts + TS workspaces)
+├── contracts/     EventRegistry, DisputeManager, EventComposer, EventBus,
+│                  SubscriptionManager, mocks/MockUSDG + interfaces/
+├── derivatives/   Market (USDG), PositionManager, Settlement — IEventBus consumers
+├── consumers/     StockLendingGuard — second IEventBus consumer
+├── resolver/      resolver daemon: adapters (chainlink.price-at,
+│                  rh.corporate-action, rh.trading-status), discovery,
+│                  keeper, dispute voter, /health + /evidence server
+├── sdk/           @novak/sdk — generated ABIs, deployments, chains, source specs
+├── frontend/      Next.js app: landing, /markets, /calendar, /guard, /docs
+├── deployments/   <chainId>.json — addresses + startBlock (script/export-deployment.mjs)
+├── script/        Deploy.s.sol, export-deployment.mjs
+├── examples/      end-to-end-flow.ts, seed-demo.ts
+├── test/          unit/ integration/ fuzz/ adversarial/ (Foundry)
+└── docs/          architecture, protocol-spec, threat-model, SPEC_AND_TASKS,
+                   ROBINHOOD_CHAIN_PLAN
 ```
 
 ## Status
 
-The backend is MVP-complete and verified end-to-end: event creation,
-multi-resolver quorum (with a defined escalation path for a non-converging
-quorum), bonded two-tier committee dispute escalation (`DisputeManager`),
-finalization, terminal `Voided`/`Expired` states with propagation through
-composition, AND/OR/NOT/BEFORE/WITHIN composition with canonicalized
-identity, and a settling parimutuel derivatives market are all implemented
-and tested — `forge test` → **80/80 passing** across unit/integration/fuzz/
-adversarial suites. The full canonical demo runs successfully against a local
-Anvil chain — see [End-to-end demo script](#end-to-end-demo-script) below.
+Implemented and tested: event registry with enforced observation windows;
+N-of-M resolver quorum with a non-convergence escalation path; bonded
+two-tier committee disputes with pull payments; specVersion 2 outcomes
+(`occurredAt`) so BEFORE/WITHIN compare when facts *happened*; terminal
+`Voided`/`Expired` propagation; `EventBus.getAvailability`
+(Pending/Available/Voided); USDG markets with trading windows, refunds on
+voided events and a protocol fee; `StockLendingGuard`; real resolver
+adapters, on-chain event discovery, keeper and dispute voter; SDK with
+generated ABIs; live-data frontend with Robinhood Wallet (WalletConnect).
 
-The frontend MVP is also built out: a landing page, a nine-page `/docs` hub,
-and `/markets` + `/markets/[id]` wired to the real `@novak/sdk` ABIs wherever
-a live read/write is possible (mock data is used only where the contracts
-have no enumeration getter, and is always visibly badged as mock). See
-`docs/FRONTEND_SPEC.md` for the exact route map and live/mock data
-breakdown.
+Known limits (details in `docs/threat-model.md` and `docs/protocol-spec.md`):
+committee selection is block-data pseudo-randomness (Chainlink VRF is not
+available on Robinhood Chain); no staking/reputation token behind resolvers;
+testnet only — Robinhood Chain mainnet is read, not written; no push/relayer
+delivery to consumers (the keeper only calls permissionless functions).
 
-**Still open**, tracked in detail in `docs/SPEC_AND_TASKS.md`:
+## Quickstart: Robinhood Chain testnet
 
-- A real public testnet deployment (needs a funded deployer key/RPC).
-- The push/relayer execution layer (zero code — pull-based `EventBus` reads
-  are what's implemented).
-- Real (non-mocked) resolver data sources and on-chain event discovery.
-- `resolver/node/index.ts` daemon wiring for `DisputeManager`'s Tier-1/Tier-2
-  escalation events (the on-chain mechanism and off-chain quorum math are
-  done; the daemon doesn't yet auto-vote).
-- `NovakClient` SDK write methods for the tiered dispute flow.
-- On-chain market discovery/indexing (`/markets`' list is structurally mock
-  until an indexer exists) and a live API server behind `/docs/api`'s
-  REST-style reference.
-- Full stake-weighted, VRF-selected dispute arbitration — the bonded
-  committee ladder is a real structural improvement over single-owner
-  arbitration, not the final design.
-
-## Setup
-
-### Prerequisites
-
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) (`forge`,
-  `anvil`, `cast`):
-  ```bash
-  curl -L https://foundry.paradigm.xyz | bash
-  foundryup
-  ```
-- Node.js 20+ and [pnpm](https://pnpm.io/) 9+ (`corepack enable` will provide
-  pnpm on modern Node installs).
-
-### Install
+Network: chain ID **46630**, RPC `https://rpc.testnet.chain.robinhood.com`,
+explorer `https://explorer.testnet.chain.robinhood.com`, faucet
+`https://faucet.testnet.chain.robinhood.com` (gas is ETH).
 
 ```bash
-# One-time: pull in forge-std for contracts/tests
-forge install foundry-rs/forge-std --no-commit
+forge install foundry-rs/forge-std --no-commit && pnpm install
+cp .env.example .env    # DEPLOYER_PRIVATE_KEY, RESOLVER_ADDRESSES, ...
 
-# TypeScript workspaces (resolver, sdk, frontend)
-pnpm install
+# 1. Deploy + verify (MockUSDG is deployed automatically on testnet)
+forge script script/Deploy.s.sol --rpc-url robinhood_testnet --broadcast --verify
+node script/export-deployment.mjs 46630          # -> deployments/46630.json
+pnpm --filter @novak/sdk gen && pnpm --filter @novak/sdk build
 
-cp .env.example .env   # fill in RPC URLs / keys as needed
+# 2. Run 3 resolvers (different keys; one also runs the keeper)
+RESOLVER_ID=r1 RESOLVER_PRIVATE_KEY=0x.. RESOLVER_KEEPER=true RESOLVER_HTTP_PORT=8787 pnpm --filter novak-resolver start
+RESOLVER_ID=r2 RESOLVER_PRIVATE_KEY=0x.. pnpm --filter novak-resolver start
+RESOLVER_ID=r3 RESOLVER_PRIVATE_KEY=0x.. pnpm --filter novak-resolver start
+
+# 3. Seed the demo set (live NVDA/TSLA thresholds, a composite, markets,
+#    a corporate-action event wired into the lending guard)
+NOVAK_CHAIN_ID=46630 pnpm tsx examples/seed-demo.ts
+
+# 4. Frontend (needs NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID for Robinhood Wallet)
+pnpm --filter novak-frontend dev
 ```
 
-### Contracts
+See what a resolver would vote right now, against live sources, without any
+deployment: `pnpm --filter novak-resolver probe`.
+
+## Local development
 
 ```bash
-forge build          # compile contracts/ + derivatives/ + test/
-forge test -vvv       # unit + integration + fuzz + adversarial suites
-forge fmt             # format
+anvil
+RESOLVER_ADDRESSES=0x70997970C51812dc3A010C7d01b50e0d17dc79C8,0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC,0x90F79bf6EB2c4f870365E785982E1f101E93b906 \
+  DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
+node script/export-deployment.mjs 31337 && pnpm --filter @novak/sdk gen
+pnpm example:e2e                                  # canonical flow, scripted
+cast rpc evm_setIntervalMining 2                  # resolvers need blocks to see time pass
+NOVAK_CHAIN_ID=31337 ... pnpm --filter novak-resolver start   # as above, anvil keys #1-#3
+NEXT_PUBLIC_CHAIN_ID=31337 pnpm --filter novak-frontend dev
 ```
 
-Deploy to a local chain:
-
-```bash
-anvil                                                     # in one terminal
-forge script script/Deploy.s.sol \
-  --rpc-url local --broadcast \
-  --private-key $DEPLOYER_PRIVATE_KEY                     # in another
-```
-
-Copy the printed contract addresses into `.env`, including
-`DISPUTE_MANAGER_ADDRESS` (deployed but not exercised by the undisputed demo
-path below).
-
-### Resolver
-
-```bash
-pnpm --filter novak-resolver dev     # watch mode
-pnpm --filter novak-resolver test
-```
-
-### SDK
-
-```bash
-pnpm --filter @novak/sdk build
-pnpm --filter @novak/sdk test
-```
-
-### Frontend
-
-```bash
-pnpm --filter novak-frontend dev     # http://localhost:3000
-```
-
-### Everything at once
-
-```bash
-pnpm build     # builds resolver, sdk, frontend (sdk first — resolver depends on it)
-pnpm test      # forge test + resolver/sdk TS tests
-```
-
-### End-to-end demo script
-
-After deploying contracts locally and populating `.env` with the deployed
-addresses (`EVENT_REGISTRY_ADDRESS`, `EVENT_BUS_ADDRESS`,
-`EVENT_COMPOSER_ADDRESS`, `SUBSCRIPTION_MANAGER_ADDRESS`,
-`SETTLEMENT_ADDRESS`, `POSITION_MANAGER_ADDRESS`, `MARKET_ADDRESS`, plus
-`DEPLOYER_PRIVATE_KEY`):
-
-```bash
-pnpm example:e2e
-```
-
-This runs the full canonical flow live against your local chain: create two
-primitive events, authorize resolvers and reach quorum on both, advance past
-the dispute window and finalize, compose `WITHIN(48h)`, resolve the
-composite, create a market, take two opposing positions, settle, and claim.
-The script doesn't exercise `DisputeManager` (the demo stays on the
-undisputed path), so `DISPUTE_MANAGER_ADDRESS` isn't required for it.
+(Those keys are anvil's public test keys — local use only.)
 
 ## Testing & CI
 

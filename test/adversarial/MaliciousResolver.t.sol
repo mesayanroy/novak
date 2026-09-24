@@ -14,6 +14,12 @@ import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 ///         staking economics that are explicitly out of MVP scope (see
 ///         docs/protocol-spec.md).
 contract MaliciousResolverTest is Test {
+    /// @dev Wallet balance + ETH credited by DisputeManager but not yet
+    ///      withdrawn (payouts are pull-based).
+    function _owed(address a) internal view returns (uint256) {
+        return a.balance + disputeManager.pendingWithdrawals(a);
+    }
+
     EventRegistry internal registry;
     DisputeManager internal disputeManager;
 
@@ -144,7 +150,7 @@ contract MaliciousResolverTest is Test {
 
         uint256 bond = disputeManager.DISPUTE_BOND();
         vm.deal(attacker, 1 ether);
-        uint256 balanceBefore = attacker.balance;
+        uint256 balanceBefore = _owed(attacker);
 
         vm.prank(attacker);
         disputeManager.dispute{ value: bond }(eventId);
@@ -158,7 +164,7 @@ contract MaliciousResolverTest is Test {
         disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true); // 2/3 >= 66% -> converges, upholds "true"
 
         assertTrue(registry.isFinalized(eventId));
-        assertEq(attacker.balance, balanceBefore - bond);
+        assertEq(_owed(attacker), balanceBefore - bond);
     }
 
     /// @dev Replay: attempting to dispute an event twice (e.g. to keep

@@ -1,3 +1,4 @@
 forge-std/=lib/forge-std/src/
 novak-contracts/=contracts/
 novak-derivatives/=derivatives/
+novak-consumers/=consumers/

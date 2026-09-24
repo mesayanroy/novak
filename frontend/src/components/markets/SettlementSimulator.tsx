@@ -140,8 +140,8 @@ export function SettlementSimulator({ yesPool, noPool }: { yesPool: number; noPo
           </span>
           <span className="text-sm font-bold text-ink">
             {simulatedOutcome
-              ? `YES Pool splits ${totalPool.toFixed(2)} ETH`
-              : `NO Pool splits ${totalPool.toFixed(2)} ETH`}
+              ? `YES Pool splits ${totalPool.toFixed(2)} USDG`
+              : `NO Pool splits ${totalPool.toFixed(2)} USDG`}
           </span>
         </div>
       </div>

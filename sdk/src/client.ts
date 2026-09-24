@@ -1,20 +1,29 @@
-import type { Account, PublicClient, WalletClient } from "viem";
+import { parseAbiItem, type Account, type PublicClient, type WalletClient } from "viem";
 import {
   eventBusAbi,
   eventComposerAbi,
   eventRegistryAbi,
   marketAbi,
+  mockUsdgAbi,
   settlementAbi,
+  stockLendingGuardAbi,
   subscriptionManagerAbi,
 } from "./abis.js";
 import type {
+  Address,
+  Availability,
   CompositeSpecInput,
   EventSpecInput,
   Hex,
   MarketDef,
+  MarketStatus,
   NovakAddresses,
   Outcome,
 } from "./types.js";
+
+const eventCreatedEvent = parseAbiItem(
+  "event EventCreated(bytes32 indexed eventId, bytes32 indexed sourceId, uint16 specVersion)",
+);
 
 /**
  * Thin wrapper over the Novak contract surface. Deliberately mirrors the
@@ -42,8 +51,8 @@ export class NovakClient {
 
   // --- Event creation (Registry) ---
 
-  async createEvent(spec: EventSpecInput, account: Account): Promise<Hex> {
-    const hash = await this.requireWallet().writeContract({
+  async createEvent(spec: EventSpecInput, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
       address: this.addresses.eventRegistry,
@@ -51,7 +60,6 @@ export class NovakClient {
       functionName: "createEvent",
       args: [spec],
     });
-    return hash;
   }
 
   /** Decodes the `eventId` a `createEvent` transaction produced from its logs. */
@@ -75,6 +83,15 @@ export class NovakClient {
     });
   }
 
+  async getEventSpec(eventId: Hex): Promise<EventSpecInput> {
+    return this.publicClient.readContract({
+      address: this.addresses.eventRegistry,
+      abi: eventRegistryAbi,
+      functionName: "getEventSpec",
+      args: [eventId],
+    }) as Promise<EventSpecInput>;
+  }
+
   async isFinalized(eventId: Hex): Promise<boolean> {
     return this.publicClient.readContract({
       address: this.addresses.eventRegistry,
@@ -87,7 +104,7 @@ export class NovakClient {
   /** Finalizes a proposed outcome once its dispute window has elapsed with no
    *  dispute filed. Permissionless — callable by anyone, including a
    *  consumer that wants to "pull the trigger" on availability. */
-  async finalize(eventId: Hex, account: Account): Promise<Hex> {
+  async finalize(eventId: Hex, account: Account | Address): Promise<Hex> {
     return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
@@ -98,10 +115,26 @@ export class NovakClient {
     });
   }
 
+  /** Every primitive event created since `fromBlock` (use the deployment's `startBlock`). */
+  async listEvents(fromBlock: bigint): Promise<Array<{ eventId: Hex; sourceId: Hex; specVersion: number; blockNumber: bigint }>> {
+    const logs = await this.publicClient.getLogs({
+      address: this.addresses.eventRegistry,
+      event: eventCreatedEvent,
+      fromBlock,
+      toBlock: "latest",
+    });
+    return logs.map((l) => ({
+      eventId: l.args.eventId as Hex,
+      sourceId: l.args.sourceId as Hex,
+      specVersion: Number(l.args.specVersion),
+      blockNumber: l.blockNumber,
+    }));
+  }
+
   // --- Composition ---
 
-  async createComposite(spec: CompositeSpecInput, account: Account): Promise<Hex> {
-    const hash = await this.requireWallet().writeContract({
+  async createComposite(spec: CompositeSpecInput, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
       address: this.addresses.eventComposer,
@@ -109,12 +142,11 @@ export class NovakClient {
       functionName: "createComposite",
       args: [spec],
     });
-    return hash;
   }
 
-  /** Attempts to resolve a composite event once its operands are finalized. */
-  async tryResolveComposite(compositeId: Hex, account: Account): Promise<Hex> {
-    const hash = await this.requireWallet().writeContract({
+  /** Attempts to resolve a composite event once its operands are decided. */
+  async tryResolveComposite(compositeId: Hex, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
       address: this.addresses.eventComposer,
@@ -122,7 +154,6 @@ export class NovakClient {
       functionName: "tryResolve",
       args: [compositeId],
     });
-    return hash;
   }
 
   async getResolvedComposite(compositeId: Hex): Promise<{ resolved: boolean; outcome: boolean }> {
@@ -155,6 +186,16 @@ export class NovakClient {
     });
   }
 
+  /** Pending / Available / Voided — distinguishes "not yet" from "never". */
+  async getAvailability(eventId: Hex): Promise<Availability> {
+    return this.publicClient.readContract({
+      address: this.addresses.eventBus,
+      abi: eventBusAbi,
+      functionName: "getAvailability",
+      args: [eventId],
+    }) as Promise<Availability>;
+  }
+
   /** Convenience: reads an event's outcome as a plain boolean via Settlement,
    *  without the caller needing to decode `Outcome.outcomeData` itself. */
   async resolveOutcome(eventId: Hex): Promise<{ available: boolean; outcome: boolean }> {
@@ -170,7 +211,7 @@ export class NovakClient {
   // --- Subscription (MVP: pull-based; this only records intent — see
   // ISubscriptionManager for why there's no push delivery here) ---
 
-  async subscribe(topic: Hex, consumer: Hex, account: Account): Promise<Hex> {
+  async subscribe(topic: Hex, consumer: Hex, account: Account | Address): Promise<Hex> {
     return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
@@ -181,7 +222,7 @@ export class NovakClient {
     });
   }
 
-  async unsubscribe(topic: Hex, consumer: Hex, account: Account): Promise<Hex> {
+  async unsubscribe(topic: Hex, consumer: Hex, account: Account | Address): Promise<Hex> {
     return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
@@ -201,16 +242,61 @@ export class NovakClient {
     });
   }
 
+  // --- Collateral (USDG / MockUSDG) ---
+
+  async collateralBalance(owner: Address): Promise<bigint> {
+    return this.publicClient.readContract({
+      address: this.addresses.collateral,
+      abi: mockUsdgAbi,
+      functionName: "balanceOf",
+      args: [owner],
+    });
+  }
+
+  async collateralAllowance(owner: Address): Promise<bigint> {
+    return this.publicClient.readContract({
+      address: this.addresses.collateral,
+      abi: mockUsdgAbi,
+      functionName: "allowance",
+      args: [owner, this.addresses.market],
+    });
+  }
+
+  /** Approves the Market to pull `amount` collateral (6 decimals for USDG). */
+  async approveCollateral(amount: bigint, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.addresses.collateral,
+      abi: mockUsdgAbi,
+      functionName: "approve",
+      args: [this.addresses.market, amount],
+    });
+  }
+
+  /** TESTNET ONLY: mints MockUSDG (capped per call by the contract). */
+  async mintTestCollateral(to: Address, amount: bigint, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.addresses.collateral,
+      abi: mockUsdgAbi,
+      functionName: "mint",
+      args: [to, amount],
+    });
+  }
+
   // --- Derivatives market ---
 
-  async createMarket(eventId: Hex, account: Account): Promise<Hex> {
+  /** `tradingClosesAt` should be the underlying event's `openTimestamp`. */
+  async createMarket(eventId: Hex, tradingClosesAt: bigint, question: string, account: Account | Address): Promise<Hex> {
     return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
       address: this.addresses.market,
       abi: marketAbi,
       functionName: "createMarket",
-      args: [eventId],
+      args: [eventId, tradingClosesAt, question],
     });
   }
 
@@ -224,40 +310,31 @@ export class NovakClient {
     return log.topics[1] as Hex; // marketId is the first indexed topic on MarketCreated
   }
 
-  async depositCollateral(
-    marketId: Hex,
-    backingYes: boolean,
-    amountWei: bigint,
-    account: Account,
-  ): Promise<Hex> {
+  /** Requires a prior `approveCollateral` of at least `amount`. */
+  async depositCollateral(marketId: Hex, backingYes: boolean, amount: bigint, account: Account | Address): Promise<Hex> {
     return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
       address: this.addresses.market,
       abi: marketAbi,
       functionName: "depositCollateral",
-      args: [marketId, backingYes],
-      value: amountWei,
+      args: [marketId, backingYes, amount],
     });
   }
 
-  async closePosition(
-    marketId: Hex,
-    backingYes: boolean,
-    amountWei: bigint,
-    account: Account,
-  ): Promise<Hex> {
+  /** Withdraws own stake — only while trading is open. */
+  async closePosition(marketId: Hex, backingYes: boolean, amount: bigint, account: Account | Address): Promise<Hex> {
     return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
       address: this.addresses.market,
       abi: marketAbi,
       functionName: "closePosition",
-      args: [marketId, backingYes, amountWei],
+      args: [marketId, backingYes, amount],
     });
   }
 
-  async settleMarket(marketId: Hex, account: Account): Promise<Hex> {
+  async settleMarket(marketId: Hex, account: Account | Address): Promise<Hex> {
     return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
@@ -268,7 +345,7 @@ export class NovakClient {
     });
   }
 
-  async claim(marketId: Hex, account: Account): Promise<Hex> {
+  async claim(marketId: Hex, account: Account | Address): Promise<Hex> {
     return this.requireWallet().writeContract({
       account,
       chain: this.walletClient?.chain,
@@ -280,13 +357,72 @@ export class NovakClient {
   }
 
   async getMarket(marketId: Hex): Promise<MarketDef> {
-    const [eventId, createdAt, settled, outcome, yesPool, noPool] = await this.publicClient.readContract({
+    const m = await this.publicClient.readContract({
       address: this.addresses.market,
       abi: marketAbi,
-      functionName: "markets",
+      functionName: "getMarket",
       args: [marketId],
     });
-    return { eventId, createdAt, settled, outcome, yesPool, noPool };
+    return {
+      eventId: m.eventId,
+      creator: m.creator,
+      createdAt: m.createdAt,
+      tradingClosesAt: m.tradingClosesAt,
+      status: m.status as MarketStatus,
+      outcome: m.outcome,
+      yesPool: m.yesPool,
+      noPool: m.noPool,
+      feeTaken: m.feeTaken,
+      question: m.question,
+    };
+  }
+
+  /** All market IDs, oldest first (paginated on-chain; no indexer needed). */
+  async listMarketIds(pageSize = 100n): Promise<Hex[]> {
+    const count = await this.publicClient.readContract({
+      address: this.addresses.market,
+      abi: marketAbi,
+      functionName: "marketCount",
+    });
+    const ids: Hex[] = [];
+    for (let offset = 0n; offset < count; offset += pageSize) {
+      const page = await this.publicClient.readContract({
+        address: this.addresses.market,
+        abi: marketAbi,
+        functionName: "getMarketIds",
+        args: [offset, pageSize],
+      });
+      ids.push(...(page as Hex[]));
+    }
+    return ids;
+  }
+
+  async listMarkets(): Promise<Array<MarketDef & { marketId: Hex }>> {
+    const ids = await this.listMarketIds();
+    return Promise.all(ids.map(async (marketId) => ({ marketId, ...(await this.getMarket(marketId)) })));
+  }
+
+  /** What `trader` would receive from `claim` right now. */
+  async payoutOf(marketId: Hex, trader: Address): Promise<bigint> {
+    return this.publicClient.readContract({
+      address: this.addresses.market,
+      abi: marketAbi,
+      functionName: "payoutOf",
+      args: [marketId, trader],
+    });
+  }
+
+  // --- StockLendingGuard (second consumer) ---
+
+  async canLiquidate(stockToken: Address): Promise<{ allowed: boolean; blockingEventId: Hex }> {
+    if (!this.addresses.stockLendingGuard) throw new Error("NovakClient: stockLendingGuard address not set");
+    const [allowed, blockingEventId] = await this.publicClient.readContract({
+      address: this.addresses.stockLendingGuard,
+      abi: stockLendingGuardAbi,
+      functionName: "canLiquidate",
+      args: [stockToken],
+    });
+    return { allowed, blockingEventId };
   }
 
   private requireWallet(): WalletClient {

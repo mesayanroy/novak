@@ -1,4 +1,7 @@
-import type { Observation } from "../adapters/types.js";
+/** One resolver's vote on an event, as seen by a local quorum check. */
+export interface Vote {
+  outcome: boolean;
+}
 
 /**
  * Quorum logic: decides whether a set of resolver observations for the same
@@ -22,12 +25,12 @@ export interface QuorumResult {
 
 /** Exact-match quorum: every MVP outcome is a boolean, so "agreement" is
  *  identity, not a tolerance band — see docs/protocol-spec.md for why. */
-export function evaluateQuorum(observations: Observation[], quorumThreshold: number): QuorumResult {
+export function evaluateQuorum(observations: Vote[], quorumThreshold: number): QuorumResult {
   if (observations.length === 0) {
     return { reached: false, agreeingCount: 0, totalCount: 0 };
   }
 
-  const trueCount = observations.filter((o) => o.outcomeData === true).length;
+  const trueCount = observations.filter((o) => o.outcome === true).length;
   const falseCount = observations.length - trueCount;
 
   if (trueCount >= quorumThreshold) {

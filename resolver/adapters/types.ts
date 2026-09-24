@@ -1,28 +1,38 @@
+import type { EventSpecInput, Hex } from "@novak/sdk";
+
 /**
- * A SourceAdapter fetches raw data for a class of events (identified by
- * `sourceId`, matching IEventRegistry.EventSpec.sourceId on-chain) and turns it
- * into an Observation the resolver can submit. Adapters do all "heavy" retrieval
- * and processing off-chain — the chain only ever sees the resulting evidence hash
- * and a boolean outcome (see evidence/ and docs/architecture.md, "minimize
- * on-chain computation").
+ * A SourceAdapter turns an on-chain event definition (`EventSpec`, whose
+ * `sourceId` names the adapter and whose `spec` bytes it decodes) into an
+ * Observation, by reading its source — Robinhood Chain mainnet contracts,
+ * Chainlink feeds, or the Robinhood assets API. All retrieval happens
+ * off-chain; only the outcome and an evidence hash go on-chain.
  *
- * `outcomeData` is a plain `boolean`, matching the finalized MVP outcome-payload
- * schema (IEventRegistry docs, specVersion 1: `abi.encode(bool)`) — every MVP
- * event is a yes/no condition.
+ * DETERMINISM IS THE CONTRACT: quorum is exact-match on the full payload
+ * (outcome AND, for specVersion 2, occurredAt), so every honest resolver
+ * reading the same source must produce the identical Observation. Derive
+ * `occurredAt` from the source (a round's timestamp, a token's effectiveAt, a
+ * spec's window bound) — never from the local clock.
+ *
+ * Return `null` to ABSTAIN: too early to know, source unavailable, data too
+ * stale. Abstaining is always safe — a wrong vote is not.
  */
 export interface Observation {
-  /** The event this observation is about (on-chain event ID). */
-  eventId: `0x${string}`;
-  outcomeData: boolean;
-  /** Unix ms timestamp the adapter fetched the source data. */
-  observedAt: number;
-  /** Raw evidence the adapter used to produce outcomeData (see evidence/). */
-  rawEvidence: unknown;
+  outcome: boolean;
+  /** Unix seconds; the fact's real-world time. Only encoded for specVersion >= 2. */
+  occurredAt: bigint;
+  /** What the adapter saw — hashed into the evidence commitment, served at /evidence/:hash. */
+  rawEvidence: Record<string, unknown>;
+}
+
+export interface ObserveContext {
+  eventId: Hex;
+  spec: EventSpecInput;
+  /** Chain time of the chain Novak is deployed on. */
+  now: bigint;
 }
 
 export interface SourceAdapter {
-  /** Must match a sourceId used in on-chain EventSpecs this adapter can serve. */
-  readonly sourceId: string;
-  /** Fetches current source data and produces an Observation for the given event. */
-  fetchObservation(eventId: `0x${string}`, eventSpec: unknown): Promise<Observation>;
+  /** Catalog name, e.g. "chainlink.price-at.v1"; sourceId = keccak256(name). */
+  readonly name: string;
+  observe(ctx: ObserveContext): Promise<Observation | null>;
 }

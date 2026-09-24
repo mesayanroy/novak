@@ -16,8 +16,11 @@ pragma solidity ^0.8.24;
 ///      - Event ID = keccak256(sourceId, specVersion, spec, nonce). Not
 ///        collision-hardened across chains/deployments; fine for a single MVP
 ///        deployment.
-///      - Outcome payload schema (specVersion 1): `outcomeData` is
-///        `abi.encode(bool)` — every MVP event resolves to a single boolean.
+///      - Outcome payload schema: specVersion 1 `outcomeData` is
+///        `abi.encode(bool)`; specVersion 2 is `abi.encode(bool outcome,
+///        uint64 occurredAt)` (64 bytes, occurredAt <= submission time),
+///        which temporal composition uses instead of `finalizedAt`.
+///      - Observations are rejected before `openTimestamp`.
 ///      - Quorum: resolvers are individually authorized by the Registry owner
 ///        (`setResolverAuthorization`) — no on-chain staking/reputation token
 ///        in the MVP. Quorum is reached when `EventSpec.quorumThreshold`

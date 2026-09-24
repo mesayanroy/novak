@@ -2,98 +2,79 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { EventStatus } from "@novak/sdk";
+import { MarketStatus } from "@novak/sdk";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";
-import type { MockMarket } from "@/lib/mock-data";
+import { fmtTime, fmtUsdg, type LiveMarket } from "@/lib/novak";
 import { shortHex } from "@/lib/utils";
-import { ArrowUpRight, TrendingUp, Layers } from "lucide-react";
+import { ArrowUpRight, Clock, Layers } from "lucide-react";
 
-export type MarketUnderlying =
-  | { kind: "primitive"; status: EventStatus; tier?: 1 | 2 }
-  | { kind: "composite"; status: "Unresolved" | "True" | "False" | "Voided" };
+export function MarketStatusLabel({ market }: { market: LiveMarket }) {
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  if (market.status === MarketStatus.Settled) return <>Settled · {market.outcome ? "YES" : "NO"} won</>;
+  if (market.status === MarketStatus.Refunding) return <>Event voided · refunds open</>;
+  if (now < market.tradingClosesAt) return <>Trading closes {fmtTime(market.tradingClosesAt)}</>;
+  return <>Trading closed · awaiting resolution</>;
+}
 
-export function MarketCard({ market, underlying }: { market: MockMarket; underlying: MarketUnderlying }) {
-  const yesPool = Number(market.yesPoolEth);
-  const noPool = Number(market.noPoolEth);
-  const total = yesPool + noPool;
-  const yesPercent = total > 0 ? Math.round((yesPool / total) * 100) : 50;
+/** Card for a LIVE on-chain market (Market.sol via the SDK). */
+export function MarketCard({ market }: { market: LiveMarket }) {
+  const total = market.yesPool + market.noPool;
+  const yesPercent = total > 0n ? Number((market.yesPool * 100n) / total) : 50;
   const noPercent = 100 - yesPercent;
+  const e = market.event;
 
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.15 }}
-    >
+    <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
       <Link
-        href={`/markets/${market.id}`}
+        href={`/markets/${market.marketId}`}
         className="group link-plain block border border-gray-300 bg-paper p-5 transition-all duration-200 hover:border-ink hover:shadow-md rounded-sm"
       >
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <span className="font-mono text-[10px] uppercase font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 flex items-center gap-1">
                 <Layers className="h-2.5 w-2.5" />
-                {underlying.kind === "composite" ? "COMPOSITE EVENT" : "PRIMITIVE EVENT"}
+                {e.kind === "composite" ? "Composite event" : "Primitive event"}
               </span>
-              <span className="font-mono text-[10px] text-gray-400">
-                ID: {shortHex(market.id, 6, 4)}
-              </span>
+              <span className="font-mono text-[10px] text-gray-400">{shortHex(market.marketId, 6, 4)}</span>
             </div>
             <h3 className="font-medium leading-snug text-base text-ink group-hover:underline flex items-center gap-1.5">
-              {market.question}
-              <ArrowUpRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100 text-gray-500" />
+              {market.question || e.title}
+              <ArrowUpRight className="h-4 w-4 flex-none opacity-0 transition-opacity group-hover:opacity-100 text-gray-500" />
             </h3>
+            <p className="mt-1 text-xs text-gray-500 truncate">Settles on: {e.title}</p>
           </div>
 
-          {underlying.kind === "composite" ? (
-            <CompositeStatusPill status={underlying.status} className="flex-none" />
+          {e.kind === "composite" ? (
+            <CompositeStatusPill status={e.compositeStatus ?? "Unresolved"} className="flex-none" />
           ) : (
-            <EventStatusPill status={underlying.status} tier={underlying.tier} className="flex-none" />
+            e.status !== undefined && <EventStatusPill status={e.status} className="flex-none" />
           )}
         </div>
 
-        {/* Parimutuel Ratio Bar */}
         <div className="mt-4">
           <div className="flex items-center justify-between text-xs font-mono mb-1.5">
-            <span className="flex items-center gap-1 text-ink font-semibold">
-              <span>YES</span>
-              <span className="text-gray-500 font-normal">({yesPercent}%)</span>
+            <span className="text-ink font-semibold">
+              YES <span className="text-gray-500 font-normal">({yesPercent}%)</span>
             </span>
-            <span className="flex items-center gap-1 text-ink font-semibold">
-              <span className="text-gray-500 font-normal">({noPercent}%)</span>
-              <span>NO</span>
+            <span className="text-ink font-semibold">
+              <span className="text-gray-500 font-normal">({noPercent}%)</span> NO
             </span>
           </div>
-
           <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden flex border border-gray-200">
-            <div
-              className="h-full bg-ink transition-all duration-300"
-              style={{ width: `${yesPercent}%` }}
-              title={`YES Pool: ${yesPool} ETH`}
-            />
-            <div
-              className="h-full bg-gray-300 transition-all duration-300"
-              style={{ width: `${noPercent}%` }}
-              title={`NO Pool: ${noPool} ETH`}
-            />
+            <div className="h-full bg-ink" style={{ width: `${yesPercent}%` }} />
+            <div className="h-full bg-gray-300" style={{ width: `${noPercent}%` }} />
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3 text-xs">
-          <div className="flex items-center gap-4 font-mono text-gray-600">
-            <span>
-              <strong className="text-ink">{market.yesPoolEth}</strong> ETH YES
-            </span>
-            <span>•</span>
-            <span>
-              <strong className="text-ink">{market.noPoolEth}</strong> ETH NO
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1 font-mono text-xs font-semibold text-ink">
-            <TrendingUp className="h-3.5 w-3.5 text-gray-500" />
-            <span>{total.toFixed(2)} ETH POOLED</span>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 pt-3 text-xs font-mono text-gray-600">
+          <span>
+            <strong className="text-ink">{fmtUsdg(total)}</strong> USDG pooled
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" />
+            <MarketStatusLabel market={market} />
+          </span>
         </div>
       </Link>
     </motion.div>

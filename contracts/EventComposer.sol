@@ -208,8 +208,19 @@ contract EventComposer is IEventComposer {
 
         if (regStatus == IEventRegistry.EventStatus.Finalized) {
             IEventRegistry.Outcome memory o = registry.getOutcome(id);
+            // Both payload versions start with the bool word.
             bool b = abi.decode(o.outcomeData, (bool));
-            return (b ? Status.True : Status.False, o.finalizedAt);
+            // Temporal ops compare WHEN THE FACT HAPPENED for v2 events
+            // (quorum-agreed `occurredAt`), not when the protocol finalized
+            // it — finalization time depends on resolver latency and
+            // dispute-window length. v1 events, and v2 events finalized by a
+            // dispute committee (which votes on the boolean only, so the
+            // payload is 32 bytes), fall back to `finalizedAt`.
+            uint64 t = o.finalizedAt;
+            if (o.outcomeData.length >= 64 && registry.getEventSpec(id).specVersion >= 2) {
+                (, t) = abi.decode(o.outcomeData, (bool, uint64));
+            }
+            return (b ? Status.True : Status.False, t);
         }
         if (
             regStatus == IEventRegistry.EventStatus.Voided

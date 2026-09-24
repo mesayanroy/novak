@@ -6,6 +6,11 @@ written). This mirrors the original milestone breakdown; see
 `docs/architecture.md`, `docs/protocol-spec.md`, and `docs/threat-model.md`
 for the narrative versions of the same decisions.
 
+**Robinhood Chain pass (2026-09-25):** the project now targets the Crypto
+World's Fair Robinhood Chain track; the build plan, verified environment
+facts and work tracker live in `docs/ROBINHOOD_CHAIN_PLAN.md`. `forge test`
+→ **112/112**. Items below are updated where that pass closed them.
+
 **Verification snapshot (updated after the protocol-layer gap-closing pass —
 see `docs/protocol-spec.md` for what "Gap 1–5" refers to):**
 `forge test` → 80/80 passing across unit/integration/fuzz/adversarial suites
@@ -115,13 +120,16 @@ tracked here regardless of which repo-ownership row it falls under.
 - [x] Multiple independent resolver instances can submit observations for the
       same event — verified in `test/integration/EndToEndFlow.t.sol` (3
       distinct resolver addresses) and live in `examples/end-to-end-flow.ts`
-- [ ] Real price/data source integration — `PriceFeedAdapter` reads a mock
-      value from an env var; wiring a live HTTP source is a follow-up (see
-      TODO in `resolver/adapters/priceFeedAdapter.ts`)
-- [ ] On-chain event discovery/indexing — a resolver is told which event IDs
-      to watch via `RESOLVER_WATCHED_EVENT_IDS`; there's no subgraph-style
-      scan of the Registry for open events yet (see `resolver/README.md`,
-      "Known limitation")
+- [x] Real data source integration — the mock adapter is gone. Three real
+      adapters read Robinhood Chain mainnet / Robinhood's API:
+      `chainlink.price-at.v1`, `rh.corporate-action.v1` (ERC-8056 logs),
+      `rh.trading-status.v1`. Verified live (`pnpm --filter novak-resolver probe`)
+      and end-to-end with 3 resolver processes on anvil.
+- [x] On-chain event discovery — resolvers scan `EventCreated` /
+      `CompositeEventCreated` logs from the deployment's `startBlock`
+      (`resolver/node/discovery.ts`); `RESOLVER_WATCHED_EVENT_IDS` is gone.
+- [x] Resolver daemon drives `DisputeManager` — committee members re-observe
+      and vote (`resolver/node/voter.ts`); verified live with a filed dispute.
 
 ### Issue #5 — Resolver Submission Contract
 **Owner:** skyyycodes · **Priority:** P0
@@ -312,12 +320,13 @@ tracked here regardless of which repo-ownership row it falls under.
       winning side → full refund" paths
 - [x] `PositionManager` keeps a queryable audit trail of individual positions
       (`recordPosition`), separate from the funds Market itself custodies
-- [ ] Fees — **not implemented** (no protocol fee taken on settlement).
-      Not in the explicit MVP checklist; straightforward to add to
-      `Market.claim` later.
-- [ ] Explicit "expired market" handling — a market whose event never
-      finalizes (e.g. no resolver ever submits) simply never becomes
-      settleable; there's no separate expiry/cancellation path today.
+- [x] Fees — `feeBps` (≤ 5%) of the losing pool to the treasury at
+      settlement; none when nobody backed the winner. Solvency fuzz-tested.
+- [x] Voided/expired event handling — `Market.settle` enters `Refunding` when
+      the Bus reports `Voided`; everyone reclaims their own stake.
+- [x] Trading window — deposits and withdrawals stop at `tradingClosesAt`
+      (fixes the losing-side-exits-after-outcome bug; regression-tested).
+- [x] Collateral is USDG (ERC-20); `MockUSDG` on testnet.
 
 ### Issue #16 — Event-Based Settlement Adapter
 **Owner:** ansu555 · **Priority:** P0
@@ -416,12 +425,12 @@ tracked here regardless of which repo-ownership row it falls under.
       rpc endpoint slot)
 - [x] Verified on a local Ethereum node (anvil) — full stack deployed, full
       canonical demo run against it, successfully
-- [ ] **Not yet run against a real public testnet** (e.g. Sepolia) — this
-      needs a funded testnet deployer key and RPC URL, which weren't
-      available in this environment. Run:
-      `forge script script/Deploy.s.sol --rpc-url testnet --broadcast --private-key $DEPLOYER_PRIVATE_KEY --verify`
-      once `.env`'s `RPC_URL_TESTNET`, `DEPLOYER_PRIVATE_KEY`, and
-      `ETHERSCAN_API_KEY` are filled in with real values.
+- [x] Simulated against the live **Robinhood Chain testnet** (46630): full
+      stack deploys, ≈ 0.0003 ETH total.
+- [ ] **Broadcast to Robinhood Chain testnet** — needs the team's faucet-funded
+      key. Run `forge script script/Deploy.s.sol --rpc-url robinhood_testnet
+      --broadcast --verify` (Blockscout verification is configured in
+      `foundry.toml`), then `node script/export-deployment.mjs 46630`.
 
 ---
 

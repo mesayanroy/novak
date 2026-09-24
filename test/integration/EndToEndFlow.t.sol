@@ -9,6 +9,7 @@ import { EventBus } from "../../contracts/EventBus.sol";
 import { Settlement } from "../../derivatives/Settlement.sol";
 import { PositionManager } from "../../derivatives/PositionManager.sol";
 import { Market } from "../../derivatives/Market.sol";
+import { MockUSDG } from "../../contracts/mocks/MockUSDG.sol";
 import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 import { IEventComposer } from "../../contracts/interfaces/IEventComposer.sol";
 
@@ -26,6 +27,7 @@ contract EndToEndFlowTest is Test {
     Settlement internal settlement;
     PositionManager internal positionManager;
     Market internal market;
+    MockUSDG internal usdg;
 
     address internal resolverA = address(0xA11CE);
     address internal resolverB = address(0xB0B);
@@ -42,23 +44,33 @@ contract EndToEndFlowTest is Test {
         bus = new EventBus(address(registry), address(composer));
         settlement = new Settlement(address(bus));
         positionManager = new PositionManager();
-        market = new Market(address(settlement), address(positionManager));
+        usdg = new MockUSDG();
+        market = new Market(
+            address(settlement), address(positionManager), address(usdg), address(this), 100
+        );
+        positionManager.setMarket(address(market));
 
         registry.setResolverAuthorization(resolverA, true);
         registry.setResolverAuthorization(resolverB, true);
         registry.setResolverAuthorization(resolverC, true);
 
-        vm.deal(alice, 10 ether);
-        vm.deal(bob, 10 ether);
+        usdg.mint(alice, 1_000e6);
+        usdg.mint(bob, 1_000e6);
+        vm.prank(alice);
+        usdg.approve(address(market), type(uint256).max);
+        vm.prank(bob);
+        usdg.approve(address(market), type(uint256).max);
     }
 
     function test_createResolveComposeSettleClaim_fullCanonicalFlow() public {
-        // 1. Create two primitive events.
+        uint64 opensAt = uint64(block.timestamp + 1 hours);
+
+        // 1. Create two primitive events whose observation windows open in 1h.
         bytes32 eventA = registry.createEvent(
             IEventRegistry.EventSpec({
                 specVersion: 1,
-                sourceId: keccak256("example.rate-decision"),
-                openTimestamp: uint64(block.timestamp),
+                sourceId: keccak256("macro.fomc.v1"),
+                openTimestamp: opensAt,
                 observationDeadline: uint64(block.timestamp + 1 days),
                 disputeWindowSeconds: 1 hours,
                 quorumThreshold: 2,
@@ -68,17 +80,37 @@ contract EndToEndFlowTest is Test {
         bytes32 eventB = registry.createEvent(
             IEventRegistry.EventSpec({
                 specVersion: 1,
-                sourceId: keccak256("example.price-feed"),
-                openTimestamp: uint64(block.timestamp),
+                sourceId: keccak256("chainlink.price-at.v1"),
+                openTimestamp: opensAt,
                 observationDeadline: uint64(block.timestamp + 1 days),
                 disputeWindowSeconds: 1 hours,
                 quorumThreshold: 3,
-                spec: abi.encode("ETH/USD > 5000 by Dec 2026")
+                spec: abi.encode("NVDA >= 250 at close")
             })
         );
 
-        // 2. Three independent resolvers submit observations for eventB;
-        //    two suffice for eventA's lower quorum threshold.
+        // 2. Compose WITHIN(48h) over the two primitives — composites can be
+        //    defined before their operands resolve.
+        bytes32[] memory operands = new bytes32[](2);
+        operands[0] = eventA;
+        operands[1] = eventB;
+        bytes32 compositeId = composer.createComposite(
+            IEventComposer.CompositeSpec({
+                op: IEventComposer.Op.Within, operands: operands, window: 48 hours
+            })
+        );
+
+        // 3. A Market references the composite; trading closes when the
+        //    observation windows open. Two users take opposing positions.
+        bytes32 marketId =
+            market.createMarket(compositeId, opensAt, "Fed holds WITHIN 48h of NVDA >= 250?");
+        vm.prank(alice);
+        market.depositCollateral(marketId, true, 100e6); // backs YES
+        vm.prank(bob);
+        market.depositCollateral(marketId, false, 100e6); // backs NO
+
+        // 4. Window opens. Three resolvers observe eventB; two suffice for eventA.
+        vm.warp(opensAt);
         vm.prank(resolverA);
         registry.submitObservation(eventA, abi.encode(true), keccak256("evidence-a1"));
         vm.prank(resolverB);
@@ -98,43 +130,27 @@ contract EndToEndFlowTest is Test {
             uint8(registry.getEvent(eventB)), uint8(IEventRegistry.EventStatus.ProposedOutcome)
         );
 
-        // 3. Undisputed -> finalize once each event's dispute window elapses.
+        // 5. Undisputed -> finalize once each event's dispute window elapses.
         vm.warp(block.timestamp + 1 hours + 1);
         registry.finalize(eventA);
         registry.finalize(eventB);
         assertTrue(registry.isFinalized(eventA));
         assertTrue(registry.isFinalized(eventB));
 
-        // 4. Compose AND / WITHIN(48h) over the two primitives.
-        bytes32[] memory operands = new bytes32[](2);
-        operands[0] = eventA;
-        operands[1] = eventB;
-        bytes32 compositeId = composer.createComposite(
-            IEventComposer.CompositeSpec({
-                op: IEventComposer.Op.Within, operands: operands, window: 48 hours
-            })
-        );
-
+        // 6. Resolve the composite (anyone may poke it).
         (bool resolved, bool outcome) = composer.tryResolve(compositeId);
         assertTrue(resolved);
         assertTrue(outcome); // both true, finalized in the same block => within window
-
         assertTrue(bus.isAvailable(compositeId));
 
-        // 5. A derivatives Market references the composite event; two users
-        //    take opposing positions.
-        bytes32 marketId = market.createMarket(compositeId);
-        vm.prank(alice);
-        market.depositCollateral{ value: 1 ether }(marketId, true); // backs YES
-        vm.prank(bob);
-        market.depositCollateral{ value: 1 ether }(marketId, false); // backs NO
-
-        // 6. Settle against the finalized composite outcome and claim.
+        // 7. Settle against the finalized composite outcome and claim.
         market.settle(marketId);
 
-        uint256 aliceBalanceBefore = alice.balance;
+        uint256 fee = (100e6 * 100) / 10_000;
+        uint256 aliceBalanceBefore = usdg.balanceOf(alice);
         vm.prank(alice);
         market.claim(marketId);
-        assertEq(alice.balance, aliceBalanceBefore + 2 ether);
+        assertEq(usdg.balanceOf(alice), aliceBalanceBefore + 200e6 - fee);
+        assertEq(usdg.balanceOf(address(this)), fee); // this test contract is the treasury
     }
 }

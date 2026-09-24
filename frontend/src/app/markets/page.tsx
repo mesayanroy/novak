@@ -2,378 +2,172 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { ExampleDataBadge } from "@/components/ExampleDataBadge";
-import { MarketCard, type MarketUnderlying } from "@/components/markets/MarketCard";
+import { Availability, MarketStatus } from "@novak/sdk";
+import { MarketCard } from "@/components/markets/MarketCard";
 import { CreateMarketCard } from "@/components/CreateMarketCard";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";
-import {
-  PriceHistoryChart,
-  OutcomeDistributionPieChart,
-  VolumeHistogram,
-  LivePositionsTable,
-} from "@/components/markets/MarketAnalyticsCharts";
-import { mockCompositeEvent, mockMarkets, mockPrimitiveEvents, findMockPrimitiveEvent } from "@/lib/mock-data";
+import { NOVAK_CHAIN_ID, deployment } from "@/lib/addresses";
+import { fmtTime, fmtUsdg, useEvents, useMarkets, type EventNode } from "@/lib/novak";
 import { shortHex } from "@/lib/utils";
-import {
-  BarChart3,
-  LayoutGrid,
-  Table as TableIcon,
-  Radio,
-  PlusCircle,
-  ShieldAlert,
-  ArrowUpRight,
-  TrendingUp,
-  Activity,
-  PieChart,
-  Zap,
-} from "lucide-react";
+import { BarChart3, PlusCircle, Radio, ShieldAlert, TrendingUp } from "lucide-react";
 
-function underlyingFor(compositeId: string): MarketUnderlying {
-  const primitive = findMockPrimitiveEvent(compositeId);
-  if (primitive) {
-    return { kind: "primitive", status: primitive.status, tier: primitive.disputeTier };
-  }
-  return { kind: "composite", status: mockCompositeEvent.status };
-}
+type Tab = "markets" | "events" | "create";
 
 export default function MarketsPage() {
-  const [activeTab, setActiveTab] = useState<"markets" | "positions" | "events" | "create">("markets");
-  const [filter, setFilter] = useState<"all" | "primitive" | "composite">("all");
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [tab, setTab] = useState<Tab>("markets");
+  const markets = useMarkets();
+  const events = useEvents();
 
-  // Calculate total pooled ETH
-  const totalEthPooled = mockMarkets
-    .reduce((acc, m) => acc + Number(m.yesPoolEth) + Number(m.noPoolEth), 0)
-    .toFixed(2);
+  if (!deployment) {
+    return (
+      <div className="mx-auto max-w-3xl px-6 py-16">
+        <h1 className="text-3xl font-semibold text-ink">Markets</h1>
+        <p className="mt-4 text-gray-600">
+          No Novak deployment is configured for chain {NOVAK_CHAIN_ID}. Deploy with <code>script/Deploy.s.sol</code>, run{" "}
+          <code>node script/export-deployment.mjs {NOVAK_CHAIN_ID}</code> and <code>pnpm --filter @novak/sdk gen</code>, then
+          reload. See the <Link href="/docs">docs</Link>.
+        </p>
+      </div>
+    );
+  }
 
-  const filteredMarkets = mockMarkets.filter((market) => {
-    const underlying = underlyingFor(market.compositeId);
-    if (filter === "primitive") return underlying.kind === "primitive";
-    if (filter === "composite") return underlying.kind === "composite";
-    return true;
-  });
+  const list = markets.data ?? [];
+  const pooled = list.reduce((s, m) => s + m.yesPool + m.noPool, 0n);
+  const open = list.filter((m) => m.status === MarketStatus.Open).length;
+  const evs = events.data ?? [];
+  const decided = evs.filter((e) => e.availability !== Availability.Pending).length;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
-      {/* Header & Title */}
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-200 pb-6">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
-            <span className="h-2 w-2 rounded-full bg-ink animate-pulse-subtle" />
-            Derivative Market Hub &amp; Live Telemetry
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl text-ink">
-            Prediction &amp; Derivative Markets
-          </h1>
-          <p className="mt-2 text-gray-600 max-w-2xl text-sm leading-relaxed">
-            Derivatives markets settle trustlessly against finalized composite events via{" "}
-            <code className="font-mono text-xs bg-gray-100 border border-gray-300 px-1.5 py-0.5 rounded text-ink font-semibold">
-              Settlement → EventBus
-            </code>.
-          </p>
+      <div className="border-b border-gray-200 pb-6">
+        <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          Live · Robinhood Chain {NOVAK_CHAIN_ID === 46630 ? "testnet" : `(chain ${NOVAK_CHAIN_ID})`}
         </div>
-        <ExampleDataBadge />
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl text-ink">Event markets on tokenized stocks</h1>
+        <p className="mt-2 text-gray-600 max-w-2xl text-sm leading-relaxed">
+          Every market settles against a Novak event — a fact about a Robinhood Stock Token, resolved once by independent
+          resolvers from live Robinhood Chain data, disputable, and readable by any contract through{" "}
+          <code className="font-mono text-xs bg-gray-100 border border-gray-300 px-1.5 py-0.5 rounded">EventBus</code>.
+          Collateral is test USDG.
+        </p>
       </div>
 
-      {/* Protocol Statistics Bar */}
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
-            <span>Total Pooled Collateral</span>
-            <TrendingUp className="h-3.5 w-3.5 text-gray-400" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold font-mono text-ink">{totalEthPooled} ETH</p>
-          <p className="mt-1 text-[11px] text-emerald-700 font-mono font-semibold">+14.2% Uplift</p>
-        </div>
-
-        <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
-            <span>Active Markets</span>
-            <BarChart3 className="h-3.5 w-3.5 text-gray-400" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold font-mono text-ink">{mockMarkets.length}</p>
-          <p className="mt-1 text-[11px] text-gray-500 font-mono">1 Primitive, 1 Composite</p>
-        </div>
-
-        <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
-            <span>Event Bus Feeds</span>
-            <Radio className="h-3.5 w-3.5 text-gray-400" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold font-mono text-ink">
-            {mockPrimitiveEvents.length + 1} Feeds
-          </p>
-          <p className="mt-1 text-[11px] text-emerald-700 font-mono font-semibold">100% Operational</p>
-        </div>
-
-        <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
-          <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
-            <span>Dispute Guard</span>
-            <ShieldAlert className="h-3.5 w-3.5 text-gray-400" />
-          </div>
-          <p className="mt-2 text-2xl font-semibold font-mono text-ink">Tier 1 &amp; 2</p>
-          <p className="mt-1 text-[11px] text-gray-500 font-mono">Bonded Challenge Ladder</p>
-        </div>
+        <Stat icon={<TrendingUp className="h-3.5 w-3.5" />} label="USDG pooled" value={fmtUsdg(pooled)} />
+        <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Markets" value={`${list.length}`} note={`${open} open`} />
+        <Stat icon={<Radio className="h-3.5 w-3.5" />} label="Events" value={`${evs.length}`} note={`${decided} decided`} />
+        <Stat icon={<ShieldAlert className="h-3.5 w-3.5" />} label="Disputes" value="Tier 1 → 2" note="bonded committees, never token votes" />
       </div>
 
-      {/* Main Navigation Tabs */}
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setActiveTab("markets")}
-            className={`link-plain flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
-              activeTab === "markets" ? "bg-ink text-paper" : "text-gray-600 hover:text-ink hover:bg-gray-100"
-            }`}
-          >
-            <BarChart3 className="h-4 w-4" />
-            Explore Markets
-          </button>
-
-          <button
-            onClick={() => setActiveTab("positions")}
-            className={`link-plain flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
-              activeTab === "positions" ? "bg-ink text-paper" : "text-gray-600 hover:text-ink hover:bg-gray-100"
-            }`}
-          >
-            <Activity className="h-4 w-4" />
-            Live Positions &amp; Telemetry
-          </button>
-
-          <button
-            onClick={() => setActiveTab("events")}
-            className={`link-plain flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
-              activeTab === "events" ? "bg-ink text-paper" : "text-gray-600 hover:text-ink hover:bg-gray-100"
-            }`}
-          >
-            <Radio className="h-4 w-4" />
-            Event Feed Monitor
-          </button>
-
-          <button
-            onClick={() => setActiveTab("create")}
-            className={`link-plain flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
-              activeTab === "create" ? "bg-ink text-paper" : "text-gray-600 hover:text-ink hover:bg-gray-100"
-            }`}
-          >
-            <PlusCircle className="h-4 w-4" />
-            Create Market
-          </button>
-        </div>
-
-        {activeTab === "markets" && (
-          <div className="flex items-center gap-3">
-            {/* Category Filter Pills */}
-            <div className="flex items-center border border-gray-300 rounded p-0.5 text-xs font-mono bg-gray-50">
-              <button
-                onClick={() => setFilter("all")}
-                className={`px-2.5 py-1 rounded-sm transition-colors ${
-                  filter === "all" ? "bg-ink text-paper font-semibold" : "text-gray-600 hover:text-ink"
-                }`}
-              >
-                ALL
-              </button>
-              <button
-                onClick={() => setFilter("primitive")}
-                className={`px-2.5 py-1 rounded-sm transition-colors ${
-                  filter === "primitive" ? "bg-ink text-paper font-semibold" : "text-gray-600 hover:text-ink"
-                }`}
-              >
-                PRIMITIVE
-              </button>
-              <button
-                onClick={() => setFilter("composite")}
-                className={`px-2.5 py-1 rounded-sm transition-colors ${
-                  filter === "composite" ? "bg-ink text-paper font-semibold" : "text-gray-600 hover:text-ink"
-                }`}
-              >
-                COMPOSITE
-              </button>
-            </div>
-
-            {/* Grid vs Table View Switcher */}
-            <div className="flex items-center border border-gray-300 rounded p-0.5 bg-gray-50">
-              <button
-                onClick={() => setViewMode("grid")}
-                title="Grid view"
-                className={`p-1.5 rounded-sm transition-colors ${
-                  viewMode === "grid" ? "bg-ink text-paper" : "text-gray-500 hover:text-ink"
-                }`}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => setViewMode("table")}
-                title="Table view"
-                className={`p-1.5 rounded-sm transition-colors ${
-                  viewMode === "table" ? "bg-ink text-paper" : "text-gray-500 hover:text-ink"
-                }`}
-              >
-                <TableIcon className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
+      <div className="mt-10 flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3">
+        <TabButton active={tab === "markets"} onClick={() => setTab("markets")} icon={<BarChart3 className="h-4 w-4" />}>
+          Markets
+        </TabButton>
+        <TabButton active={tab === "events"} onClick={() => setTab("events")} icon={<Radio className="h-4 w-4" />}>
+          Event feed
+        </TabButton>
+        <TabButton active={tab === "create"} onClick={() => setTab("create")} icon={<PlusCircle className="h-4 w-4" />}>
+          Create market
+        </TabButton>
       </div>
 
-      {/* Tab Content 1: Explore Markets */}
-      {activeTab === "markets" && (
-        <div className="mt-6 flex flex-col gap-8">
-          {/* Top Live Interactive Chart */}
-          <PriceHistoryChart marketTitle="Featured: WITHIN(48h) Composite Market (Fed Holds & ETH > $5,000)" />
-
-          <div>
-            <p className="mb-4 text-xs font-mono text-gray-500">
-              Showing {filteredMarkets.length} market{filteredMarkets.length !== 1 ? "s" : ""} settled against EventBus finalized state.
+      {tab === "markets" && (
+        <div className="mt-6">
+          {markets.isLoading ? (
+            <p className="text-sm text-gray-500">Loading markets from chain…</p>
+          ) : markets.error ? (
+            <p className="text-sm text-rose-700">Couldn&apos;t read markets: {(markets.error as Error).message}</p>
+          ) : list.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              No markets yet.{" "}
+              <button className="underline" onClick={() => setTab("create")}>
+                Create the first one
+              </button>
+              .
             </p>
-
-            {viewMode === "grid" ? (
-              <div className="grid gap-5 md:grid-cols-2">
-                {filteredMarkets.map((market) => (
-                  <MarketCard
-                    key={market.id}
-                    market={market}
-                    underlying={underlyingFor(market.compositeId)}
-                  />
-                ))}
-              </div>
-            ) : (
-              /* Technical Matrix Table View */
-              <div className="overflow-x-auto border border-gray-300 rounded-sm">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-100 font-mono text-gray-600 uppercase tracking-wider border-b border-gray-300">
-                    <tr>
-                      <th className="p-3 font-semibold">Market ID</th>
-                      <th className="p-3 font-semibold">Question</th>
-                      <th className="p-3 font-semibold">Underlying Feed</th>
-                      <th className="p-3 font-semibold">YES Pool</th>
-                      <th className="p-3 font-semibold">NO Pool</th>
-                      <th className="p-3 font-semibold">Total Collateral</th>
-                      <th className="p-3 font-semibold text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 font-mono bg-paper">
-                    {filteredMarkets.map((market) => {
-                      const total = Number(market.yesPoolEth) + Number(market.noPoolEth);
-                      return (
-                        <tr key={market.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="p-3 font-bold text-ink">{shortHex(market.id, 6, 4)}</td>
-                          <td className="p-3 font-sans font-medium text-ink max-w-xs truncate">
-                            {market.question}
-                          </td>
-                          <td className="p-3 text-gray-600">{shortHex(market.compositeId, 6, 4)}</td>
-                          <td className="p-3 text-ink font-semibold">{market.yesPoolEth} ETH</td>
-                          <td className="p-3 text-ink font-semibold">{market.noPoolEth} ETH</td>
-                          <td className="p-3 text-ink font-bold">{total.toFixed(2)} ETH</td>
-                          <td className="p-3 text-right">
-                            <Link
-                              href={`/markets/${market.id}`}
-                              className="link-plain inline-flex items-center gap-1 border border-ink bg-ink text-paper px-2.5 py-1 text-[11px] font-mono uppercase tracking-wide hover:bg-gray-800 rounded-sm"
-                            >
-                              Trade <ArrowUpRight className="h-3 w-3" />
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab Content 2: Live Positions & Telemetry */}
-      {activeTab === "positions" && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 flex flex-col gap-8"
-        >
-          {/* Active Positions Table */}
-          <LivePositionsTable />
-
-          {/* Side-by-side Analytics Charts */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <OutcomeDistributionPieChart yesPoolEth={3.4} noPoolEth={1.15} />
-            <VolumeHistogram />
-          </div>
-        </motion.div>
-      )}
-
-      {/* Tab Content 3: Event Stream Monitor */}
-      {activeTab === "events" && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 flex flex-col gap-6"
-        >
-          <div className="border border-gray-300 bg-paper p-5 rounded-sm shadow-sm">
-            <h3 className="font-semibold text-lg text-ink flex items-center gap-2">
-              <Radio className="h-4 w-4 text-ink" />
-              EventBus Feed Monitor &amp; Registry Stream
-            </h3>
-            <p className="mt-1 text-sm text-gray-600">
-              Inspect on-chain primitive events observed by authorized resolvers and composite logic nodes evaluated by <code className="font-mono text-xs">EventComposer.sol</code>.
-            </p>
-
-            <div className="mt-6 flex flex-col gap-4">
-              {/* Composite Event Card */}
-              <div className="border border-gray-300 bg-gray-50 p-4 rounded-sm">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold border border-ink bg-ink text-paper px-1.5 py-0.5 rounded-sm">
-                      C-EVENT
-                    </span>
-                    <span className="font-mono text-xs text-gray-600">{shortHex(mockCompositeEvent.id, 8, 6)}</span>
-                  </div>
-                  <CompositeStatusPill status={mockCompositeEvent.status} />
-                </div>
-                <h4 className="mt-2 font-medium text-base text-ink">
-                  WITHIN(48h) Composite: BTC &gt; $100k AND Fed Rate Cut within 48h
-                </h4>
-                <div className="mt-3 flex items-center gap-4 text-xs font-mono text-gray-600 flex-wrap">
-                  <span>Operator: <strong className="text-ink">WITHIN</strong></span>
-                  <span>Window: <strong className="text-ink">172,800s (48h)</strong></span>
-                  <span>Operands: <strong className="text-ink">2 Primitive Events</strong></span>
-                </div>
-              </div>
-
-              {/* Primitive Events */}
-              {mockPrimitiveEvents.map((pevent) => (
-                <div key={pevent.id} className="border border-gray-300 bg-paper p-4 rounded-sm">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold border border-gray-300 px-1.5 py-0.5 rounded-sm text-gray-700">
-                        PRIMITIVE
-                      </span>
-                      <span className="font-mono text-xs text-gray-600">{shortHex(pevent.id, 8, 6)}</span>
-                    </div>
-                    <EventStatusPill status={pevent.status} tier={pevent.disputeTier} />
-                  </div>
-                  <h4 className="mt-2 font-medium text-base text-ink">{pevent.title}</h4>
-                  <div className="mt-3 flex items-center gap-4 text-xs font-mono text-gray-600 flex-wrap">
-                    <span>Resolver: <strong className="text-ink">Fed Watcher Adapter</strong></span>
-                    <span>Observation Time: <strong className="text-ink">2026-09-10T14:00:00Z</strong></span>
-                  </div>
-                </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2">
+              {list.map((m) => (
+                <MarketCard key={m.marketId} market={m} />
               ))}
             </div>
-          </div>
-        </motion.div>
+          )}
+        </div>
       )}
 
-      {/* Tab Content 4: Create Market */}
-      {activeTab === "create" && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6"
-        >
-          <CreateMarketCard />
-        </motion.div>
+      {tab === "events" && (
+        <div className="mt-6 flex flex-col gap-3">
+          {events.isLoading && <p className="text-sm text-gray-500">Scanning EventCreated logs…</p>}
+          {evs.map((e) => (
+            <EventRow key={e.id} e={e} />
+          ))}
+        </div>
+      )}
+
+      {tab === "create" && (
+        <div className="mt-6">
+          <CreateMarketCard onCreated={() => setTab("markets")} />
+        </div>
       )}
     </div>
+  );
+}
+
+function EventRow({ e }: { e: EventNode }) {
+  return (
+    <div className="border border-gray-300 bg-paper p-4 rounded-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-mono text-xs text-gray-500">{shortHex(e.id, 8, 6)}</span>
+        {e.kind === "composite" ? (
+          <CompositeStatusPill status={e.compositeStatus ?? "Unresolved"} />
+        ) : (
+          e.status !== undefined && <EventStatusPill status={e.status} />
+        )}
+      </div>
+      <h4 className="mt-2 font-medium text-ink">{e.title}</h4>
+      <div className="mt-2 flex flex-wrap gap-4 font-mono text-xs text-gray-600">
+        {e.source && <span>Source: {e.source}</span>}
+        {e.opensAt !== undefined && <span>Observation opens {fmtTime(e.opensAt)}</span>}
+        {e.spec && <span>Quorum {e.spec.quorumThreshold} · spec v{e.spec.specVersion}</span>}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note?: string }) {
+  return (
+    <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
+      <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
+        <span>{label}</span>
+        {icon}
+      </div>
+      <p className="mt-2 text-2xl font-semibold font-mono text-ink">{value}</p>
+      {note && <p className="mt-1 text-[11px] text-gray-500 font-mono">{note}</p>}
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`link-plain flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-sm transition-colors ${
+        active ? "bg-ink text-paper" : "text-gray-600 hover:text-ink hover:bg-gray-100"
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }

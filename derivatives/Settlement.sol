@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IEventBus} from "../contracts/interfaces/IEventBus.sol";
-import {IEventRegistry} from "../contracts/interfaces/IEventRegistry.sol";
+import { IEventBus } from "../contracts/interfaces/IEventBus.sol";
+import { IEventRegistry } from "../contracts/interfaces/IEventRegistry.sol";
 
 /// @title Settlement
 /// @notice Adapts the Event Bus's generic `Outcome` payload into the single
@@ -25,7 +25,26 @@ contract Settlement {
         if (!eventBus.isAvailable(eventId)) {
             return (false, false);
         }
+        return (true, _decode(eventId));
+    }
+
+    /// @notice Three-way settlement state: `Pending` (wait), `Available`
+    ///         (settle on `outcome`), or `Voided` (the event will never
+    ///         resolve — consumers must refund). `outcome` is only meaningful
+    ///         when `status == Available`.
+    function getSettlement(bytes32 eventId)
+        external
+        view
+        returns (IEventBus.Availability status, bool outcome)
+    {
+        status = eventBus.getAvailability(eventId);
+        if (status == IEventBus.Availability.Available) {
+            outcome = _decode(eventId);
+        }
+    }
+
+    function _decode(bytes32 eventId) private view returns (bool) {
         IEventRegistry.Outcome memory o = eventBus.readOutcome(eventId);
-        return (true, abi.decode(o.outcomeData, (bool)));
+        return abi.decode(o.outcomeData, (bool));
     }
 }

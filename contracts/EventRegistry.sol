@@ -85,11 +85,25 @@ contract EventRegistry is IEventRegistry {
             status == EventStatus.Open || status == EventStatus.ObservationsSubmitted,
             "EventRegistry: not accepting observations"
         );
+        // An observation is a claim about something that has already
+        // happened — accepting one before the event's window opens would let
+        // a quorum resolve e.g. "earnings beat" to `false` before the
+        // earnings are even released.
+        require(
+            block.timestamp >= _specs[eventId].openTimestamp, "EventRegistry: event not open yet"
+        );
         require(
             block.timestamp <= _specs[eventId].observationDeadline,
             "EventRegistry: observation deadline passed"
         );
         require(!_hasSubmitted[eventId][msg.sender], "EventRegistry: already submitted");
+        if (_specs[eventId].specVersion >= 2) {
+            // v2 payload: abi.encode(bool outcome, uint64 occurredAt). A
+            // resolver can't observe something that hasn't happened yet.
+            require(outcomeData.length == 64, "EventRegistry: bad v2 payload");
+            (, uint64 occurredAt) = abi.decode(outcomeData, (bool, uint64));
+            require(occurredAt <= block.timestamp, "EventRegistry: occurredAt in future");
+        }
 
         _hasSubmitted[eventId][msg.sender] = true;
         bytes32 outcomeHash = keccak256(outcomeData);

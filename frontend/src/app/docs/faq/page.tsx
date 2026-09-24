@@ -2,8 +2,12 @@ export const metadata = { title: "FAQ — Novak Docs" };
 
 const faqs = [
   {
+    q: "Isn't this what Chainlink does?",
+    a: "Chainlink is Robinhood Chain's price oracle, and Novak resolvers read its feeds. Price feeds answer \"what is the price now\"; they don't provide corporate-action calendars or pause triggers (Chainlink's own docs say so). Novak finalizes those facts — with disputes, history and composition — and every protocol reads the same answer.",
+  },
+  {
     q: "Is Novak decentralized dispute arbitration finished?",
-    a: "No. The MVP replaced a single-owner arbitrator with a bonded, two-tier committee ladder that never falls back to a token vote — a real structural change, not a relabeling. Committee selection is still block-data pseudo-randomness (not VRF-based), and there's no on-chain staking/reputation token behind committee membership yet. See Dispute & finalization and the threat model.",
+    a: "No. A bonded, two-tier committee ladder replaced single-owner arbitration and never falls back to a token vote. Committee selection is still block-data pseudo-randomness — weaker on Arbitrum chains like Robinhood Chain, and Chainlink VRF isn't available there — and there's no staking/reputation token behind membership. See Dispute & finalization and the threat model.",
   },
   {
     q: "Why is K_OF_N not available yet?",
@@ -14,12 +18,12 @@ const faqs = [
     a: "No. The Events API reference page documents the intended surface against the real on-chain function signatures already implemented, so a future indexer/API layer has an exact contract to build against.",
   },
   {
-    q: "Why does /markets show example data?",
-    a: "Market.sol has no enumeration getter — only a keyed markets(marketId) lookup. Listing \"all markets\" requires an indexer that doesn't exist yet. Every example section is marked visibly, not just in a code comment.",
+    q: "Is the data on /markets real?",
+    a: "Yes. Market.sol enumerates its markets on-chain (marketCount/getMarketIds) and the app reads them live, with each event's status and source. Collateral on testnet is MockUSDG — test money with no value.",
   },
   {
     q: "What chain does the demo run on?",
-    a: "Local Anvil (chain id 31337) only, matching the current deployment. No public testnet deployment exists yet — see SPEC_AND_TASKS.md Issue #20.",
+    a: "Robinhood Chain testnet (chain ID 46630). Resolvers read their data — Chainlink stock feeds, ERC-8056 stock tokens, Robinhood's asset registry — from Robinhood Chain mainnet, read-only. Local anvil (31337) is supported for development.",
   },
 ];
 

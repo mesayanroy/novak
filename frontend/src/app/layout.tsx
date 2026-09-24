@@ -8,9 +8,9 @@ import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Novak — a composable event bus for Ethereum",
+  title: "Novak — the event layer for tokenized stocks on Robinhood Chain",
   description:
-    "A decentralized, composable event bus for Ethereum. Events are resolved, finalized, and stored once, then composed and read by many independent smart contracts.",
+    "Chainlink tells your contract the price. Novak tells it what happened: corporate actions, trading halts, price-at-close conditions — resolved once by independent resolvers, disputable by bonded committees, composable, and read by every protocol on Robinhood Chain.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

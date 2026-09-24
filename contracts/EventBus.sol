@@ -53,4 +53,27 @@ contract EventBus is IEventBus {
         }
         return composer.isResolved(eventId);
     }
+
+    function getAvailability(bytes32 eventId) external view returns (Availability) {
+        IEventRegistry.EventStatus regStatus = registry.getEvent(eventId);
+        if (regStatus == IEventRegistry.EventStatus.Finalized) return Availability.Available;
+        if (
+            regStatus == IEventRegistry.EventStatus.Voided
+                || regStatus == IEventRegistry.EventStatus.Expired
+        ) {
+            return Availability.Voided;
+        }
+        if (regStatus != IEventRegistry.EventStatus.None) return Availability.Pending;
+
+        // Not a primitive — read the composite's cached resolution. A
+        // composite whose operands are all decided still reads `Pending`
+        // until someone calls `EventComposer.tryResolve` (the Bus never
+        // triggers resolution itself — see contract docs).
+        IEventComposer.Status s = composer.getStatus(eventId);
+        if (s == IEventComposer.Status.True || s == IEventComposer.Status.False) {
+            return Availability.Available;
+        }
+        if (s == IEventComposer.Status.Voided) return Availability.Voided;
+        return Availability.Pending;
+    }
 }

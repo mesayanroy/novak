@@ -10,11 +10,12 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/node/index.js",
     "test": "vitest run",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "probe": "tsx scripts/probe-sources.ts"
   },
   "dependencies": {
     "@novak/sdk": "workspace:*",
-    "viem": "^2.21.0"
+    "viem": "^2.56.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

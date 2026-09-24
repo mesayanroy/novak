@@ -1,100 +1,97 @@
-import { createPublicClient, createWalletClient, http } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { foundry } from "viem/chains";
 import { eventRegistryAbi } from "@novak/sdk";
-import { PriceFeedAdapter } from "../adapters/priceFeedAdapter.js";
-import { hashEvidence, encodeOutcomeData } from "../evidence/evidence.js";
-import type { SourceAdapter } from "../adapters/types.js";
+import { buildAdapters } from "../adapters/index.js";
+import { EvidenceStore } from "../evidence/evidence.js";
+import { loadConfig } from "../lib/config.js";
+import { chainNow, makeClients } from "../lib/chain.js";
+import { EventIndex } from "./discovery.js";
+import { KeeperDuty } from "./keeper.js";
+import { makeLog } from "./log.js";
+import { ResolverDuty } from "./resolve.js";
+import { startServer } from "./server.js";
+import { VoterDuty } from "./voter.js";
 
 /**
- * Resolver daemon entrypoint. For each configured event ID, runs every
- * adapter matching that event's expected source and submits the resulting
- * observation directly to EventRegistry.submitObservation. Quorum,
- * proposal, and dispute-window bookkeeping all happen on-chain in the
- * Registry (see contracts/EventRegistry.sol) — this daemon's only job is
- * "fetch, evidence, submit".
+ * Resolver daemon. Every poll interval:
+ *   1. discover new events/composites from on-chain logs (node/discovery.ts)
+ *   2. resolver duty: observe + submit for events it has an adapter for
+ *   3. voter duty: vote in dispute committees it was drawn into
+ *   4. keeper duty (RESOLVER_KEEPER=true on ONE node): poke finalize/expire/
+ *      escalations/tryResolve/settle/withdraw
  *
- * KNOWN MVP LIMITATION: there is no on-chain event discovery/indexer here —
- * a resolver is told exactly which event IDs to watch via
- * `RESOLVER_WATCHED_EVENT_IDS` rather than scanning the Registry for all Open
- * events matching its adapters' sourceIds. Building a subgraph-style indexer
- * is deferred; wiring one in would only change how `eventIds` below is
- * populated, not the submission logic itself.
- *
- * Run with: pnpm --filter novak-resolver dev
+ * Writes to the chain Novak is deployed on (NOVAK_CHAIN_ID: 46630 Robinhood
+ * testnet, or 31337 anvil); reads source data from Robinhood Chain MAINNET
+ * (RESOLVER_SOURCE_RPC_URL). Run 3 of these with different keys for a
+ * 2-of-3 quorum — see resolver/README.md.
  */
-const adapters: SourceAdapter[] = [new PriceFeedAdapter()];
-
-async function submitForEvent(
-  publicClient: ReturnType<typeof createPublicClient>,
-  walletClient: ReturnType<typeof createWalletClient>,
-  registryAddress: `0x${string}`,
-  eventId: `0x${string}`,
-): Promise<void> {
-  for (const adapter of adapters) {
-    const observation = await adapter.fetchObservation(eventId, null);
-    const evidenceHash = hashEvidence(observation);
-    const outcomeData = encodeOutcomeData(observation.outcomeData);
-
-    console.log(
-      `[resolver] eventId=${eventId} source=${adapter.sourceId} outcome=${observation.outcomeData} evidenceHash=${evidenceHash}`,
-    );
-
-    try {
-      const hash = await walletClient.writeContract({
-        account: walletClient.account!,
-        chain: walletClient.chain,
-        address: registryAddress,
-        abi: eventRegistryAbi,
-        functionName: "submitObservation",
-        args: [eventId, outcomeData, evidenceHash],
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
-      console.log(`[resolver] submitted, tx=${hash}`);
-    } catch (err) {
-      // Common non-fatal cases: already submitted, event no longer accepting
-      // observations (quorum already reached), or not an authorized resolver
-      // yet. Log and move on rather than crashing the daemon.
-      console.warn(`[resolver] submission failed for ${eventId}:`, (err as Error).message);
-    }
-  }
-}
-
 async function main(): Promise<void> {
-  const rpcUrl = process.env.RPC_URL_LOCAL ?? "http://127.0.0.1:8545";
-  const privateKey = process.env.RESOLVER_PRIVATE_KEY;
-  const registryAddress = process.env.EVENT_REGISTRY_ADDRESS;
-  const eventIdsRaw = process.env.RESOLVER_WATCHED_EVENT_IDS ?? "";
+  const config = loadConfig();
+  const c = makeClients(config);
+  const log = makeLog(config.resolverId);
 
-  if (!privateKey || !registryAddress) {
-    console.log(
-      "[resolver] RESOLVER_PRIVATE_KEY / EVENT_REGISTRY_ADDRESS not set — nothing to do. See .env.example.",
-    );
-    return;
-  }
-
-  const eventIds = eventIdsRaw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean) as `0x${string}`[];
-
-  if (eventIds.length === 0) {
-    console.log("[resolver] RESOLVER_WATCHED_EVENT_IDS is empty — nothing to watch. See resolver/README.md.");
-    return;
-  }
-
-  const account = privateKeyToAccount(privateKey as `0x${string}`);
-  const publicClient = createPublicClient({ chain: foundry, transport: http(rpcUrl) });
-  const walletClient = createWalletClient({ account, chain: foundry, transport: http(rpcUrl) });
-
-  const pollIntervalMs = Number(process.env.RESOLVER_POLL_INTERVAL_MS ?? 15000);
-  console.log(
-    `[resolver] starting as ${account.address}, watching ${eventIds.length} event(s), poll interval ${pollIntervalMs}ms`,
+  const authorized = await c.publicClient.readContract({
+    address: c.deployment.eventRegistry,
+    abi: eventRegistryAbi,
+    functionName: "isAuthorizedResolver",
+    args: [c.account.address],
+  });
+  log.info(
+    `starting ${c.account.address} on chain ${config.chainId} (registry ${c.deployment.eventRegistry}); ` +
+      `authorized=${authorized} keeper=${config.keeper} voter=${config.voter} source=${config.sourceRpcUrl}`,
   );
+  if (!authorized) log.warn("not an authorized resolver — observations will be rejected (keeper duties still work)");
 
-  for (const eventId of eventIds) {
-    await submitForEvent(publicClient, walletClient, registryAddress as `0x${string}`, eventId);
+  const index = new EventIndex(c.publicClient, c.deployment, config.logChunk);
+  const adapters = buildAdapters(c.sourceClient);
+  const evidence = new EvidenceStore();
+  const resolver = new ResolverDuty(c, index, adapters, evidence, log);
+  const voter = new VoterDuty(c, index, adapters, resolver, log);
+  const keeper = new KeeperDuty(c, index, resolver, log);
+
+  let lastLoopAt = 0;
+  let lastError: string | undefined;
+  if (config.httpPort) {
+    startServer(config.httpPort, evidence, () => ({
+      resolverId: config.resolverId,
+      address: c.account.address,
+      chainId: config.chainId,
+      authorized,
+      keeper: config.keeper,
+      lastLoopAt: lastLoopAt ? new Date(lastLoopAt).toISOString() : null,
+      scannedToBlock: index.scannedTo,
+      events: index.primitives.size,
+      composites: index.composites.size,
+      submissions: resolver.submissions,
+      votes: voter.votes,
+      keeperActions: keeper.actions,
+      evidenceRecords: evidence.size,
+      lastError,
+    }));
+    log.info(`http on :${config.httpPort} (/health, /evidence/:hash)`);
   }
+
+  let running = false;
+  const loop = async () => {
+    if (running) return; // a slow tick (cold log scans) must not overlap the next
+    running = true;
+    try {
+      await index.sync();
+      const now = await chainNow(c.publicClient);
+      if (authorized) await resolver.tick(now);
+      if (authorized && config.voter) await voter.tick(now);
+      if (config.keeper) await keeper.tick(now);
+      lastLoopAt = Date.now();
+      lastError = undefined;
+    } catch (err) {
+      lastError = (err as Error).message;
+      log.warn(`loop error: ${lastError}`);
+    } finally {
+      running = false;
+    }
+  };
+
+  await loop();
+  if (process.env.RESOLVER_ONCE === "true") return;
+  setInterval(loop, config.pollIntervalMs);
 }
 
 main().catch((err) => {

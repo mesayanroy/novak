@@ -61,6 +61,18 @@ contract DisputeManager is IDisputeManager {
     mapping(bytes32 => DisputeCase) private _cases;
     mapping(bytes32 => mapping(uint8 => Tier)) private _tiers;
 
+    /// @notice ETH owed to each committee member / disputer / the treasury,
+    ///         claimable via `withdraw`. Pull payments: a recipient whose
+    ///         receive() reverts can only block its OWN withdrawal — with push
+    ///         payments, a permissionless disputer contract that reverts on
+    ///         receipt could make every resolution path revert and leave the
+    ///         event (and every composite/market depending on it) stuck in
+    ///         `Disputed` forever.
+    mapping(address => uint256) public pendingWithdrawals;
+
+    event PaymentCredited(address indexed to, uint256 amount);
+    event Withdrawn(address indexed to, uint256 amount);
+
     constructor(address registry_, address treasury_) {
         registry = IEventRegistry(registry_);
         treasury = treasury_;
@@ -165,8 +177,18 @@ contract DisputeManager is IDisputeManager {
 
         _refundTierBonds(t2);
         if (c.hasOriginalProposal && c.disputerBond > 0) {
-            _send(c.disputer, c.disputerBond);
+            _credit(c.disputer, c.disputerBond);
         }
+    }
+
+    /// @notice Withdraws everything owed to the caller.
+    function withdraw() external {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        require(amount > 0, "DisputeManager: nothing to withdraw");
+        pendingWithdrawals[msg.sender] = 0;
+        (bool sent,) = msg.sender.call{ value: amount }("");
+        require(sent, "DisputeManager: transfer failed");
+        emit Withdrawn(msg.sender, amount);
     }
 
     // --- Internal: tier lifecycle ---
@@ -269,11 +291,11 @@ contract DisputeManager is IDisputeManager {
             bool votedWithWinner = (decidedOutcome && v == VoteChoice.VotedTrue)
                 || (!decidedOutcome && v == VoteChoice.VotedFalse);
             if (votedWithWinner) {
-                _send(member, t.bondAmount + m.perWinner);
+                _credit(member, t.bondAmount + m.perWinner);
             }
         }
         if (m.burnShare > 0) _send(BURN_ADDRESS, m.burnShare);
-        if (m.treasuryDust > 0) _send(treasury, m.treasuryDust);
+        if (m.treasuryDust > 0) _credit(treasury, m.treasuryDust);
     }
 
     /// @dev Disputer challenged a proposal the committee upheld: their bond
@@ -284,12 +306,12 @@ contract DisputeManager is IDisputeManager {
         private
     {
         if (disputerWasRight) {
-            _send(disputer, disputerBond);
+            _credit(disputer, disputerBond);
         } else {
             uint256 dBurn = disputerBond / 3;
             uint256 dTreasury = disputerBond - dBurn;
             if (dBurn > 0) _send(BURN_ADDRESS, dBurn);
-            if (dTreasury > 0) _send(treasury, dTreasury);
+            if (dTreasury > 0) _credit(treasury, dTreasury);
         }
     }
 
@@ -297,7 +319,7 @@ contract DisputeManager is IDisputeManager {
         for (uint256 i = 0; i < t.committee.length; i++) {
             address member = t.committee[i];
             if (t.votes[member] != VoteChoice.NotVoted) {
-                _send(member, t.bondAmount);
+                _credit(member, t.bondAmount);
             }
         }
     }
@@ -355,6 +377,13 @@ contract DisputeManager is IDisputeManager {
         return false;
     }
 
+    function _credit(address to, uint256 amount) private {
+        pendingWithdrawals[to] += amount;
+        emit PaymentCredited(to, amount);
+    }
+
+    /// @dev Only used for the burn share: BURN_ADDRESS has no code, so this
+    ///      can never revert and never needs the pull path.
     function _send(address to, uint256 amount) private {
         (bool sent,) = to.call{ value: amount }("");
         require(sent, "DisputeManager: transfer failed");

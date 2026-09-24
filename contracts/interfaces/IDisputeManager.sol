@@ -73,6 +73,13 @@ interface IDisputeManager {
     ///         the ladder. Never escalates to a vote of any other kind.
     function voidAfterTier2Timeout(bytes32 eventId) external;
 
+    /// @notice Withdraws all ETH (bond refunds, rewards, treasury share)
+    ///         credited to the caller. Payouts are pull-based so no
+    ///         recipient can block a resolution by rejecting ETH.
+    function withdraw() external;
+
+    function pendingWithdrawals(address account) external view returns (uint256);
+
     function getCommittee(bytes32 eventId, uint8 tier) external view returns (address[] memory);
 
     function getTierTally(bytes32 eventId, uint8 tier)

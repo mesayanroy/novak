@@ -14,17 +14,26 @@ const implementedMethods = [
   { name: "getResolvedComposite(compositeId)", kind: "read", returns: "{ resolved, outcome }" },
   { name: "readOutcome(eventId)", kind: "read", returns: "Outcome" },
   { name: "isAvailable(eventId)", kind: "read", returns: "boolean" },
+  { name: "getAvailability(eventId)", kind: "read", returns: "Availability (Pending | Available | Voided)" },
+  { name: "getEventSpec(eventId)", kind: "read", returns: "EventSpecInput" },
+  { name: "listEvents(fromBlock)", kind: "read", returns: "{ eventId, sourceId, specVersion, blockNumber }[]" },
   { name: "resolveOutcome(eventId)", kind: "read", returns: "{ available, outcome }" },
   { name: "subscribe(topic, consumer, account)", kind: "write", returns: "Hex (tx hash)" },
   { name: "unsubscribe(topic, consumer, account)", kind: "write", returns: "Hex (tx hash)" },
   { name: "isSubscribed(topic, consumer)", kind: "read", returns: "boolean" },
-  { name: "createMarket(eventId, account)", kind: "write", returns: "Hex (tx hash)" },
+  { name: "approveCollateral(amount, account)", kind: "write", returns: "Hex (tx hash)" },
+  { name: "mintTestCollateral(to, amount, account)", kind: "write", returns: "Hex (tx hash) — testnet MockUSDG" },
+  { name: "collateralBalance(owner) / collateralAllowance(owner)", kind: "read", returns: "bigint (6 decimals)" },
+  { name: "createMarket(eventId, tradingClosesAt, question, account)", kind: "write", returns: "Hex (tx hash)" },
   { name: "getCreatedMarketId(txHash)", kind: "read", returns: "Hex" },
-  { name: "depositCollateral(marketId, backingYes, amountWei, account)", kind: "write", returns: "Hex (tx hash)" },
-  { name: "closePosition(marketId, backingYes, amount, account)", kind: "write", returns: "Hex (tx hash)" },
+  { name: "depositCollateral(marketId, backingYes, amount, account)", kind: "write", returns: "Hex (tx hash) — USDG, approve first" },
+  { name: "closePosition(marketId, backingYes, amount, account)", kind: "write", returns: "Hex (tx hash) — only before tradingClosesAt" },
   { name: "settleMarket(marketId, account)", kind: "write", returns: "Hex (tx hash)" },
   { name: "claim(marketId, account)", kind: "write", returns: "Hex (tx hash)" },
   { name: "getMarket(marketId)", kind: "read", returns: "MarketDef" },
+  { name: "listMarkets() / listMarketIds()", kind: "read", returns: "MarketDef[] / Hex[] (on-chain enumeration)" },
+  { name: "payoutOf(marketId, trader)", kind: "read", returns: "bigint" },
+  { name: "canLiquidate(stockToken)", kind: "read", returns: "{ allowed, blockingEventId } — StockLendingGuard" },
 ];
 
 const comingSoonMethods = [
@@ -60,9 +69,13 @@ export default function SdkReferencePage() {
         <TabsContent value="read">
           <CodeBlock
             variant="dark"
-            code={`import { NovakClient } from "@novak/sdk";
+            code={`import { NovakClient, getDeployment, robinhoodTestnet } from "@novak/sdk";
 
-const client = new NovakClient(publicClient, undefined, addresses);
+// Addresses ship with the SDK (deployments/<chainId>.json).
+const client = new NovakClient(publicClient, undefined, getDeployment(robinhoodTestnet.id));
+
+// Pending | Available | Voided — distinguishes "not yet" from "never".
+const availability = await client.getAvailability(eventId);
 
 // Read a finalized primitive event's outcome.
 const outcome = await client.readOutcome(eventId);
@@ -75,16 +88,18 @@ const { resolved, outcome: compositeOutcome } = await client.getResolvedComposit
         <TabsContent value="write">
           <CodeBlock
             variant="dark"
-            code={`import { NovakClient } from "@novak/sdk";
+            code={`import { NovakClient, getDeployment, robinhoodTestnet } from "@novak/sdk";
 
-const client = new NovakClient(publicClient, walletClient, addresses);
+const client = new NovakClient(publicClient, walletClient, getDeployment(robinhoodTestnet.id));
 
 // Create a market referencing a finalized (possibly composite) event.
-const txHash = await client.createMarket(compositeId, account);
+// Trading closes when the event's observation window opens.
+const txHash = await client.createMarket(compositeId, opensAt, "NVDA up AND split this week?", account);
 const marketId = await client.getCreatedMarketId(txHash);
 
-// Back YES with 0.1 ETH.
-await client.depositCollateral(marketId, true, 100000000000000000n, account);`}
+// Back YES with 50 USDG (6 decimals): approve, then deposit.
+await client.approveCollateral(50_000_000n, account);
+await client.depositCollateral(marketId, true, 50_000_000n, account);`}
           />
         </TabsContent>
       </Tabs>

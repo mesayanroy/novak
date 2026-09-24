@@ -12,7 +12,26 @@ import { IDisputeManager } from "../../contracts/interfaces/IDisputeManager.sol"
 ///         convergence, Tier-1 -> Tier-2 escalation, Tier-2 -> Void, the
 ///         burn/reward/treasury bond math, the small-pool committee
 ///         fallback, and the non-convergence escalation path.
+/// @dev A disputer contract that rejects ETH. Under push payments its
+///      refund made every resolution path revert, leaving the event stuck
+///      in `Disputed` forever.
+contract RevertingDisputer {
+    function fileDispute(DisputeManager dm, bytes32 eventId) external payable {
+        dm.dispute{ value: msg.value }(eventId);
+    }
+
+    receive() external payable {
+        revert("RevertingDisputer: no ETH");
+    }
+}
+
 contract DisputeManagerTest is Test {
+    /// @dev Wallet balance + ETH credited by DisputeManager but not yet
+    ///      withdrawn (payouts are pull-based).
+    function _owed(address a) internal view returns (uint256) {
+        return a.balance + disputeManager.pendingWithdrawals(a);
+    }
+
     EventRegistry internal registry;
     DisputeManager internal disputeManager;
 
@@ -116,14 +135,14 @@ contract DisputeManagerTest is Test {
         address[] memory committee = disputeManager.getCommittee(eventId, 1);
         assertEq(committee.length, 3, "small pool -> committee is the whole pool");
 
-        uint256 attackerBalanceBefore = attacker.balance;
-        uint256 treasuryBalanceBefore = treasury.balance;
+        uint256 attackerBalanceBefore = _owed(attacker);
+        uint256 treasuryBalanceBefore = _owed(treasury);
         uint256 burnBalanceBefore = disputeManager.BURN_ADDRESS().balance;
         // Captured before either A or B has paid their tier-1 bond, so the
         // expected final balance is simply "before + net effect of the
         // whole round" (pay bond, get bond + reward back).
-        uint256 aBalanceBefore = resolverA.balance;
-        uint256 bBalanceBefore = resolverB.balance;
+        uint256 aBalanceBefore = _owed(resolverA);
+        uint256 bBalanceBefore = _owed(resolverB);
 
         // C votes with the (losing) original outcome first, then A and B
         // vote to overturn it — B's vote is the one that crosses 66%.
@@ -146,12 +165,12 @@ contract DisputeManagerTest is Test {
         uint256 perWinner = rewardPool / 2;
 
         assertEq(disputeManager.BURN_ADDRESS().balance, burnBalanceBefore + burnShare);
-        assertEq(treasury.balance, treasuryBalanceBefore + treasuryShare);
-        assertEq(resolverA.balance, aBalanceBefore + perWinner);
-        assertEq(resolverB.balance, bBalanceBefore + perWinner);
+        assertEq(_owed(treasury), treasuryBalanceBefore + treasuryShare);
+        assertEq(_owed(resolverA), aBalanceBefore + perWinner);
+        assertEq(_owed(resolverB), bBalanceBefore + perWinner);
 
         // Disputer was right (committee overturned the proposal) -> full refund.
-        assertEq(attacker.balance, attackerBalanceBefore + disputeBond);
+        assertEq(_owed(attacker), attackerBalanceBefore + disputeBond);
     }
 
     /// @dev Same small pool, but the committee UPHOLDS the original "true"
@@ -164,7 +183,7 @@ contract DisputeManagerTest is Test {
         vm.prank(attacker);
         disputeManager.dispute{ value: disputeBond }(eventId);
 
-        uint256 treasuryBalanceBefore = treasury.balance;
+        uint256 treasuryBalanceBefore = _owed(treasury);
         uint256 burnBalanceBefore = disputeManager.BURN_ADDRESS().balance;
 
         vm.prank(resolverA);
@@ -179,7 +198,7 @@ contract DisputeManagerTest is Test {
         uint256 dBurn = disputeBond / 3;
         uint256 dTreasury = disputeBond - dBurn;
         assertEq(disputeManager.BURN_ADDRESS().balance, burnBalanceBefore + dBurn);
-        assertEq(treasury.balance, treasuryBalanceBefore + dTreasury);
+        assertEq(_owed(treasury), treasuryBalanceBefore + dTreasury);
     }
 
     // --- Tier-1 non-convergence -> Tier-2 ---
@@ -197,13 +216,13 @@ contract DisputeManagerTest is Test {
 
         vm.warp(block.timestamp + disputeManager.TIER1_WINDOW() + 1);
 
-        uint256 aBalanceBefore = resolverA.balance;
-        uint256 bBalanceBefore = resolverB.balance;
+        uint256 aBalanceBefore = _owed(resolverA);
+        uint256 bBalanceBefore = _owed(resolverB);
         disputeManager.escalateTier2(eventId);
 
         // Full refund, no slashing — Tier-1 never reached a decision.
-        assertEq(resolverA.balance, aBalanceBefore + tier1Bond);
-        assertEq(resolverB.balance, bBalanceBefore + tier1Bond);
+        assertEq(_owed(resolverA), aBalanceBefore + tier1Bond);
+        assertEq(_owed(resolverB), bBalanceBefore + tier1Bond);
 
         address[] memory tier2Committee = disputeManager.getCommittee(eventId, 2);
         assertEq(tier2Committee.length, 3);
@@ -278,17 +297,17 @@ contract DisputeManagerTest is Test {
 
         vm.warp(block.timestamp + disputeManager.TIER2_WINDOW() + 1);
 
-        uint256 aBalanceBefore = resolverA.balance;
-        uint256 cBalanceBefore = resolverC.balance;
-        uint256 attackerBalanceBefore = attacker.balance;
+        uint256 aBalanceBefore = _owed(resolverA);
+        uint256 cBalanceBefore = _owed(resolverC);
+        uint256 attackerBalanceBefore = _owed(attacker);
 
         disputeManager.voidAfterTier2Timeout(eventId);
 
         assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.Voided));
         assertFalse(registry.isFinalized(eventId));
-        assertEq(resolverA.balance, aBalanceBefore + tier2Bond);
-        assertEq(resolverC.balance, cBalanceBefore + tier2Bond);
-        assertEq(attacker.balance, attackerBalanceBefore + disputeBond);
+        assertEq(_owed(resolverA), aBalanceBefore + tier2Bond);
+        assertEq(_owed(resolverC), cBalanceBefore + tier2Bond);
+        assertEq(_owed(attacker), attackerBalanceBefore + disputeBond);
     }
 
     function test_voidAfterTier2Timeout_revertsIfWindowStillOpen() public {
@@ -404,5 +423,64 @@ contract DisputeManagerTest is Test {
         vm.prank(resolverA);
         vm.expectRevert(bytes("DisputeManager: tier window closed"));
         disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
+    }
+
+    // --- Pull payments ---
+
+    /// @dev REGRESSION: a reverting disputer must not be able to block a
+    ///      committee from finalizing the event.
+    function test_revertingDisputer_cannotBlockConvergence() public {
+        bytes32 eventId = _proposedTrueEvent();
+        RevertingDisputer griefer = new RevertingDisputer();
+        griefer.fileDispute{ value: disputeBond }(disputeManager, eventId);
+
+        // Committee overturns -> disputer was "right" -> refund owed to a
+        // contract that rejects ETH. Must still finalize.
+        vm.prank(resolverA);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, false);
+        vm.prank(resolverB);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, false);
+
+        assertTrue(registry.isFinalized(eventId));
+        assertEq(disputeManager.pendingWithdrawals(address(griefer)), disputeBond);
+    }
+
+    /// @dev REGRESSION: same griefer on the Tier-2 timeout path, which always
+    ///      refunds the disputer — voiding must still go through.
+    function test_revertingDisputer_cannotBlockVoid() public {
+        bytes32 eventId = _proposedTrueEvent();
+        RevertingDisputer griefer = new RevertingDisputer();
+        griefer.fileDispute{ value: disputeBond }(disputeManager, eventId);
+
+        uint64 tier1Window = disputeManager.TIER1_WINDOW();
+        vm.warp(block.timestamp + tier1Window + 1);
+        disputeManager.escalateTier2(eventId);
+        uint64 tier2Window = disputeManager.TIER2_WINDOW();
+        vm.warp(block.timestamp + tier2Window + 1);
+        disputeManager.voidAfterTier2Timeout(eventId);
+
+        assertEq(uint8(registry.getEvent(eventId)), uint8(IEventRegistry.EventStatus.Voided));
+        assertEq(disputeManager.pendingWithdrawals(address(griefer)), disputeBond);
+    }
+
+    function test_withdraw_paysOutCreditsOnce() public {
+        bytes32 eventId = _proposedTrueEvent();
+        vm.prank(attacker);
+        disputeManager.dispute{ value: disputeBond }(eventId);
+        vm.prank(resolverA);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
+        vm.prank(resolverB);
+        disputeManager.submitTier1Vote{ value: tier1Bond }(eventId, true);
+
+        uint256 owed = disputeManager.pendingWithdrawals(resolverA);
+        assertEq(owed, tier1Bond); // upheld, no losing voter -> bond back, no reward
+        uint256 before = resolverA.balance;
+        vm.prank(resolverA);
+        disputeManager.withdraw();
+        assertEq(resolverA.balance, before + owed);
+
+        vm.prank(resolverA);
+        vm.expectRevert(bytes("DisputeManager: nothing to withdraw"));
+        disputeManager.withdraw();
     }
 }

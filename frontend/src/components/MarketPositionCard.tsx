@@ -1,135 +1,176 @@
 "use client";
 
 import { useState } from "react";
-import { parseEther } from "viem";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
-import { marketAbi } from "@novak/sdk";
-import { novakAddresses } from "@/lib/addresses";
+import { parseUnits } from "viem";
+import { useAccount, useReadContracts } from "wagmi";
+import { Availability, MarketStatus, TESTNET_FAUCET_URL, marketAbi, mockUsdgAbi } from "@novak/sdk";
+import { deployment, novakAddresses } from "@/lib/addresses";
+import { USDG_DECIMALS, fmtUsdg, useNovakClient, type LiveMarket } from "@/lib/novak";
+import { useTx } from "@/lib/useTx";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConnectButton } from "@/components/ConnectButton";
+import { MarketStatusLabel } from "@/components/markets/MarketCard";
 import { shortHex } from "@/lib/utils";
 
-/** Deposit collateral into a market, settle it once its event is finalized,
- *  and claim a payout — the parimutuel YES/NO flow in derivatives/Market.sol.
- *  Position-taking is gated behind wallet connection. */
-export function MarketPositionCard({ marketId: presetMarketId }: { marketId?: `0x${string}` }) {
-  const { isConnected } = useAccount();
-  const [marketIdInput, setMarketIdInput] = useState(presetMarketId ?? "");
-  const [amountEth, setAmountEth] = useState("0.1");
-  const { writeContract, isPending, data: txHash } = useWriteContract();
+/**
+ * USDG position flow on Market.sol: (mint test USDG) -> approve -> back YES/NO
+ * -> [trading closes] -> settle (anyone; the keeper usually does it) -> claim.
+ * Withdrawals are only possible while trading is open — that is what stops
+ * the losing side from pulling out once the outcome is public.
+ */
+export function MarketPositionCard({ market }: { market: LiveMarket }) {
+  const { address, isConnected } = useAccount();
+  const client = useNovakClient();
+  const { run, pending, error, lastHash } = useTx();
+  const [amount, setAmount] = useState("50");
 
-  const marketId = marketIdInput.startsWith("0x") ? (marketIdInput as `0x${string}`) : undefined;
-
-  const { data: marketDef } = useReadContract({
-    address: novakAddresses.market,
-    abi: marketAbi,
-    functionName: "markets",
-    args: marketId ? [marketId] : undefined,
-    query: { enabled: Boolean(marketId) },
+  const id = market.marketId;
+  const { data } = useReadContracts({
+    allowFailure: false,
+    query: { enabled: Boolean(address), refetchInterval: 5_000 },
+    contracts: address
+      ? [
+          { address: novakAddresses.collateral, abi: mockUsdgAbi, functionName: "balanceOf", args: [address] },
+          { address: novakAddresses.collateral, abi: mockUsdgAbi, functionName: "allowance", args: [address, novakAddresses.market] },
+          { address: novakAddresses.market, abi: marketAbi, functionName: "yesBalance", args: [id, address] },
+          { address: novakAddresses.market, abi: marketAbi, functionName: "noBalance", args: [id, address] },
+          { address: novakAddresses.market, abi: marketAbi, functionName: "payoutOf", args: [id, address] },
+          { address: novakAddresses.market, abi: marketAbi, functionName: "claimed", args: [id, address] },
+        ]
+      : [],
   });
+  const [balance, allowance, yesStake, noStake, payout] = (data?.slice(0, 5) ?? []) as (bigint | undefined)[];
+  const claimed = data?.[5] as boolean | undefined;
 
-  const settled = marketDef?.[2];
-  const outcome = marketDef?.[3];
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const tradingOpen = market.status === MarketStatus.Open && now < market.tradingClosesAt;
+  const canSettle = market.status === MarketStatus.Open && market.event.availability !== Availability.Pending;
+  let amountWei = 0n;
+  try {
+    amountWei = parseUnits(amount || "0", USDG_DECIMALS);
+  } catch {
+    /* invalid input */
+  }
+  const needsApproval = allowance !== undefined && allowance < amountWei;
+
+  const act = (label: string, fn: () => Promise<`0x${string}`>) =>
+    run(label, async (wait) => {
+      await wait(await fn());
+    });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Take a position</CardTitle>
-        <CardDescription>Parimutuel YES/NO pool — reads/writes go through Market.sol only.</CardDescription>
+        <CardTitle>Your position</CardTitle>
+        <CardDescription>
+          <MarketStatusLabel market={market} />
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        {!isConnected ? (
+      <CardContent className="flex flex-col gap-4">
+        {!isConnected || !client || !address ? (
           <div className="flex flex-col items-start gap-3 border border-dashed border-gray-300 p-4">
-            <p className="text-sm text-gray-600">Connect a wallet to take a position.</p>
+            <p className="text-sm text-gray-600">Connect a wallet (Robinhood Wallet, MetaMask, …) on Robinhood Chain testnet.</p>
             <ConnectButton />
           </div>
         ) : (
           <>
-            {!presetMarketId && (
-              <Input
-                value={marketIdInput}
-                onChange={(e) => setMarketIdInput(e.target.value)}
-                placeholder="0x… market ID"
-                className="mb-3"
-              />
-            )}
+            <div className="grid grid-cols-3 gap-2 font-mono text-xs">
+              <Stat label="Wallet USDG" value={balance !== undefined ? fmtUsdg(balance) : "…"} />
+              <Stat label="Your YES" value={yesStake !== undefined ? fmtUsdg(yesStake) : "…"} />
+              <Stat label="Your NO" value={noStake !== undefined ? fmtUsdg(noStake) : "…"} />
+            </div>
 
-            {marketDef && (
-              <p className="mb-3 font-mono text-xs text-gray-500">
-                {settled ? `Settled — outcome: ${outcome ? "YES" : "NO"}` : "Not yet settled"}
+            {deployment?.chainId === 46630 && (
+              <p className="text-xs text-gray-500">
+                Gas is testnet ETH —{" "}
+                <a className="underline" href={TESTNET_FAUCET_URL} target="_blank" rel="noreferrer">
+                  Robinhood Chain faucet
+                </a>
+                .
               </p>
             )}
-
-            <div className="mb-3 flex items-center gap-2">
-              <Input
-                value={amountEth}
-                onChange={(e) => setAmountEth(e.target.value)}
-                placeholder="ETH amount"
-                className="w-32"
-              />
-              <Button
-                variant="secondary"
-                disabled={!marketId || isPending}
-                onClick={() =>
-                  marketId &&
-                  writeContract({
-                    address: novakAddresses.market,
-                    abi: marketAbi,
-                    functionName: "depositCollateral",
-                    args: [marketId, true],
-                    value: parseEther(amountEth || "0"),
-                  })
-                }
-              >
-                Back YES
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={!marketId || isPending}
-                onClick={() =>
-                  marketId &&
-                  writeContract({
-                    address: novakAddresses.market,
-                    abi: marketAbi,
-                    functionName: "depositCollateral",
-                    args: [marketId, false],
-                    value: parseEther(amountEth || "0"),
-                  })
-                }
-              >
-                Back NO
-              </Button>
-            </div>
-
-            <div className="flex gap-2">
+            {deployment?.collateralIsMock && (
               <Button
                 variant="ghost"
-                disabled={!marketId || isPending}
-                onClick={() =>
-                  marketId &&
-                  writeContract({ address: novakAddresses.market, abi: marketAbi, functionName: "settle", args: [marketId] })
-                }
+                size="sm"
+                disabled={Boolean(pending)}
+                onClick={() => act("Minting", () => client.mintTestCollateral(address, parseUnits("1000", USDG_DECIMALS), address))}
               >
-                Settle
+                Get 1,000 test USDG
               </Button>
-              <Button
-                variant="ghost"
-                disabled={!marketId || isPending}
-                onClick={() =>
-                  marketId &&
-                  writeContract({ address: novakAddresses.market, abi: marketAbi, functionName: "claim", args: [marketId] })
-                }
-              >
-                Claim payout
-              </Button>
-            </div>
+            )}
 
-            {txHash && <p className="mt-3 font-mono text-xs text-gray-500">tx: {shortHex(txHash, 10, 8)}</p>}
+            {tradingOpen && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Input value={amount} onChange={(e) => setAmount(e.target.value)} className="w-32" aria-label="Amount in USDG" />
+                  <span className="font-mono text-xs text-gray-500">USDG</span>
+                </div>
+                {needsApproval ? (
+                  <Button disabled={Boolean(pending) || amountWei === 0n} onClick={() => act("Approving", () => client.approveCollateral(amountWei, address))}>
+                    Approve {amount} USDG
+                  </Button>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button disabled={Boolean(pending) || amountWei === 0n} onClick={() => act("Backing YES", () => client.depositCollateral(id, true, amountWei, address))}>
+                      Back YES
+                    </Button>
+                    <Button variant="secondary" disabled={Boolean(pending) || amountWei === 0n} onClick={() => act("Backing NO", () => client.depositCollateral(id, false, amountWei, address))}>
+                      Back NO
+                    </Button>
+                  </div>
+                )}
+                {((yesStake ?? 0n) > 0n || (noStake ?? 0n) > 0n) && (
+                  <div className="flex gap-2">
+                    {(yesStake ?? 0n) > 0n && (
+                      <Button variant="ghost" size="sm" disabled={Boolean(pending)} onClick={() => act("Withdrawing", () => client.closePosition(id, true, yesStake ?? 0n, address))}>
+                        Withdraw YES
+                      </Button>
+                    )}
+                    {(noStake ?? 0n) > 0n && (
+                      <Button variant="ghost" size="sm" disabled={Boolean(pending)} onClick={() => act("Withdrawing", () => client.closePosition(id, false, noStake ?? 0n, address))}>
+                        Withdraw NO
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {canSettle && (
+              <Button variant="secondary" disabled={Boolean(pending)} onClick={() => act("Settling", () => client.settleMarket(id, address))}>
+                Settle market (event is decided)
+              </Button>
+            )}
+
+            {market.status !== MarketStatus.Open &&
+              (claimed ? (
+                <p className="text-sm text-gray-600">Claimed.</p>
+              ) : (payout ?? 0n) > 0n ? (
+                <Button disabled={Boolean(pending)} onClick={() => act("Claiming", () => client.claim(id, address))}>
+                  Claim {fmtUsdg(payout ?? 0n)} USDG{market.status === MarketStatus.Refunding ? " refund" : ""}
+                </Button>
+              ) : (
+                <p className="text-sm text-gray-600">Nothing to claim for this wallet.</p>
+              ))}
+
+            {pending && <p className="font-mono text-xs text-gray-500">{pending}…</p>}
+            {error && <p className="font-mono text-xs text-rose-700">{error}</p>}
+            {lastHash && !pending && <p className="font-mono text-xs text-gray-400">last tx {shortHex(lastHash, 10, 8)}</p>}
           </>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border border-gray-200 p-2">
+      <p className="text-[10px] uppercase text-gray-500">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-ink">{value}</p>
+    </div>
   );
 }

@@ -6,12 +6,20 @@ and the invariants you must not break.
 
 ## What this project is
 
-**Novak (Neural Event Network / NEN)** — a decentralized, composable event bus
-for Ethereum, built for ETHOnline. On-chain and real-world events are
-resolved, finalized, and stored once, then composed (AND/OR/NOT,
-BEFORE/WITHIN) and consumed by many independent smart contracts, instead of
-every app building its own oracle integration. The first consumer application
-is a derivatives market that settles against composite events.
+**Novak (Neural Event Network / NEN)** — the event layer for tokenized stocks
+on **Robinhood Chain** (Arbitrum Orbit L2), entered in the Colosseum Crypto
+World's Fair **Robinhood Chain track** (deadline 2026-10-12). Positioning:
+"Chainlink tells your contract the price. Novak tells it what happened."
+Real-world facts about Robinhood Stock Tokens (corporate actions, trading
+status, price-at-time conditions) are resolved, finalized and stored once,
+composed (AND/OR/NOT, BEFORE/WITHIN), and consumed by many contracts.
+Chainlink is a Novak **data source**, never framed as a competitor. Two
+consumers ship: a USDG derivatives `Market` and `StockLendingGuard`.
+
+Deployment: **testnet only (46630)**. Resolvers READ Robinhood Chain mainnet
+(4663) — Chainlink stock feeds and ERC-8056 stock tokens exist only there —
+and WRITE to testnet. Verified facts + the build plan:
+`docs/ROBINHOOD_CHAIN_PLAN.md`.
 
 Full narrative context: `README.md` (setup/commands), `docs/architecture.md`
 (component breakdown + diagram), `docs/protocol-spec.md` (data shapes +
@@ -23,10 +31,13 @@ the authoritative "what's actually done" tracker).
 
 **Applications depend on the Event Bus, never directly on a resolver, the
 Registry, or the Composer.** `derivatives/Market.sol` holds only a
-`Settlement` reference, and `derivatives/Settlement.sol` holds only an
-`IEventBus` reference. This is enforced by a regression test:
-`test/unit/Market.t.sol::test_market_onlyHoldsSettlementReference`. If you add
-a new consumer contract, add an equivalent guard test. Same principle applies
+`Settlement` reference, `derivatives/Settlement.sol` and
+`consumers/StockLendingGuard.sol` hold only an `IEventBus` reference.
+Enforced by regression tests:
+`test/unit/Market.t.sol::test_market_onlyHoldsSettlementReference` and
+`test/unit/StockLendingGuard.t.sol::test_guard_onlyHoldsEventBusReference`.
+If you add a new consumer contract, add an equivalent guard test. Consumers
+that hold funds must handle `IEventBus.Availability.Voided` (Market refunds). Same principle applies
 on the TS side: the frontend and SDK read event state through
 `eventBus`/`settlement`/`market` ABI calls only, never through a resolver's
 internals.
@@ -39,7 +50,8 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTED
 ```
 
 - **Registry** (`contracts/EventRegistry.sol`) owns this state machine:
-  `createEvent`, `submitObservation` (quorum-gated auto-proposal), `finalize`
+  `createEvent`, `submitObservation` (quorum-gated auto-proposal; rejected
+  before `openTimestamp`; v2 payloads validated), `finalize`
   (undisputed path), `expire` (nobody ever observed it). It deliberately
   knows nothing about committees or bonds — dispute-side transitions
   (`escalateToDispute`/`finalizeFromDispute`/`voidEvent`) are gated
@@ -48,10 +60,16 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTED
   committee escalation ladder: `dispute`/`escalateNonConvergence` open
   Tier-1 (≤7 resolvers, ≥66% agreement); failing to converge escalates to
   Tier-2 (≤15); failing there marks the event permanently `Voided` (bonds
-  refunded) — **never** a token-weighted vote. Fully implemented.
-- **Resolver network** (`resolver/`) — independent off-chain processes that
-  fetch source data (adapters), hash it into evidence, encode a boolean
-  outcome, and submit directly to `EventRegistry.submitObservation`.
+  refunded) — **never** a token-weighted vote. Payouts are **pull-based**
+  (`pendingWithdrawals` + `withdraw()`) so a reverting recipient can't
+  freeze a dispute. Fully implemented.
+- **Resolver network** (`resolver/`) — independent daemons that discover
+  events from logs, observe real sources via adapters
+  (`chainlink.price-at.v1`, `rh.corporate-action.v1`,
+  `rh.trading-status.v1`), submit outcome + evidence hash, vote in dispute
+  committees, and (one node, `RESOLVER_KEEPER=true`) poke permissionless
+  transitions (finalize/escalate/tryResolve/settle). Serves
+  `/health` + `/evidence/:hash`.
 - **Composer** (`contracts/EventComposer.sol`) — builds composite events from
   primitive event IDs (AND/OR/NOT/BEFORE/WITHIN), deterministically, without
   duplicating Registry state. Composite identity is canonicalized for every
@@ -61,7 +79,12 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTED
   forever once computed.
 - **Bus** (`contracts/EventBus.sol`) — the only pull-based read surface
   consumers should use. Transparently serves both primitive (Registry) and
-  composite (Composer) event outcomes.
+  composite (Composer) event outcomes; `getAvailability` returns
+  Pending/Available/Voided.
+- **Market** (`derivatives/Market.sol`) — USDG (ERC-20) parimutuel markets
+  with `tradingClosesAt` (deposits AND withdrawals stop there — this fixed a
+  real fund-loss bug), refunds on Voided, a protocol fee, and on-chain
+  enumeration. `contracts/mocks/MockUSDG.sol` is the testnet collateral.
 - **SubscriptionManager** — stub only, by design. MVP is pull-only; do not
   build push/callback delivery (that's the deferred relayer, Issue #13 in
   `docs/SPEC_AND_TASKS.md`).
@@ -71,65 +94,57 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTED
 ```
 contracts/       Foundry workspace: EventRegistry, DisputeManager, EventBus,
                   EventComposer, SubscriptionManager + interfaces/ (I*.sol)
-derivatives/      Market (parimutuel pools), PositionManager, Settlement —
+derivatives/      Market (USDG parimutuel pools), PositionManager, Settlement —
                   IEventBus consumers only (via Settlement)
-resolver/         Node/TS resolver daemon: node/ adapters/ evidence/ consensus/
-sdk/              @novak/sdk — TS client wrapping contract calls (viem-based)
-frontend/         Next.js + Tailwind + wagmi/viem demo UI
-test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 80 tests, all passing
+consumers/        StockLendingGuard — second IEventBus consumer
+deployments/      <chainId>.json (addresses + startBlock), from
+                  script/export-deployment.mjs — the single address source
+resolver/         daemon: node/ (discovery, resolve, keeper, voter, server)
+                  adapters/ evidence/ consensus/ lib/ scripts/probe-sources.ts
+sdk/              @novak/sdk — GENERATED abis.ts + deployments.ts (scripts/gen.mjs),
+                  chains, source-spec encoders, NovakClient (viem ≥ 2.56)
+frontend/         Next.js: /, /markets, /markets/[id], /calendar, /guard, /docs;
+                  api/rh-assets route; Robinhood Wallet via WalletConnect
+test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 112 tests, all passing
 script/           Deploy.s.sol (Registry -> DisputeManager -> Composer -> Bus
                   -> Settlement -> Market)
-examples/         end-to-end-flow.ts — canonical create->compose->settle demo,
-                  verified running against a live local anvil chain
+examples/         end-to-end-flow.ts (scripted canonical flow), seed-demo.ts
+                  (seeds live-priced demo events/markets/guard rule on any chain)
 docs/             architecture.md, protocol-spec.md, threat-model.md,
                   SPEC_AND_TASKS.md (living)
 ```
 
-## Current status: backend is MVP-complete, verified end-to-end
+## Current status
 
-`forge test` → 80/80 passing (unit/integration/fuzz/adversarial). The full
-canonical flow (create two events → resolvers reach quorum → dispute window
-elapses → finalize → compose WITHIN(48h) → resolve composite → create market
-→ two opposing deposits → settle → claim) runs successfully against a live
-local anvil chain via `examples/end-to-end-flow.ts` — this was actually
-executed and verified (in a prior pass; the flow itself is unaffected by the
-`DisputeManager` addition below, since it never disputes).
+`forge test` → 112/112. Verified in the 2026-09-25 pass: full-stack deploy
+simulates on the live Robinhood testnet; `pnpm example:e2e` runs on anvil;
+three resolver processes + keeper resolved seeded events from LIVE mainnet
+data, finalized, resolved a composite, settled markets, paused NVDA
+liquidations in the guard, and handled a filed dispute end to end.
 
-**What's still genuinely incomplete** (see `docs/SPEC_AND_TASKS.md` for the
-full checklist with reasoning per item):
+**Still genuinely incomplete:**
 
-- **No relayer/push-trigger service** (Issue #13, P1) — zero code exists for
-  this. Pull-based consumption (Bus reads) is what's implemented.
-- **No real testnet deployment** — `script/Deploy.s.sol` is testnet-ready but
-  has only been run against local anvil in this environment (no funded
-  testnet key/RPC available). See `docs/SPEC_AND_TASKS.md` Issue #20 for the
-  exact command to run once you have one.
-- **Resolver adapters are mocked** — `PriceFeedAdapter` reads a price from an
-  env var, not a real API. There's also no on-chain event-discovery/indexer;
-  a resolver is told which event IDs to watch via
-  `RESOLVER_WATCHED_EVENT_IDS`.
-- **Dispute arbitration is a bonded committee ladder, not full
-  decentralization.** This changed: single-owner arbitration
-  (`resolveDispute`) is gone, replaced by `DisputeManager`'s two-tier
-  committee escalation (see above) — a real structural change, not a
-  relabeling, and it never falls back to a token-weighted vote. What's
-  still genuinely missing: committee selection is block-data
-  pseudo-randomness (not VRF-based), and there's no on-chain
-  staking/reputation token behind committee membership (every member posts
-  the same flat bond). Don't present this as "solved" — see
-  `docs/protocol-spec.md` and `docs/threat-model.md` item 10 for the
-  precise residual gap before changing it further.
-- **The resolver daemon (`resolver/node/index.ts`) doesn't yet drive
-  `DisputeManager`** — the on-chain tiered-escalation mechanism and its pure
-  off-chain quorum math (`evaluateEscalationQuorum`) are done, but nothing
-  listens for `TierOpened` events and auto-submits committee votes yet.
-- **No fees, no market expiry/cancellation path** in the derivatives market.
+- **Not yet deployed to testnet** — needs the team's funded faucet keys
+  (deployer + 3 resolvers). Everything else is ready (see README quickstart).
+- **Frontend not click-tested in a browser** — builds, typechecks, serves
+  200s, API route verified with real data.
+- **Committee selection is block-data pseudo-randomness**, weaker on
+  Arbitrum chains (`prevrandao` = 1, `blockhash` insecure) and Chainlink VRF
+  is not on Robinhood Chain. Mitigation plan: commit-reveal; keep the
+  resolver pool ≤ 7 meanwhile. See `docs/threat-model.md` items 10, 16.
+- **No push/relayer delivery** (Issue #13) — the keeper only calls
+  permissionless functions; consumers still pull.
+- **No staking/reputation token** behind resolver authorization or
+  committee membership (flat bonds).
 
 **Protocol semantics that were open TODOs are now FINALIZED** — event ID
 derivation, composite ID derivation (**canonicalized/sorted for every
 order-independent operator** — `AND`, `OR`, `NOT`, `WITHIN` — except
 `BEFORE`, where operand order is semantic and deliberately preserved),
-outcome payload schema (`abi.encode(bool)`, specVersion 1), quorum model
+outcome payload schema (`abi.encode(bool)` specVersion 1;
+`abi.encode(bool, uint64 occurredAt)` specVersion 2 — temporal ops use
+`occurredAt`), consumer availability (`getAvailability`), market trading
+window + void refunds, quorum model
 (N-of-M exact-match, authorized resolvers, no staking, with a defined
 escalation path for a non-converging/ambiguous quorum), temporal op
 timestamp source (`Outcome.finalizedAt` for primitives, resolution-time for
@@ -143,13 +158,15 @@ cross-referenced.
 ## MVP scope boundaries
 
 **In scope (implemented):** Event Registry, event spec format, resolver
-network with multiple observations, quorum (incl. the ambiguous-split
+network with real Robinhood Chain adapters, event discovery, keeper and
+dispute voter, multiple observations, quorum (incl. the ambiguous-split
 escalation path), bonded two-tier committee dispute escalation
 (`DisputeManager`), finalization, terminal non-outcomes (`Voided`/`Expired`)
 with propagation through composition, structural DAG bounds, pull-based
 on-chain Event Bus (primitive + composite), AND/OR/NOT + BEFORE/WITHIN
 composition with canonicalized identity, derivatives market with
-event-based settlement, TS SDK, local deployment scripts, end-to-end demo.
+event-based settlement (USDG), StockLendingGuard, TS SDK with generated
+ABIs, Robinhood testnet deployment scripts, live-data frontend, end-to-end demo.
 
 **Explicitly out of scope — do not add complexity for these:** cross-chain
 events, ZK oracle proofs, permissionless resolver marketplace (staking
@@ -170,10 +187,22 @@ design — see `docs/protocol-spec.md`).
   `frontend/`. `resolver/` depends on `@novak/sdk` (workspace link) for
   shared ABIs and the outcome codec — build `sdk/` before `resolver/` on a
   clean install (`pnpm --filter @novak/sdk build` first).
-- `derivatives/*.sol` is NOT under Foundry's `src` (`contracts/`) — it's
-  picked up purely because `test/` files import it directly. If you add a new
-  top-level derivatives contract that nothing in `test/` imports yet, add at
-  least one test import or it won't get compiled by `forge build`.
+- `derivatives/*.sol` and `consumers/*.sol` are NOT under Foundry's `src`
+  (`contracts/`) — they're picked up because `test/` files (and
+  `script/Deploy.s.sol`) import them directly. A new contract nothing imports
+  won't be compiled by `forge build`.
+- **ABIs are generated, never hand-edited:** after any contract change run
+  `forge build && pnpm --filter @novak/sdk gen && pnpm --filter @novak/sdk build`.
+  Addresses come from `deployments/<chainId>.json`
+  (`node script/export-deployment.mjs <chainId>` after a deploy).
+- **Arbitrum/Orbit quirks:** inside contracts `block.number` is an L1
+  estimate (don't use it for log scanning — the export script reads L2 block
+  numbers from broadcast receipts); `prevrandao` is 1.
+- **Local anvil + resolvers:** anvil only mines on transactions, so resolvers
+  never see time pass — run `cast rpc evm_setIntervalMining 2`.
+- The public Robinhood mainnet RPC is not an archive node (no historical
+  `eth_call`); adapters read logs instead. Topic-filtered `getLogs` over
+  ~1.5M blocks works.
 - The frontend's `next.config.mjs` aliases out `@x402/*` modules — these are
   optional transitive deps of wagmi's Coinbase Smart Wallet connector that
   aren't installed and aren't used (the demo only wires up the `injected`
@@ -206,12 +235,17 @@ pnpm test                         # forge test + all TS tests
 pnpm --filter novak-resolver dev
 pnpm --filter novak-frontend dev
 
-# Deploy locally
-anvil
-forge script script/Deploy.s.sol --rpc-url local --broadcast --private-key $DEPLOYER_PRIVATE_KEY
+# Deploy (testnet; MockUSDG auto-deployed) and export addresses
+forge script script/Deploy.s.sol --rpc-url robinhood_testnet --broadcast --verify
+node script/export-deployment.mjs 46630 && pnpm --filter @novak/sdk gen
 
-# Run the full canonical demo against that local deployment
-pnpm example:e2e   # needs DEPLOYER_PRIVATE_KEY + the deployed addresses in your env
+# Resolvers (3 keys; one with RESOLVER_KEEPER=true), live-source probe, demo seed
+pnpm --filter novak-resolver start
+pnpm --filter novak-resolver probe
+NOVAK_CHAIN_ID=46630 pnpm tsx examples/seed-demo.ts
+
+# Local: anvil + deploy with RPC http://127.0.0.1:8545, export 31337, then
+pnpm example:e2e
 ```
 
 See `README.md` for the full setup walkthrough and `.env.example` for every
