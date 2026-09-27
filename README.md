@@ -1,4 +1,4 @@
-# Novak — the event layer for tokenized stocks on Robinhood Chain
+# Novak — the Oracle layer for tokenized stocks on Robinhood Chain
 
 [![CI](https://github.com/mesayanroy/novak/actions/workflows/ci.yml/badge.svg)](https://github.com/mesayanroy/novak/actions/workflows/ci.yml)
 [![Built with Foundry](https://img.shields.io/badge/built%20with-Foundry-4a4a4a)](https://book.getfoundry.sh/)
