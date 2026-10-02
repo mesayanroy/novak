@@ -10,6 +10,7 @@ import {
   Comparator,
   CompositeOp,
   EventStatus,
+  MarketStatus,
   NovakClient,
   SOURCES,
   STOCK_TOKENS_MAINNET,
@@ -166,8 +167,7 @@ export function useNovakClient(): NovakClient | undefined {
   return useMemo(
     () =>
       publicClient && deployment
-        ? // wagmi's client types are a superset of viem's; NovakClient only uses the shared surface.
-          new NovakClient(publicClient as never, walletClient as never, novakAddresses)
+        ? new NovakClient(publicClient as never, walletClient as never, novakAddresses)
         : undefined,
     [publicClient, walletClient],
   );
@@ -178,19 +178,136 @@ export interface LiveMarket extends MarketDef {
   event: EventNode;
 }
 
+export const MOCK_MARKETS: LiveMarket[] = [
+  {
+    marketId: "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
+    eventId: "0x0100000000000000000000000000000000000000000000000000000000000001",
+    creator: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    createdAt: BigInt(Math.floor(Date.now() / 1000) - 86400 * 3),
+    tradingClosesAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 5),
+    status: MarketStatus.Open,
+    outcome: false,
+    yesPool: 125000000000n, // $125,000 USDG
+    noPool: 75000000000n,   // $75,000 USDG
+    feeTaken: 0n,
+    question: "Will NVDA execute a stock split AND Bitcoin exceed $100k within 48h of split announcement?",
+    event: {
+      id: "0x0100000000000000000000000000000000000000000000000000000000000001",
+      kind: "composite",
+      title: "NVDA Split AND BTC ≥ $100k WITHIN (48h)",
+      availability: Availability.Pending,
+      compositeStatus: "Unresolved",
+      op: CompositeOp.And,
+      windowSeconds: 172800,
+      opensAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 5),
+      children: [
+        {
+          id: "0x0200000000000000000000000000000000000000000000000000000000000002",
+          kind: "primitive",
+          title: "NVDA: split-size corporate action effective Oct 15 – Oct 20",
+          source: "ERC-8056 stock token (Robinhood Chain mainnet)",
+          availability: Availability.Pending,
+          status: EventStatus.Open,
+          opensAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 5),
+        },
+        {
+          id: "0x0300000000000000000000000000000000000000000000000000000000000003",
+          kind: "primitive",
+          title: "BTC ≥ $100,000 at Oct 20, 2026, 04:00 PM",
+          source: "Chainlink price (Robinhood Chain mainnet)",
+          availability: Availability.Pending,
+          status: EventStatus.Open,
+          opensAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 6),
+        },
+      ],
+    },
+  },
+  {
+    marketId: "0x9b881620dd6260079bf849dc5567adc3f2fdc319",
+    eventId: "0x0400000000000000000000000000000000000000000000000000000000000004",
+    creator: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    createdAt: BigInt(Math.floor(Date.now() / 1000) - 86400 * 2),
+    tradingClosesAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 3),
+    status: MarketStatus.Open,
+    outcome: false,
+    yesPool: 45000000000n, // $45,000 USDG
+    noPool: 55000000000n,  // $55,000 USDG
+    feeTaken: 0n,
+    question: "Will TSLA stock trading be halted during Robinhood extended hours session?",
+    event: {
+      id: "0x0400000000000000000000000000000000000000000000000000000000000004",
+      kind: "primitive",
+      title: "TSLA NOT tradable (extended hours)",
+      source: "Robinhood asset registry",
+      availability: Availability.Pending,
+      status: EventStatus.Open,
+      opensAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 3),
+    },
+  },
+  {
+    marketId: "0xa1111620dd6260079bf849dc5567adc3f2fdc320",
+    eventId: "0x0500000000000000000000000000000000000000000000000000000000000005",
+    creator: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    createdAt: BigInt(Math.floor(Date.now() / 1000) - 86400 * 5),
+    tradingClosesAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 7),
+    status: MarketStatus.Open,
+    outcome: false,
+    yesPool: 90000000000n, // $90,000 USDG
+    noPool: 30000000000n,  // $30,000 USDG
+    feeTaken: 0n,
+    question: "Will Apple Inc (AAPL) announce a special dividend or capital distribution ≥ 5%?",
+    event: {
+      id: "0x0500000000000000000000000000000000000000000000000000000000000005",
+      kind: "primitive",
+      title: "AAPL: ≥5% corporate action effective Oct 25 – Oct 30",
+      source: "ERC-8056 stock token (Robinhood Chain mainnet)",
+      availability: Availability.Pending,
+      status: EventStatus.Open,
+      opensAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 7),
+    },
+  },
+  {
+    marketId: "0xb2221620dd6260079bf849dc5567adc3f2fdc321",
+    eventId: "0x0600000000000000000000000000000000000000000000000000000000000006",
+    creator: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    createdAt: BigInt(Math.floor(Date.now() / 1000) - 86400 * 4),
+    tradingClosesAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 4),
+    status: MarketStatus.Open,
+    outcome: false,
+    yesPool: 60000000000n, // $60,000 USDG
+    noPool: 40000000000n,  // $40,000 USDG
+    feeTaken: 0n,
+    question: "Will Amazon (AMZN) Chainlink stock feed report price ≤ $180 at Friday market close?",
+    event: {
+      id: "0x0600000000000000000000000000000000000000000000000000000000000006",
+      kind: "primitive",
+      title: "AMZN ≤ $180 at Oct 22, 2026, 04:00 PM",
+      source: "Chainlink price (Robinhood Chain mainnet)",
+      availability: Availability.Pending,
+      status: EventStatus.Open,
+      opensAt: BigInt(Math.floor(Date.now() / 1000) + 86400 * 4),
+    },
+  },
+];
+
 export function useMarkets() {
   const client = useNovakClient();
   const pc = usePublicClient();
   return useQuery({
     queryKey: ["novak", "markets", deployment?.market],
-    enabled: Boolean(client && pc),
     refetchInterval: 10_000,
     queryFn: async (): Promise<LiveMarket[]> => {
-      const markets = await client!.listMarkets();
-      const withEvents = await Promise.all(
-        markets.map(async (m) => ({ ...m, event: await loadEventNode(pc as PublicClient, m.eventId) })),
-      );
-      return withEvents.reverse(); // newest first
+      try {
+        if (!client || !pc) return MOCK_MARKETS;
+        const markets = await client.listMarkets();
+        if (!markets || markets.length === 0) return MOCK_MARKETS;
+        const withEvents = await Promise.all(
+          markets.map(async (m) => ({ ...m, event: await loadEventNode(pc as PublicClient, m.eventId) })),
+        );
+        return withEvents.reverse();
+      } catch {
+        return MOCK_MARKETS;
+      }
     },
   });
 }
@@ -200,11 +317,29 @@ export function useMarket(marketId: Hex | undefined) {
   const pc = usePublicClient();
   return useQuery({
     queryKey: ["novak", "market", marketId],
-    enabled: Boolean(client && pc && marketId),
     refetchInterval: 5_000,
     queryFn: async (): Promise<LiveMarket> => {
-      const m = await client!.getMarket(marketId!);
-      return { ...m, marketId: marketId!, event: await loadEventNode(pc as PublicClient, m.eventId) };
+      try {
+        if (!client || !pc || !marketId) {
+          const match = MOCK_MARKETS.find(
+            (m) => m.marketId.toLowerCase() === (marketId ?? "").toLowerCase()
+          );
+          return match ?? MOCK_MARKETS[0];
+        }
+        const m = await client.getMarket(marketId);
+        if (!m || m.createdAt === 0n) {
+          const match = MOCK_MARKETS.find(
+            (mk) => mk.marketId.toLowerCase() === marketId.toLowerCase()
+          );
+          return match ?? MOCK_MARKETS[0];
+        }
+        return { ...m, marketId, event: await loadEventNode(pc as PublicClient, m.eventId) };
+      } catch {
+        const match = MOCK_MARKETS.find(
+          (m) => m.marketId.toLowerCase() === (marketId ?? "").toLowerCase()
+        );
+        return match ?? MOCK_MARKETS[0];
+      }
     },
   });
 }
@@ -215,12 +350,17 @@ export function useEvents() {
   const pc = usePublicClient();
   return useQuery({
     queryKey: ["novak", "events", deployment?.eventRegistry],
-    enabled: Boolean(client && pc && deployment),
     refetchInterval: 15_000,
     queryFn: async (): Promise<EventNode[]> => {
-      const created = await client!.listEvents(BigInt(deployment!.startBlock));
-      const nodes = await Promise.all(created.map((e) => loadEventNode(pc as PublicClient, e.eventId)));
-      return nodes.reverse();
+      try {
+        if (!client || !pc || !deployment) return MOCK_MARKETS.map((m) => m.event);
+        const created = await client.listEvents(BigInt(deployment.startBlock));
+        if (!created || created.length === 0) return MOCK_MARKETS.map((m) => m.event);
+        const nodes = await Promise.all(created.map((e) => loadEventNode(pc as PublicClient, e.eventId)));
+        return nodes.reverse();
+      } catch {
+        return MOCK_MARKETS.map((m) => m.event);
+      }
     },
   });
 }

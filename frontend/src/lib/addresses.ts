@@ -8,7 +8,8 @@ import { deployments, type NovakAddresses, type NovakDeployment } from "@novak/s
  */
 export const NOVAK_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 46630);
 
-export const deployment: NovakDeployment | undefined = deployments[NOVAK_CHAIN_ID];
+export const deployment: NovakDeployment =
+  deployments[NOVAK_CHAIN_ID] ?? deployments[46630] ?? deployments[31337];
 
 const NONE = "0x" as `0x${string}`;
 
