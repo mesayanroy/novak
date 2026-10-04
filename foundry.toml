@@ -25,6 +25,8 @@ runs = 128
 depth = 50
 
 [fmt]
+# Vendored third-party code (Solady) stays byte-identical to upstream.
+ignore = ["contracts/vendor/**"]
 line_length = 100
 tab_width = 4
 bracket_spacing = true
