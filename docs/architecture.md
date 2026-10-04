@@ -150,6 +150,10 @@ testnet has neither — see `docs/ROBINHOOD_CHAIN_PLAN.md` §0).
 | Keeper duty | off-chain → testnet | call permissionless transitions (finalize, escalate, tryResolve, settle). Not push delivery: consumers still pull |
 | `Market` | testnet | USDG parimutuel markets, the first Bus consumer |
 | `StockLendingGuard` | testnet | liquidation circuit-breaker, the second Bus consumer, reading the same events |
+| `DistributionMarket` | testnet | LMSR range markets; each range boundary is a Novak event (threshold ladder), so resolution and disputes are the dispute layer's |
+| `TreasuryVault` | testnet | receives every market fee (tagged by event) and the treasury third of forfeited dispute bonds; splits fees ⅓ correct resolvers · ⅓ correct committee voters (or insurance) · ⅓ treasury |
+| Rewards duty | off-chain → testnet | each resolver claims its vault share for events it reported correctly |
+| Frontend `/api/feeds`, `/api/rates` | server routes | 53 Chainlink Robinhood feeds (stocks, SGOV tokenized Treasuries); Fed target range (FRED) and EFFR (NY Fed) |
 | Frontend `/calendar` | server route, reads mainnet | ERC-8056 state of all stock tokens, the corporate-action calendar Chainlink doesn't provide |
 
 Chainlink is a **data source** of Novak, not something Novak replaces: price
