@@ -4,10 +4,12 @@ import {
   EventStatus,
   MarketStatus,
   disputeManagerAbi,
+  distributionMarketAbi,
   eventBusAbi,
   eventComposerAbi,
   eventRegistryAbi,
   marketAbi,
+  treasuryVaultAbi,
 } from "@novak/sdk";
 import type { Clients } from "../lib/chain.js";
 import { send } from "../lib/tx.js";
@@ -131,7 +133,46 @@ export class KeeperDuty {
       }
     }
 
+    await this.distributionTick();
+    await this.vaultTick();
+
     const owed = await this.read<bigint>(d.disputeManager, disputeManagerAbi as Abi, "pendingWithdrawals", [this.c.account.address]);
     if (owed > 0n) await this.poke(`withdraw ${owed} wei`, d.disputeManager, disputeManagerAbi as Abi, "withdraw", []);
+  }
+
+  /** Settle every open DistributionMarket whose boundary events are all decided. */
+  private async distributionTick(): Promise<void> {
+    const dist = this.c.deployment.distributionMarket;
+    if (!dist) return;
+    const count = await this.read<bigint>(dist, distributionMarketAbi as Abi, "marketCount");
+    if (count === 0n) return;
+    const ids = await this.read<Hex[]>(dist, distributionMarketAbi as Abi, "getMarketIds", [0n, count]);
+    for (const marketId of ids) {
+      const m = await this.read<{ status: number }>(dist, distributionMarketAbi as Abi, "getMarket", [marketId]);
+      if (Number(m.status) !== 0) continue;
+      const boundaries = await this.read<Hex[]>(dist, distributionMarketAbi as Abi, "getBoundaries", [marketId]);
+      const avail = await Promise.all(
+        boundaries.map((b) => this.read<number>(this.c.deployment.eventBus, eventBusAbi as Abi, "getAvailability", [b])),
+      );
+      if (avail.some((a) => Number(a) === Availability.Pending)) continue;
+      await this.poke(`settle distribution market ${marketId}`, dist, distributionMarketAbi as Abi, "settle", [marketId]);
+    }
+  }
+
+  /** Split decided events' pending fees into thirds; pull forfeited-bond ETH into the vault. */
+  private async vaultTick(): Promise<void> {
+    const vault = this.c.deployment.treasuryVault;
+    if (!vault) return;
+    for (const eventId of this.terminal) {
+      const pending = await this.read<bigint>(vault, treasuryVaultAbi as Abi, "pendingFees", [eventId]);
+      if (pending > 0n) await this.poke(`vault allocate ${eventId}`, vault, treasuryVaultAbi as Abi, "allocate", [eventId]);
+    }
+    const owedToVault = await this.read<bigint>(
+      this.c.deployment.disputeManager,
+      disputeManagerAbi as Abi,
+      "pendingWithdrawals",
+      [vault],
+    );
+    if (owedToVault > 0n) await this.poke(`vault sweep ${owedToVault} wei`, vault, treasuryVaultAbi as Abi, "sweepDisputeProceeds", []);
   }
 }
