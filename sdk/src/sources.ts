@@ -14,6 +14,8 @@ export const SOURCES = {
   corporateAction: "rh.corporate-action.v1",
   /** "Stock token S is NOT tradable in session X when observed" — specVersion 1. */
   tradingStatus: "rh.trading-status.v1",
+  /** "Fed funds target upper bound on date D is >= / <= X bps" — specVersion 2. */
+  fedRate: "macro.fomc.v1",
 } as const;
 
 export type SourceName = (typeof SOURCES)[keyof typeof SOURCES];
@@ -61,6 +63,81 @@ export function encodePriceAtSpec(s: PriceAtSpec): Hex {
 export function decodePriceAtSpec(data: Hex): PriceAtSpec {
   const [feed, threshold, comparator, at, maxStaleness] = decodeAbiParameters(priceAtParams, data);
   return { feed, threshold, comparator: comparator as Comparator, at, maxStaleness };
+}
+
+/**
+ * The N-1 boundary events behind an N-bucket DistributionMarket: event i is
+ * "feed >= thresholds[i] at `at`" (specVersion 2), thresholds ascending.
+ * Bucket k wins when exactly k boundaries resolve TRUE, i.e. the value lands
+ * in [thresholds[k-1], thresholds[k]). Create them with
+ * `NovakClient.createEvents` (one transaction).
+ */
+export function buildPriceLadderSpecs(p: {
+  feed: Address;
+  /** Ascending, in the feed's units (8 decimals for Robinhood stock feeds). */
+  thresholds: bigint[];
+  at: bigint;
+  maxStaleness: bigint;
+  openTimestamp?: bigint;
+  observationDeadline?: bigint;
+  disputeWindowSeconds?: bigint;
+  quorumThreshold?: number;
+}): Array<{
+  specVersion: number;
+  sourceId: Hex;
+  openTimestamp: bigint;
+  observationDeadline: bigint;
+  disputeWindowSeconds: bigint;
+  quorumThreshold: number;
+  spec: Hex;
+}> {
+  for (let i = 1; i < p.thresholds.length; i++) {
+    if (p.thresholds[i] <= p.thresholds[i - 1]) throw new Error("buildPriceLadderSpecs: thresholds must ascend");
+  }
+  const open = p.openTimestamp ?? p.at;
+  return p.thresholds.map((threshold) => ({
+    specVersion: 2,
+    sourceId: sourceId(SOURCES.priceAt),
+    openTimestamp: open,
+    observationDeadline: p.observationDeadline ?? open + 86_400n,
+    disputeWindowSeconds: p.disputeWindowSeconds ?? 600n,
+    quorumThreshold: p.quorumThreshold ?? 2,
+    spec: encodePriceAtSpec({ feed: p.feed, threshold, comparator: Comparator.Gte, at: p.at, maxStaleness: p.maxStaleness }),
+  }));
+}
+
+/** Human labels for the N buckets of a ladder: "< $200", "$200–210", …, "≥ $230". */
+export function ladderBucketLabels(thresholds: bigint[], decimals = 8): string[] {
+  const fmt = (v: bigint) => `$${(Number(v) / 10 ** decimals).toLocaleString()}`;
+  const labels = [`< ${fmt(thresholds[0])}`];
+  for (let i = 1; i < thresholds.length; i++) labels.push(`${fmt(thresholds[i - 1])}–${fmt(thresholds[i])}`);
+  labels.push(`≥ ${fmt(thresholds[thresholds.length - 1])}`);
+  return labels;
+}
+
+// --- macro.fomc.v1 ---
+
+export interface FedRateSpec {
+  /** Unix seconds; the UTC calendar day whose published target is checked (also occurredAt). */
+  date: bigint;
+  /** Threshold on the target range's UPPER bound, in basis points (4.00% = 400). */
+  upperBoundBps: number;
+  comparator: Comparator;
+}
+
+const fedRateParams = [
+  { type: "uint64", name: "date" },
+  { type: "uint16", name: "upperBoundBps" },
+  { type: "uint8", name: "comparator" },
+] as const;
+
+export function encodeFedRateSpec(s: FedRateSpec): Hex {
+  return encodeAbiParameters(fedRateParams, [s.date, s.upperBoundBps, s.comparator]);
+}
+
+export function decodeFedRateSpec(data: Hex): FedRateSpec {
+  const [date, upperBoundBps, comparator] = decodeAbiParameters(fedRateParams, data);
+  return { date, upperBoundBps, comparator: comparator as Comparator };
 }
 
 // --- rh.corporate-action.v1 ---
@@ -126,6 +203,7 @@ export const CHAINLINK_FEEDS_MAINNET: Record<string, Address> = {
   NVDA: "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15",
   TSLA: "0x4A1166a659A55625345e9515b32adECea5547C38",
   AAPL: "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0",
+  SGOV: "0xa0DF4ee0fFf975306345875E3548Fcc519577A11", // tokenized 0-3M US Treasury ETF
   "USDG/USD": "0x61B7e5650328764B076A108EFF5fa7282a1B9aD2",
   "ETH/USD": "0x78F3556b67E17Df817D51Ef5a990cDaF09E8d3A9",
 };
