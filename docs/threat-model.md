@@ -250,6 +250,27 @@ determinism) unless marked unresolved.
     served at `/evidence/:hash` so a disputer can check it against the
     on-chain commitment.
 
+18. **LMSR market-maker loss.** Informed traders can extract up to the
+    LMSR's bounded loss `b·ln N` from the market creator's subsidy (by
+    design, the price of liquidity). They cannot extract more: every trade
+    re-checks `reserve ≥ C(q)`, buys round shares down and sells round
+    proceeds down. Trading on a known outcome is blocked (trading window plus
+    "any boundary decided" check).
+
+19. **Ladder manipulation / inconsistency.** Each boundary is resolved
+    independently, so a corrupted quorum on one boundary can shift which range
+    wins. The defenses are the same as for any event: disputes, then Tier-1
+    and Tier-2 committees, then Void. An inconsistent ladder (a TRUE above a
+    FALSE, which honest resolvers reading one Chainlink round can never
+    produce) voids the market and redeems every share at 1/N, instead of
+    picking an arbitrary range.
+
+20. **Fee attribution games.** Anyone can call `depositFees` for any event
+    IDs. That's harmless, because it only *adds* rewards. Rewards go only to
+    resolvers whose observed boolean matches the final outcome, and to
+    committee members who voted it, so being wrong pays nothing. Insurance
+    top-ups are capped at one extra third per event.
+
 ## Cycle-impossibility proof (Gap 3)
 
 **Claim:** the composition DAG built by `EventComposer.createComposite` can
