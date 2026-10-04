@@ -1,9 +1,11 @@
-import { parseAbiItem, type Account, type PublicClient, type WalletClient } from "viem";
+import { parseAbiItem, toEventSelector, type Account, type PublicClient, type WalletClient } from "viem";
 import {
+  distributionMarketAbi,
   eventBusAbi,
   eventComposerAbi,
   eventRegistryAbi,
   marketAbi,
+  treasuryVaultAbi,
   mockUsdgAbi,
   settlementAbi,
   stockLendingGuardAbi,
@@ -12,6 +14,8 @@ import {
 import type {
   Address,
   Availability,
+  DistributionMarketInfo,
+  DistributionStatus,
   CompositeSpecInput,
   EventSpecInput,
   Hex,
@@ -423,6 +427,279 @@ export class NovakClient {
       args: [stockToken],
     });
     return { allowed, blockingEventId };
+  }
+
+  // --- Batch events / threshold ladders ---
+
+  /** Creates several events in one transaction (Registry.createEvents, max 16). */
+  async createEvents(specs: EventSpecInput[], account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.addresses.eventRegistry,
+      abi: eventRegistryAbi,
+      functionName: "createEvents",
+      args: [specs],
+    });
+  }
+
+  /** Event IDs created by a `createEvents` / `createEvent` transaction, in order. */
+  async getCreatedEventIds(txHash: Hex): Promise<Hex[]> {
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
+    const topic = toEventSelector(eventCreatedEvent);
+    return receipt.logs
+      .filter((l) => l.address.toLowerCase() === this.addresses.eventRegistry.toLowerCase() && l.topics[0] === topic)
+      .map((l) => l.topics[1] as Hex);
+  }
+
+  // --- DistributionMarket (LMSR range markets) ---
+
+  private get dist(): Address {
+    if (!this.addresses.distributionMarket) throw new Error("NovakClient: distributionMarket address not set");
+    return this.addresses.distributionMarket;
+  }
+
+  /** Approves any spender (e.g. the DistributionMarket) to pull collateral. */
+  async approveCollateralFor(spender: Address, amount: bigint, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.addresses.collateral,
+      abi: mockUsdgAbi,
+      functionName: "approve",
+      args: [spender, amount],
+    });
+  }
+
+  async collateralAllowanceFor(owner: Address, spender: Address): Promise<bigint> {
+    return this.publicClient.readContract({
+      address: this.addresses.collateral,
+      abi: mockUsdgAbi,
+      functionName: "allowance",
+      args: [owner, spender],
+    });
+  }
+
+  /**
+   * Opens a range market over `boundaryEventIds` (ascending thresholds,
+   * boundary i = "value >= threshold_i"). The creator pays the LMSR subsidy
+   * b·ln(N) — approve the DistributionMarket first (see `distributionSubsidy`).
+   */
+  async createDistributionMarket(
+    question: string,
+    boundaryEventIds: Hex[],
+    tradingClosesAt: bigint,
+    liquidity: bigint,
+    account: Account | Address,
+  ): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "createMarket",
+      args: [question, boundaryEventIds, tradingClosesAt, liquidity],
+    });
+  }
+
+  /** LMSR subsidy for N = boundaries + 1 buckets: ceil(b·ln N) + 1 unit (what createMarket pulls). */
+  distributionSubsidy(liquidity: bigint, nBuckets: number): bigint {
+    const wad = (Number(liquidity) * Math.log(nBuckets));
+    return BigInt(Math.ceil(wad)) + 2n; // +1 margin, +1 for float rounding
+  }
+
+  async getCreatedDistributionMarketId(txHash: Hex): Promise<Hex> {
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
+    const log = receipt.logs.find((l) => l.address.toLowerCase() === this.dist.toLowerCase());
+    if (!log?.topics[1]) throw new Error("NovakClient: MarketCreated log not found");
+    return log.topics[1] as Hex;
+  }
+
+  async distributionBuy(marketId: Hex, bucket: number, collateralIn: bigint, minShares: bigint, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "buy",
+      args: [marketId, bucket, collateralIn, minShares],
+    });
+  }
+
+  async distributionSell(marketId: Hex, bucket: number, shares: bigint, minCollateralOut: bigint, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "sell",
+      args: [marketId, bucket, shares, minCollateralOut],
+    });
+  }
+
+  async distributionSettle(marketId: Hex, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "settle",
+      args: [marketId],
+    });
+  }
+
+  async distributionRedeem(marketId: Hex, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "redeem",
+      args: [marketId],
+    });
+  }
+
+  async distributionQuoteBuy(marketId: Hex, bucket: number, collateralIn: bigint): Promise<{ shares: bigint; fee: bigint }> {
+    const [shares, fee] = await this.publicClient.readContract({
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "quoteBuy",
+      args: [marketId, bucket, collateralIn],
+    });
+    return { shares, fee };
+  }
+
+  async distributionQuoteSell(marketId: Hex, bucket: number, shares: bigint): Promise<{ collateralOut: bigint; fee: bigint }> {
+    const [collateralOut, fee] = await this.publicClient.readContract({
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "quoteSell",
+      args: [marketId, bucket, shares],
+    });
+    return { collateralOut, fee };
+  }
+
+  /** Bucket prices as probabilities (0..1), summing to ~1. */
+  async distributionPrices(marketId: Hex): Promise<number[]> {
+    const p = await this.publicClient.readContract({
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "prices",
+      args: [marketId],
+    });
+    return (p as readonly bigint[]).map((x) => Number(x) / 1e18);
+  }
+
+  async getDistributionMarket(marketId: Hex): Promise<
+    DistributionMarketInfo & { marketId: Hex; boundaries: Hex[]; outstanding: bigint[]; prices: number[] }
+  > {
+    const [m, boundaries, outstanding, prices] = await Promise.all([
+      this.publicClient.readContract({ address: this.dist, abi: distributionMarketAbi, functionName: "getMarket", args: [marketId] }),
+      this.publicClient.readContract({ address: this.dist, abi: distributionMarketAbi, functionName: "getBoundaries", args: [marketId] }),
+      this.publicClient.readContract({ address: this.dist, abi: distributionMarketAbi, functionName: "getOutstanding", args: [marketId] }),
+      this.distributionPrices(marketId),
+    ]);
+    return {
+      marketId,
+      creator: m.creator,
+      createdAt: m.createdAt,
+      tradingClosesAt: m.tradingClosesAt,
+      status: m.status as DistributionStatus,
+      nBuckets: m.nBuckets,
+      winningBucket: m.winningBucket,
+      b: m.b,
+      reserve: m.reserve,
+      fees: m.fees,
+      liability: m.liability,
+      question: m.question,
+      boundaries: [...(boundaries as readonly Hex[])],
+      outstanding: [...(outstanding as readonly bigint[])],
+      prices,
+    };
+  }
+
+  async listDistributionMarkets(): Promise<Awaited<ReturnType<NovakClient["getDistributionMarket"]>>[]> {
+    const count = await this.publicClient.readContract({ address: this.dist, abi: distributionMarketAbi, functionName: "marketCount" });
+    if (count === 0n) return [];
+    const ids = await this.publicClient.readContract({
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "getMarketIds",
+      args: [0n, count],
+    });
+    return Promise.all((ids as readonly Hex[]).map((id) => this.getDistributionMarket(id)));
+  }
+
+  async distributionSharesOf(marketId: Hex, trader: Address): Promise<bigint[]> {
+    const s = await this.publicClient.readContract({
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "sharesOf",
+      args: [marketId, trader],
+    });
+    return [...(s as readonly bigint[])];
+  }
+
+  async distributionPayoutOf(marketId: Hex, trader: Address): Promise<bigint> {
+    return this.publicClient.readContract({
+      address: this.dist,
+      abi: distributionMarketAbi,
+      functionName: "payoutOf",
+      args: [marketId, trader],
+    });
+  }
+
+  // --- TreasuryVault ---
+
+  private get vault(): Address {
+    if (!this.addresses.treasuryVault) throw new Error("NovakClient: treasuryVault address not set");
+    return this.addresses.treasuryVault;
+  }
+
+  async vaultClaimable(eventId: Hex, who: Address): Promise<{ resolver: bigint; committee: bigint }> {
+    const [resolver, committee] = await Promise.all([
+      this.publicClient.readContract({ address: this.vault, abi: treasuryVaultAbi, functionName: "claimableResolverReward", args: [eventId, who] }),
+      this.publicClient.readContract({ address: this.vault, abi: treasuryVaultAbi, functionName: "claimableCommitteeReward", args: [eventId, who] }),
+    ]);
+    return { resolver, committee };
+  }
+
+  async vaultBalances(): Promise<{ treasury: bigint; insurance: bigint }> {
+    const [treasury, insurance] = await Promise.all([
+      this.publicClient.readContract({ address: this.vault, abi: treasuryVaultAbi, functionName: "treasuryBalance" }),
+      this.publicClient.readContract({ address: this.vault, abi: treasuryVaultAbi, functionName: "insuranceReserve" }),
+    ]);
+    return { treasury, insurance };
+  }
+
+  async vaultPendingFees(eventId: Hex): Promise<bigint> {
+    return this.publicClient.readContract({ address: this.vault, abi: treasuryVaultAbi, functionName: "pendingFees", args: [eventId] });
+  }
+
+  // --- Integration helper ---
+
+  /**
+   * Polls the Event Bus until `eventId` is decided (pull model — no push
+   * delivery). Resolves with the outcome, or `{ voided: true }` if the event
+   * will never resolve (refund your users). Rejects on timeout.
+   */
+  async waitForOutcome(
+    eventId: Hex,
+    opts: { intervalMs?: number; timeoutMs?: number } = {},
+  ): Promise<{ voided: false; outcome: boolean; outcomeData: Hex } | { voided: true }> {
+    const interval = opts.intervalMs ?? 15_000;
+    const deadline = Date.now() + (opts.timeoutMs ?? 7 * 24 * 3600 * 1000);
+    for (;;) {
+      const a = await this.getAvailability(eventId);
+      if (a === 2) return { voided: true };
+      if (a === 1) {
+        const o = await this.readOutcome(eventId);
+        const { outcome } = await this.resolveOutcome(eventId);
+        return { voided: false, outcome, outcomeData: o.outcomeData };
+      }
+      if (Date.now() > deadline) throw new Error(`NovakClient: timed out waiting for ${eventId}`);
+      await new Promise((r) => setTimeout(r, interval));
+    }
   }
 
   private requireWallet(): WalletClient {
