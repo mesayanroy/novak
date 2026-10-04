@@ -5,6 +5,7 @@ import { Settlement } from "./Settlement.sol";
 import { PositionManager } from "./PositionManager.sol";
 import { IERC20Minimal } from "./interfaces/IERC20Minimal.sol";
 import { IEventBus } from "../contracts/interfaces/IEventBus.sol";
+import { ITreasuryVault } from "../contracts/interfaces/ITreasuryVault.sol";
 
 /// @title Market
 /// @notice First consumer application of the Event Bus: a binary (YES/NO)
@@ -64,6 +65,9 @@ contract Market {
     Settlement public immutable settlement;
     PositionManager public immutable positionManager;
     IERC20Minimal public immutable collateral;
+    /// @dev The TreasuryVault: the protocol fee is pushed there tagged with
+    ///      this market's event ID, and split into thirds (resolvers /
+    ///      committee or insurance / treasury) once the event is decided.
     address public immutable treasury;
     uint256 public immutable feeBps;
 
@@ -221,7 +225,7 @@ contract Market {
         uint256 fee = (winnerPool > 0) ? (loserPool * feeBps) / BPS : 0;
         m.feeTaken = fee;
 
-        if (fee > 0) _safeTransfer(treasury, fee);
+        if (fee > 0) _payFee(m.eventId, fee);
         emit MarketSettled(marketId, outcome, fee);
     }
 
@@ -296,6 +300,15 @@ contract Market {
         uint256 winnerStake = m.outcome ? yesBalance[marketId][trader] : noBalance[marketId][trader];
         if (winnerStake == 0) return 0;
         return winnerStake + (winnerStake * (loserPool - m.feeTaken)) / winnerPool;
+    }
+
+    function _payFee(bytes32 eventId, uint256 fee) private {
+        (bool ok, bytes memory data) =
+            address(collateral).call(abi.encodeCall(IERC20Minimal.approve, (treasury, fee)));
+        require(ok && (data.length == 0 || abi.decode(data, (bool))), "Market: approve failed");
+        bytes32[] memory ids = new bytes32[](1);
+        ids[0] = eventId;
+        ITreasuryVault(treasury).depositFees(ids, fee);
     }
 
     function _safeTransfer(address to, uint256 amount) private {
