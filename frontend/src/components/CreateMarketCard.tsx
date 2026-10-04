@@ -21,8 +21,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConnectButton } from "@/components/ConnectButton";
 import { shortHex } from "@/lib/utils";
+import { RangeTemplate } from "@/components/distribution/RangeTemplate";
 
-type Template = "price" | "corporate" | "combine";
+type Template = "range" | "price" | "corporate" | "combine";
 
 const TICKERS = Object.keys(CHAINLINK_FEEDS_MAINNET).filter((t) => !t.includes("/"));
 const HOUR = 3600;
@@ -195,6 +196,7 @@ export function CreateMarketCard({ onCreated }: { onCreated?: (marketId: Hex) =>
               ["price", "Stock price at a time"],
               ["corporate", "Corporate action"],
               ["combine", "Combine two events"],
+              ["range", "Price range (distribution)"],
             ] as const
           ).map(([t, label]) => (
             <Button key={t} size="sm" variant={template === t ? "primary" : "secondary"} onClick={() => setTemplate(t)}>
@@ -255,6 +257,8 @@ export function CreateMarketCard({ onCreated }: { onCreated?: (marketId: Hex) =>
             </Button>
           </div>
         )}
+
+        {template === "range" && <RangeTemplate />}
 
         {template === "combine" && (
           <div className="flex flex-col gap-3">
