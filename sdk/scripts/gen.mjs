@@ -23,6 +23,8 @@ const contracts = [
   ["PositionManager", "positionManagerAbi"],
   ["Market", "marketAbi"],
   ["StockLendingGuard", "stockLendingGuardAbi"],
+  ["DistributionMarket", "distributionMarketAbi"],
+  ["TreasuryVault", "treasuryVaultAbi"],
   ["MockUSDG", "mockUsdgAbi"],
 ];
 
