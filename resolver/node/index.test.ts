@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { TradingSession, encodeTradingStatusSpec, type EventSpecInput } from "@novak/sdk";
+import { Comparator, TradingSession, encodeFedRateSpec, encodeTradingStatusSpec, type EventSpecInput } from "@novak/sdk";
 import { evaluateQuorum, evaluateEscalationQuorum } from "../consensus/quorum.js";
 import { buildEvidence, hashEvidence, EvidenceStore } from "../evidence/evidence.js";
 import { changeBps, decideCorporateAction, type MultiplierChange } from "../adapters/corporateAction.js";
 import { TradingStatusAdapter } from "../adapters/tradingStatus.js";
+import { FedRateAdapter, parseFredTargets } from "../adapters/fedRate.js";
 
 describe("quorum", () => {
   it("reaches quorum when enough observations agree", () => {
@@ -140,5 +141,41 @@ describe("rh.trading-status adapter", () => {
     expect(await down.observe({ eventId: "0x1", spec: spec(TradingSession.Market), now: 5n })).toBeNull();
     const a = new TradingStatusAdapter(assets);
     expect(await a.observe({ eventId: "0x1", spec: spec(TradingSession.Extended), now: 5n })).toBeNull();
+  });
+});
+
+describe("macro.fomc fed-rate adapter", () => {
+  const csv = ["observation_date,DFEDTARU", "2026-10-28,4.00", "2026-10-29,3.75", ""].join("\n");
+  const day = (iso: string) => BigInt(Date.parse(iso + "T00:00:00Z") / 1000);
+  const spec = (date: bigint, bps: number, comparator: Comparator): EventSpecInput => ({
+    specVersion: 2,
+    sourceId: "0x00",
+    openTimestamp: 0n,
+    observationDeadline: 0n,
+    disputeWindowSeconds: 0n,
+    quorumThreshold: 1,
+    spec: encodeFedRateSpec({ date, upperBoundBps: bps, comparator }),
+  });
+
+  it("parses FRED's CSV into bps", () => {
+    expect(parseFredTargets(csv).get("2026-10-29")).toBe(375);
+  });
+
+  it("resolves a 25bp cut (upper <= 375) on the day after the meeting, occurredAt = that day", async () => {
+    const a = new FedRateAdapter(async () => csv);
+    const d = day("2026-10-29");
+    const obs = await a.observe({ eventId: "0x1", spec: spec(d, 375, Comparator.Lte), now: d + 3600n });
+    expect(obs).toMatchObject({ outcome: true, occurredAt: d });
+    const hold = await a.observe({ eventId: "0x1", spec: spec(day("2026-10-28"), 375, Comparator.Lte), now: d });
+    expect(hold?.outcome).toBe(false);
+  });
+
+  it("abstains until the day is published, or when the source is down", async () => {
+    const a = new FedRateAdapter(async () => csv);
+    expect(await a.observe({ eventId: "0x1", spec: spec(day("2026-12-10"), 375, Comparator.Lte), now: 0n })).toBeNull();
+    const down = new FedRateAdapter(async () => {
+      throw new Error("503");
+    });
+    expect(await down.observe({ eventId: "0x1", spec: spec(day("2026-10-29"), 375, Comparator.Lte), now: 0n })).toBeNull();
   });
 });
