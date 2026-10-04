@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { MarketStatus } from "@novak/sdk";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";
+import { ExampleDataBadge } from "@/components/ExampleDataBadge";
 import { fmtTime, fmtUsdg, type LiveMarket } from "@/lib/novak";
 import { shortHex } from "@/lib/utils";
 import { ArrowUpRight, Clock, Layers } from "lucide-react";
@@ -37,6 +38,7 @@ export function MarketCard({ market }: { market: LiveMarket }) {
                 {e.kind === "composite" ? "Composite event" : "Primitive event"}
               </span>
               <span className="font-mono text-[10px] text-gray-400">{shortHex(market.marketId, 6, 4)}</span>
+              {market.isExample && <ExampleDataBadge />}
             </div>
             <h3 className="font-medium leading-snug text-base text-ink group-hover:underline flex items-center gap-1.5">
               {market.question || e.title}
