@@ -42,6 +42,30 @@ export enum MarketStatus {
   Refunding = 2,
 }
 
+/** DistributionMarket lifecycle. */
+export enum DistributionStatus {
+  Open = 0,
+  /** Winning bucket decided — 1 USDG per winning share. */
+  Settled = 1,
+  /** A boundary was voided or the ladder was inconsistent — every share redeems 1/N. */
+  Voided = 2,
+}
+
+export interface DistributionMarketInfo {
+  creator: Address;
+  createdAt: bigint;
+  tradingClosesAt: bigint;
+  status: DistributionStatus;
+  nBuckets: number;
+  winningBucket: number;
+  /** LMSR liquidity b (collateral units, 6 decimals). */
+  b: bigint;
+  reserve: bigint;
+  fees: bigint;
+  liability: bigint;
+  question: string;
+}
+
 export interface EventSpecInput {
   /** 1: outcome = abi.encode(bool). 2: abi.encode(bool, uint64 occurredAt) — use for anything feeding BEFORE/WITHIN. */
   specVersion: number;
@@ -96,6 +120,10 @@ export interface NovakAddresses {
   /** ERC-20 collateral (MockUSDG on testnet, USDG on mainnet). */
   collateral: Address;
   stockLendingGuard?: Address;
+  /** LMSR range markets (bucket AMM over a threshold ladder). */
+  distributionMarket?: Address;
+  /** Fee + dispute-proceeds vault (thirds: resolvers / committee / treasury). */
+  treasuryVault?: Address;
 }
 
 /** Shape of deployments/<chainId>.json (script/export-deployment.mjs). */
@@ -107,4 +135,6 @@ export interface NovakDeployment extends NovakAddresses {
   collateralIsMock: boolean;
   disputeManager: Address;
   stockLendingGuard: Address;
+  distributionMarket: Address;
+  treasuryVault: Address;
 }
