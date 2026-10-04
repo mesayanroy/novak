@@ -29,6 +29,13 @@ contract EventRegistry is IEventRegistry {
     mapping(bytes32 => Proposal) private _proposals;
 
     mapping(bytes32 => mapping(address => bool)) private _hasSubmitted;
+    /// @dev The boolean each resolver observed (first ABI word of its payload,
+    ///      identical across specVersions) and per-boolean counts — what the
+    ///      TreasuryVault uses to pay resolvers who reported the final outcome.
+    ///      Booleans, not payload hashes: a v2 event finalized by a committee
+    ///      stores a 32-byte payload that no resolver's 64-byte payload hashes to.
+    mapping(bytes32 => mapping(address => bool)) private _observedOutcome;
+    mapping(bytes32 => mapping(bool => uint256)) private _observedOutcomeCount;
     mapping(bytes32 => mapping(bytes32 => uint256)) private _observationCount;
     mapping(address => bool) private _authorizedResolvers;
 
@@ -36,6 +43,8 @@ contract EventRegistry is IEventRegistry {
     mapping(address => uint256) private _resolverListIndex; // 1-based; 0 = absent
 
     uint256 private _nonce;
+
+    uint256 public constant MAX_BATCH = 16;
 
     modifier onlyOwner() {
         require(msg.sender == owner, "EventRegistry: not owner");
@@ -54,6 +63,25 @@ contract EventRegistry is IEventRegistry {
     // --- Event creation ---
 
     function createEvent(EventSpec calldata eventSpec) external returns (bytes32 eventId) {
+        return _createEvent(eventSpec);
+    }
+
+    /// @notice Creates several events in one transaction (e.g. the threshold
+    ///         ladder behind a DistributionMarket), in order.
+    function createEvents(EventSpec[] calldata eventSpecs)
+        external
+        returns (bytes32[] memory eventIds)
+    {
+        require(
+            eventSpecs.length > 0 && eventSpecs.length <= MAX_BATCH, "EventRegistry: bad batch size"
+        );
+        eventIds = new bytes32[](eventSpecs.length);
+        for (uint256 i = 0; i < eventSpecs.length; i++) {
+            eventIds[i] = _createEvent(eventSpecs[i]);
+        }
+    }
+
+    function _createEvent(EventSpec calldata eventSpec) private returns (bytes32 eventId) {
         require(eventSpec.quorumThreshold > 0, "EventRegistry: quorumThreshold must be > 0");
         require(
             eventSpec.observationDeadline > eventSpec.openTimestamp,
@@ -105,7 +133,13 @@ contract EventRegistry is IEventRegistry {
             require(occurredAt <= block.timestamp, "EventRegistry: occurredAt in future");
         }
 
+        require(outcomeData.length >= 32, "EventRegistry: bad payload");
+        // Reverts on a first word that isn't a canonical bool (0/1).
+        bool observed = abi.decode(outcomeData[:32], (bool));
+
         _hasSubmitted[eventId][msg.sender] = true;
+        _observedOutcome[eventId][msg.sender] = observed;
+        _observedOutcomeCount[eventId][observed]++;
         bytes32 outcomeHash = keccak256(outcomeData);
         uint256 count = ++_observationCount[eventId][outcomeHash];
 
@@ -248,6 +282,18 @@ contract EventRegistry is IEventRegistry {
         require(disputeManager_ != address(0), "EventRegistry: zero address");
         disputeManager = disputeManager_;
         emit DisputeManagerSet(disputeManager_);
+    }
+
+    function observedOutcome(bytes32 eventId, address resolver)
+        external
+        view
+        returns (bool submitted, bool outcome)
+    {
+        return (_hasSubmitted[eventId][resolver], _observedOutcome[eventId][resolver]);
+    }
+
+    function observedOutcomeCount(bytes32 eventId, bool outcome) external view returns (uint256) {
+        return _observedOutcomeCount[eventId][outcome];
     }
 
     function isAuthorizedResolver(address resolver) external view returns (bool) {
