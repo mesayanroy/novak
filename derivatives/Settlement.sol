@@ -43,6 +43,23 @@ contract Settlement {
         }
     }
 
+    /// @notice `getSettlement` for many events at once (e.g. a
+    ///         DistributionMarket's threshold ladder).
+    function getSettlements(bytes32[] calldata eventIds)
+        external
+        view
+        returns (IEventBus.Availability[] memory statuses, bool[] memory outcomes)
+    {
+        statuses = new IEventBus.Availability[](eventIds.length);
+        outcomes = new bool[](eventIds.length);
+        for (uint256 i = 0; i < eventIds.length; i++) {
+            statuses[i] = eventBus.getAvailability(eventIds[i]);
+            if (statuses[i] == IEventBus.Availability.Available) {
+                outcomes[i] = _decode(eventIds[i]);
+            }
+        }
+    }
+
     function _decode(bytes32 eventId) private view returns (bool) {
         IEventRegistry.Outcome memory o = eventBus.readOutcome(eventId);
         return abi.decode(o.outcomeData, (bool));
