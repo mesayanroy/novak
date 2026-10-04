@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 export interface IphoneProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -42,10 +43,13 @@ export function Iphone({
               <div className="h-full w-full overflow-y-auto">{children}</div>
             ) : src ? (
               <div className="relative h-full w-full overflow-hidden pt-6 bg-[#f8f6fc]">
-                <img
+                <Image
                   src={src}
                   alt="Novak Mobile Display"
-                  className="h-full w-full object-cover object-top"
+                  fill
+                  sizes="320px"
+                  priority
+                  className="object-cover object-top"
                 />
               </div>
             ) : null}
