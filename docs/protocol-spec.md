@@ -285,6 +285,81 @@ event's `openTimestamp`.
 moves the market to `Refunding` and every depositor claims back exactly their
 own stake — funds are never locked behind an event that can never resolve.
 
+## Value layer: TreasuryVault (v2)
+
+**FINALIZED — what resolvers are credited for.** `EventRegistry` records, per
+event, each resolver's observed **boolean** (`observedOutcome`) and per-boolean
+counts (`observedOutcomeCount`). A resolver is "correct" when its boolean
+equals the final outcome. Booleans, not payload hashes: a specVersion-2 event
+finalized by a committee stores a 32-byte payload that no resolver's 64-byte
+payload would hash to. `submitObservation` now also rejects payloads shorter
+than 32 bytes and non-canonical bools.
+
+**FINALIZED — batch creation.** `createEvents(EventSpec[])` (≤ 16) creates
+events in order in one transaction, e.g. the threshold ladder behind a
+DistributionMarket.
+
+**FINALIZED — fee thirds.** Consumers push fees with
+`ITreasuryVault.depositFees(eventIds, amount)`:
+- the amount is split equally across the listed events;
+- a composite ID expands one level into its primitive operands;
+- deeper nesting and unknown IDs go to the treasury.
+
+When an event is decided, `allocate` (permissionless, and also run by claims)
+splits its fees:
+- **⅓ resolver pool:** shared equally by resolvers whose observed boolean is
+  the final one. If there are none, this third goes to the treasury.
+- **⅓ committee pool:** if a dispute converged, shared equally by the deciding
+  tier's members who voted the final outcome, plus a top-up of up to one more
+  third from the **insurance reserve**. If the event was never disputed, this
+  third goes **into** the insurance reserve.
+- **⅓ treasury,** plus rounding dust.
+
+A Voided or Expired event sends everything to the treasury. Claims are pull
+payments. The vault is also the DisputeManager's `treasury`, so the treasury
+third of every forfeited dispute bond (ETH) is pulled in with
+`sweepDisputeProceeds`. The DisputeManager's own split is unchanged: losing
+bonds go ⅓ burn, ⅓ treasury (the vault), ⅓ winning voters. Consumers only
+*push* into the vault; the vault reads the Registry, Composer and
+DisputeManager, so the "consumers depend only on the Bus" rule still holds.
+
+## DistributionMarket (v2)
+
+**FINALIZED — mechanism.** An LMSR bucket AMM:
+- N ranges (2–10), with `C(q) = b·ln Σ exp(q_i/b)`, computed with the
+  log-sum-exp shift;
+- `expWad`/`lnWad` come from vendored Solady v0.1.26;
+- prices `p_i = exp(q_i/b) / Σ exp(q_j/b)` sum to 1, so the vector *is* the
+  market's probability distribution;
+- 1 share of the winning range pays 1 USDG;
+- `buy` uses the closed form
+  `q_k + Δ = M + b·ln(1 − Σ_{j≠k} exp((q_j − M)/b))` with
+  `M = C(q) + cost`, rounding shares down;
+- `sell` pays `C(q) − C(q − Δe_k)`, rounded down;
+- a trade fee (`tradeFeeBps`, at most 5%) accrues and goes to the vault at
+  settlement, tagged with the boundary events.
+
+**FINALIZED — solvency.**
+- The creator deposits `ceil(b·ln N) + 1` unit, which is `C(0)` plus margin
+  and the LMSR's maximum loss.
+- Every trade re-checks `reserve ≥ ceil(C(q))` and reverts otherwise.
+- Because `C(q) ≥ max q_i ≥ mean q_i`, both payout paths are always covered.
+  Fuzz-tested.
+- Leftover reserve after settlement goes back to the creator.
+
+**FINALIZED — resolution by threshold events.**
+- The N−1 boundaries are ordinary yes/no Novak events with ascending
+  thresholds; boundary *i* is "value ≥ threshold_i at T".
+- Winning range = the number of TRUE boundaries.
+- If any boundary is Voided or Expired, or the results are inconsistent (a
+  TRUE above a FALSE), the market is **Voided**: every share redeems 1/N.
+- The resolvers, quorum, committees and fee thirds apply to each boundary
+  unchanged, and other markets can reuse the same boundaries.
+
+**FINALIZED — trading window.** Trading (buy *and* sell) stops at
+`tradingClosesAt` **and** as soon as any boundary is no longer Pending. This is
+the same guarantee as `Market`: nobody trades on a known outcome.
+
 ## MVP scope
 
 **In scope (all implemented and tested — see `docs/SPEC_AND_TASKS.md`):**
