@@ -35,6 +35,8 @@ const keys = {
   Settlement: "settlement",
   PositionManager: "positionManager",
   Market: "market",
+  DistributionMarket: "distributionMarket",
+  TreasuryVault: "treasuryVault",
   StockLendingGuard: "stockLendingGuard",
 };
 
