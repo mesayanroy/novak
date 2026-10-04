@@ -6,6 +6,8 @@ import {
   disputeManagerAbi,
   marketAbi,
   stockLendingGuardAbi,
+  distributionMarketAbi,
+  treasuryVaultAbi,
 } from "./abis.js";
 import {
   encodeBoolOutcome,
@@ -26,6 +28,9 @@ import {
   encodeTradingStatusSpec,
   sourceId,
   sourceName,
+  buildPriceLadderSpecs,
+  ladderBucketLabels,
+  CHAINLINK_FEEDS_MAINNET,
 } from "./sources.js";
 import { ROBINHOOD_MAINNET_ID, ROBINHOOD_TESTNET_ID } from "./chains.js";
 
@@ -167,5 +172,26 @@ describe("source specs", () => {
   it("round-trips a trading-status spec", () => {
     const spec = { symbol: "NVDA", session: TradingSession.Market };
     expect(decodeTradingStatusSpec(encodeTradingStatusSpec(spec))).toEqual(spec);
+  });
+});
+
+describe("distribution markets + vault", () => {
+  it("exposes the DistributionMarket and TreasuryVault ABIs", () => {
+    expect(fnNames(distributionMarketAbi)).toEqual(
+      expect.arrayContaining(["createMarket", "buy", "sell", "settle", "redeem", "prices", "quoteBuy", "quoteSell", "payoutOf"]),
+    );
+    expect(fnNames(treasuryVaultAbi)).toEqual(
+      expect.arrayContaining(["depositFees", "allocate", "claimResolverReward", "claimCommitteeReward", "sweepDisputeProceeds"]),
+    );
+    expect(fnNames(eventRegistryAbi)).toEqual(expect.arrayContaining(["createEvents", "observedOutcome", "observedOutcomeCount"]));
+  });
+
+  it("builds an ascending price ladder of >= events and bucket labels", () => {
+    const thresholds = [200_0000_0000n, 210_0000_0000n, 220_0000_0000n];
+    const specs = buildPriceLadderSpecs({ feed: CHAINLINK_FEEDS_MAINNET.NVDA, thresholds, at: 1_800_000_000n, maxStaleness: 86_400n });
+    expect(specs).toHaveLength(3);
+    expect(specs.every((s) => s.specVersion === 2 && s.openTimestamp === 1_800_000_000n)).toBe(true);
+    expect(ladderBucketLabels(thresholds)).toEqual(["< $200", "$200–$210", "$210–$220", "≥ $220"]);
+    expect(() => buildPriceLadderSpecs({ feed: CHAINLINK_FEEDS_MAINNET.NVDA, thresholds: [2n, 1n], at: 1n, maxStaleness: 1n })).toThrow();
   });
 });
