@@ -21,7 +21,12 @@ Novak events. Every poll interval it:
    `voidAfterTier2Timeout`, `tryResolve` (only when it would change state),
    `Market.settle`, and `withdraw` of its own credited bonds. This is not push
    delivery — consumers still pull from the Bus.
-5. **Serves** `GET /health` and `GET /evidence/:hash` (`RESOLVER_HTTP_PORT`),
+5. **Claims rewards** (`node/rewards.ts`, every node). It claims its
+   TreasuryVault share: the resolver third for events it reported correctly,
+   and the committee third for disputes where it voted with the decision.
+   The keeper also settles DistributionMarkets, allocates vault fees and
+   sweeps dispute proceeds into the vault.
+6. **Serves** `GET /health` and `GET /evidence/:hash` (`RESOLVER_HTTP_PORT`),
    so anyone can check exactly what a resolver saw behind an on-chain
    evidence hash.
 
@@ -36,6 +41,7 @@ free; no mainnet funds are involved.
 |---|---|---|---|
 | `chainlink.price-at.v1` (v2) | `encodePriceAtSpec` — feed, threshold, ≥/≤, `at`, `maxStaleness` | Chainlink `Robinhood <TICKER> / USD` on mainnet; binary search for the round in effect at `at` | comparison result / `at`. Abstains if the round is staler than `maxStaleness` |
 | `rh.corporate-action.v1` (v2) | `encodeCorporateActionSpec` — stock token, window, `minChangeBps` | the token's ERC-8056 `UIMultiplierUpdated(old, new, effectiveAt)` logs (logs, not state: the public RPC isn't an archive node) | a qualifying change took effect in the window / its `effectiveAt`; false after the window / `windowEnd` |
+| `macro.fomc.v1` (v2) | `encodeFedRateSpec` — day D, upper-bound bps, ≥/≤ | FRED `DFEDTARU` public CSV (no key) | comparison on day D / D. Abstains until FRED publishes D |
 | `rh.trading-status.v1` (v1) | `encodeTradingStatusSpec` — symbol, session | `api.robinhood.com/rhj/assets` `tradingCapabilities` | session NOT tradable when observed |
 
 Adapters must be **deterministic** (quorum is exact-match on the full
