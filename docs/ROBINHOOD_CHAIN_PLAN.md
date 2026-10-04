@@ -13,6 +13,15 @@ Functionality or looks broken · **P1** = the difference between "works" and
 only as a free, read-only *data source* for resolvers: Chainlink feeds,
 ERC-8056 stock tokens, and the Robinhood assets API.
 
+## v2 (Oct 4): dispute layer + distribution markets
+
+The approved v2 plan adds the TreasuryVault (fee thirds), the
+DistributionMarket (LMSR ranges over threshold ladders), the Fed-rate
+adapter, live feeds, insights and integration docs. All of it is built and
+verified on anvil; see the README "What's verified" section. Remaining: the
+real testnet broadcast with team keys, hosting, a browser click-test, and
+the video.
+
 ## Work tracker (build order)
 
 **A: Contracts**
