@@ -82,6 +82,17 @@ interface IDisputeManager {
 
     function getCommittee(bytes32 eventId, uint8 tier) external view returns (address[] memory);
 
+    /// @notice How `member` voted in `tier` of `eventId`'s dispute.
+    function getVote(bytes32 eventId, uint8 tier, address member) external view returns (VoteChoice);
+
+    /// @notice `tier` is the currently (or last) active tier; when `resolved`
+    ///         and the Registry shows the event Finalized, that tier converged
+    ///         and decided it (a Voided event never converged).
+    function getCaseSummary(bytes32 eventId)
+        external
+        view
+        returns (bool exists, bool resolved, uint8 tier, bool hasOriginalProposal);
+
     function getTierTally(bytes32 eventId, uint8 tier)
         external
         view
