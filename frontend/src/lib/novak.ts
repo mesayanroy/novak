@@ -110,12 +110,15 @@ export interface EventNode {
 }
 
 export async function loadEventNode(pc: PublicClient, id: Hex, depth = 0): Promise<EventNode> {
-  const availability = Number(
-    await pc.readContract({ address: novakAddresses.eventBus, abi: eventBusAbi, functionName: "getAvailability", args: [id] }),
-  ) as Availability;
-  const status = Number(
-    await pc.readContract({ address: novakAddresses.eventRegistry, abi: eventRegistryAbi, functionName: "getEvent", args: [id] }),
-  ) as EventStatus;
+  // getAvailability and getEvent don't depend on each other — fire them
+  // concurrently (and, with multicall batching enabled on the client,
+  // collapsed into a single RPC round trip) instead of waiting in series.
+  const [availabilityRaw, statusRaw] = await Promise.all([
+    pc.readContract({ address: novakAddresses.eventBus, abi: eventBusAbi, functionName: "getAvailability", args: [id] }),
+    pc.readContract({ address: novakAddresses.eventRegistry, abi: eventRegistryAbi, functionName: "getEvent", args: [id] }),
+  ]);
+  const availability = Number(availabilityRaw) as Availability;
+  const status = Number(statusRaw) as EventStatus;
 
   if (status !== EventStatus.None) {
     const spec = (await pc.readContract({
@@ -128,15 +131,16 @@ export async function loadEventNode(pc: PublicClient, id: Hex, depth = 0): Promi
     return { id, kind: "primitive", title: d.title, source: d.source, availability, status, spec, opensAt: spec.openTimestamp };
   }
 
-  const cs = await pc.readContract({
-    address: novakAddresses.eventComposer,
-    abi: eventComposerAbi,
-    functionName: "getCompositeSpec",
-    args: [id],
-  });
-  const cStatus = Number(
-    await pc.readContract({ address: novakAddresses.eventComposer, abi: eventComposerAbi, functionName: "getStatus", args: [id] }),
-  );
+  const [cs, cStatusRaw] = await Promise.all([
+    pc.readContract({
+      address: novakAddresses.eventComposer,
+      abi: eventComposerAbi,
+      functionName: "getCompositeSpec",
+      args: [id],
+    }),
+    pc.readContract({ address: novakAddresses.eventComposer, abi: eventComposerAbi, functionName: "getStatus", args: [id] }),
+  ]);
+  const cStatus = Number(cStatusRaw);
   const op = Number(cs.op) as CompositeOp;
   const children =
     depth < 3 ? await Promise.all(cs.operands.map((o) => loadEventNode(pc, o as Hex, depth + 1))) : [];
@@ -176,9 +180,11 @@ export function useNovakClient(): NovakClient | undefined {
 export interface LiveMarket extends MarketDef {
   marketId: Hex;
   event: EventNode;
+  /** Preview data shown only when no deployment exists — render <ExampleDataBadge />. */
+  isExample?: boolean;
 }
 
-export const MOCK_MARKETS: LiveMarket[] = [
+const MOCK_MARKETS_RAW: LiveMarket[] = [
   {
     marketId: "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
     eventId: "0x0100000000000000000000000000000000000000000000000000000000000001",
@@ -290,24 +296,26 @@ export const MOCK_MARKETS: LiveMarket[] = [
   },
 ];
 
+/** Preview markets, clearly flagged. Used ONLY when no deployment exists for
+ *  the configured chain — never as a fallback for failed or empty reads. */
+export const MOCK_MARKETS: LiveMarket[] = MOCK_MARKETS_RAW.map((m) => ({ ...m, isExample: true }));
+
+export const showingExamples = !deployment;
+
 export function useMarkets() {
   const client = useNovakClient();
   const pc = usePublicClient();
   return useQuery({
     queryKey: ["novak", "markets", deployment?.market],
-    refetchInterval: 10_000,
+    enabled: showingExamples || Boolean(client && pc),
+    refetchInterval: showingExamples ? false : 10_000,
     queryFn: async (): Promise<LiveMarket[]> => {
-      try {
-        if (!client || !pc) return MOCK_MARKETS;
-        const markets = await client.listMarkets();
-        if (!markets || markets.length === 0) return MOCK_MARKETS;
-        const withEvents = await Promise.all(
-          markets.map(async (m) => ({ ...m, event: await loadEventNode(pc as PublicClient, m.eventId) })),
-        );
-        return withEvents.reverse();
-      } catch {
-        return MOCK_MARKETS;
-      }
+      if (showingExamples) return MOCK_MARKETS;
+      const markets = await client!.listMarkets();
+      const withEvents = await Promise.all(
+        markets.map(async (m) => ({ ...m, event: await loadEventNode(pc as PublicClient, m.eventId) })),
+      );
+      return withEvents.reverse(); // newest first
     },
   });
 }
@@ -317,29 +325,16 @@ export function useMarket(marketId: Hex | undefined) {
   const pc = usePublicClient();
   return useQuery({
     queryKey: ["novak", "market", marketId],
-    refetchInterval: 5_000,
+    enabled: Boolean(marketId) && (showingExamples || Boolean(client && pc)),
+    refetchInterval: showingExamples ? false : 5_000,
     queryFn: async (): Promise<LiveMarket> => {
-      try {
-        if (!client || !pc || !marketId) {
-          const match = MOCK_MARKETS.find(
-            (m) => m.marketId.toLowerCase() === (marketId ?? "").toLowerCase()
-          );
-          return match ?? MOCK_MARKETS[0];
-        }
-        const m = await client.getMarket(marketId);
-        if (!m || m.createdAt === 0n) {
-          const match = MOCK_MARKETS.find(
-            (mk) => mk.marketId.toLowerCase() === marketId.toLowerCase()
-          );
-          return match ?? MOCK_MARKETS[0];
-        }
-        return { ...m, marketId, event: await loadEventNode(pc as PublicClient, m.eventId) };
-      } catch {
-        const match = MOCK_MARKETS.find(
-          (m) => m.marketId.toLowerCase() === (marketId ?? "").toLowerCase()
-        );
-        return match ?? MOCK_MARKETS[0];
+      if (showingExamples) {
+        const match = MOCK_MARKETS.find((m) => m.marketId.toLowerCase() === marketId!.toLowerCase());
+        if (!match) throw new Error("Unknown example market");
+        return match;
       }
+      const m = await client!.getMarket(marketId!);
+      return { ...m, marketId: marketId!, event: await loadEventNode(pc as PublicClient, m.eventId) };
     },
   });
 }
@@ -350,17 +345,13 @@ export function useEvents() {
   const pc = usePublicClient();
   return useQuery({
     queryKey: ["novak", "events", deployment?.eventRegistry],
-    refetchInterval: 15_000,
+    enabled: showingExamples || Boolean(client && pc),
+    refetchInterval: showingExamples ? false : 15_000,
     queryFn: async (): Promise<EventNode[]> => {
-      try {
-        if (!client || !pc || !deployment) return MOCK_MARKETS.map((m) => m.event);
-        const created = await client.listEvents(BigInt(deployment.startBlock));
-        if (!created || created.length === 0) return MOCK_MARKETS.map((m) => m.event);
-        const nodes = await Promise.all(created.map((e) => loadEventNode(pc as PublicClient, e.eventId)));
-        return nodes.reverse();
-      } catch {
-        return MOCK_MARKETS.map((m) => m.event);
-      }
+      if (showingExamples) return MOCK_MARKETS.map((m) => m.event);
+      const created = await client!.listEvents(BigInt(deployment!.startBlock));
+      const nodes = await Promise.all(created.map((e) => loadEventNode(pc as PublicClient, e.eventId)));
+      return nodes.reverse();
     },
   });
 }
