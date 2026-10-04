@@ -6,6 +6,7 @@ import { EventRegistry } from "../../contracts/EventRegistry.sol";
 import { EventComposer } from "../../contracts/EventComposer.sol";
 import { EventBus } from "../../contracts/EventBus.sol";
 import { MockUSDG } from "../../contracts/mocks/MockUSDG.sol";
+import { TreasuryVault } from "../../contracts/TreasuryVault.sol";
 import { Settlement } from "../../derivatives/Settlement.sol";
 import { PositionManager } from "../../derivatives/PositionManager.sol";
 import { Market } from "../../derivatives/Market.sol";
@@ -25,7 +26,8 @@ contract MarketTest is Test {
     address internal alice = address(0x1);
     address internal bob = address(0x2);
     address internal carol = address(0x3);
-    address internal treasury = address(0x7EA5);
+    TreasuryVault internal vault;
+    address internal treasury; // = address(vault)
 
     uint256 internal constant FEE_BPS = 100; // 1%
     uint256 internal constant ONE = 1e6; // 1 USDG
@@ -37,6 +39,9 @@ contract MarketTest is Test {
         settlement = new Settlement(address(bus));
         positionManager = new PositionManager();
         usdg = new MockUSDG();
+        vault =
+            new TreasuryVault(address(usdg), address(registry), address(composer), address(this));
+        treasury = address(vault);
         market = new Market(
             address(settlement), address(positionManager), address(usdg), treasury, FEE_BPS
         );
@@ -158,6 +163,7 @@ contract MarketTest is Test {
 
         uint256 fee = (100 * ONE * FEE_BPS) / 10_000;
         assertEq(usdg.balanceOf(treasury), fee);
+        assertEq(vault.pendingFees(eventId), fee, "fee attributed to the market's event");
 
         uint256 before = usdg.balanceOf(alice);
         assertEq(market.payoutOf(marketId, alice), 200 * ONE - fee);
