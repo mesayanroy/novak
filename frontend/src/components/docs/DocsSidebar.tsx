@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 export const docsNav = [
   { href: "/docs", label: "Introduction" },
   { href: "/docs/robinhood", label: "Robinhood Chain" },
+  { href: "/docs/integrate", label: "Integrate (other markets)" },
   { href: "/docs/architecture", label: "Architecture" },
   { href: "/docs/lifecycle", label: "Event lifecycle" },
   { href: "/docs/composition", label: "Composition" },
