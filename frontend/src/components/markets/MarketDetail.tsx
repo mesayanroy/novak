@@ -2,14 +2,23 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ExampleDataBadge } from "@/components/ExampleDataBadge";
+import dynamic from "next/dynamic";
 import type { Hex } from "@novak/sdk";
 import { CompositionTree, type CompositionNode } from "@/components/markets/CompositionTree";
 import { MarketPositionCard } from "@/components/MarketPositionCard";
 import { SettlementSimulator } from "@/components/markets/SettlementSimulator";
 import { MarketStatusLabel } from "@/components/markets/MarketCard";
 import { MarketVisualizer } from "@/components/markets/MarketVisualizer";
-import { OracleArchitectureGuide } from "@/components/markets/OracleArchitectureGuide";
-import { DistributionMarketFAQ } from "@/components/markets/DistributionMarketFAQ";
+
+// Below-the-fold explainer sections — split out of the initial bundle so the
+// live market detail/trading UI above the fold isn't gated on their JS.
+const OracleArchitectureGuide = dynamic(
+  () => import("@/components/markets/OracleArchitectureGuide").then((m) => m.OracleArchitectureGuide),
+);
+const DistributionMarketFAQ = dynamic(
+  () => import("@/components/markets/DistributionMarketFAQ").then((m) => m.DistributionMarketFAQ),
+);
 import { explorerUrl, marketAbi } from "@novak/sdk";
 import { useReadContract } from "wagmi";
 import { NOVAK_CHAIN_ID, novakAddresses } from "@/lib/addresses";
@@ -94,8 +103,9 @@ export function MarketDetail({ marketId }: { marketId: Hex }) {
       {/* Header Info Banner */}
       <div className="border border-gray-300 bg-paper p-6 rounded-sm shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="font-mono text-xs text-gray-500 uppercase tracking-wider font-semibold">
+          <span className="flex items-center gap-2 font-mono text-xs text-gray-500 uppercase tracking-wider font-semibold">
             <MarketStatusLabel market={market} />
+            {market.isExample && <ExampleDataBadge />}
           </span>
           <div className="flex items-center gap-2 font-mono text-xs text-gray-500">
             <span className="bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-ink">
