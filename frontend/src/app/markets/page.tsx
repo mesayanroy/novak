@@ -2,14 +2,25 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Availability, MarketStatus } from "@novak/sdk";
 import { MarketCard } from "@/components/markets/MarketCard";
 import { CreateMarketCard } from "@/components/CreateMarketCard";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";
-import { OracleArchitectureGuide } from "@/components/markets/OracleArchitectureGuide";
-import { DistributionMarketFAQ } from "@/components/markets/DistributionMarketFAQ";
+
+// Below-the-fold explainer sections — split out of the initial bundle so the
+// market list/create flow above the fold isn't gated on their JS.
+const OracleArchitectureGuide = dynamic(
+  () => import("@/components/markets/OracleArchitectureGuide").then((m) => m.OracleArchitectureGuide),
+);
+const DistributionMarketFAQ = dynamic(
+  () => import("@/components/markets/DistributionMarketFAQ").then((m) => m.DistributionMarketFAQ),
+);
 import { NOVAK_CHAIN_ID, deployment } from "@/lib/addresses";
-import { fmtTime, fmtUsdg, useEvents, useMarkets, type EventNode, type LiveMarket } from "@/lib/novak";
+import { fmtTime, fmtUsdg, showingExamples, useEvents, useMarkets, type EventNode, type LiveMarket } from "@/lib/novak";
+import { ExampleDataBadge } from "@/components/ExampleDataBadge";
+import { DistributionMarketCard } from "@/components/distribution/DistributionMarketCard";
+import { useDistributionMarkets } from "@/lib/distribution";
 import { shortHex, cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -34,6 +45,7 @@ export default function MarketsPage() {
 
   const markets = useMarkets();
   const events = useEvents();
+  const distMarkets = useDistributionMarkets();
 
 
   const list = markets.data ?? [];
@@ -62,11 +74,21 @@ export default function MarketsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
+      {showingExamples && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 border border-dashed border-gray-400 bg-gray-50 p-3 text-xs text-gray-700 rounded-sm">
+          <ExampleDataBadge />
+          <span>
+            No Novak deployment is configured for chain {NOVAK_CHAIN_ID} yet — these are preview markets, not on-chain
+            data. Deploy with <code>script/Deploy.s.sol</code> and they&apos;re replaced by live markets.
+          </span>
+        </div>
+      )}
+
       {/* Top Banner */}
       <div className="border-b border-gray-200 pb-6">
         <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          Live · Robinhood Chain {NOVAK_CHAIN_ID === 46630 ? "testnet" : `(chain ${NOVAK_CHAIN_ID})`}
+          <span className={`h-2 w-2 rounded-full ${showingExamples ? "bg-gray-400" : "bg-emerald-500 animate-pulse"}`} />
+          {showingExamples ? "Preview" : "Live"} · Robinhood Chain {NOVAK_CHAIN_ID === 46630 ? "testnet" : `(chain ${NOVAK_CHAIN_ID})`}
         </div>
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl text-ink">
           Event Markets on Tokenized Stocks
@@ -105,6 +127,23 @@ export default function MarketsPage() {
       </div>
 
       {/* Tab: Markets Explorer */}
+      {tab === "markets" && (distMarkets.data?.length ?? 0) > 0 && (
+        <section className="mt-6">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold text-ink">Distribution markets — where will the price land?</h2>
+            <span className="font-mono text-xs text-gray-500">
+              LMSR ranges · resolved by Novak threshold events on Chainlink rounds
+            </span>
+          </div>
+          <div className="grid gap-5 md:grid-cols-2">
+            {distMarkets.data!.map((v) => (
+              <DistributionMarketCard key={v.marketId} view={v} />
+            ))}
+          </div>
+          <h2 className="mt-8 text-lg font-semibold text-ink">Yes/no event markets</h2>
+        </section>
+      )}
+
       {tab === "markets" && (
         <div className="mt-6">
           {/* Sub-Filter & Search Bar */}
