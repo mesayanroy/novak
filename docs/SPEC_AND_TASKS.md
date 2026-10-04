@@ -6,6 +6,13 @@ written). This mirrors the original milestone breakdown; see
 `docs/architecture.md`, `docs/protocol-spec.md`, and `docs/threat-model.md`
 for the narrative versions of the same decisions.
 
+**v2 pass (2026-10-04):** TreasuryVault (fee thirds + insurance + dispute
+proceeds), DistributionMarket (LMSR range markets over threshold-event
+ladders), `createEvents` + per-resolver observed outcomes, Fed-rate adapter
+(`macro.fomc.v1`), rewards duty, live feeds and rates routes, distribution
+UI with insights, and the integration guide (`docs/INTEGRATE.md`) with a
+tested example consumer. `forge test` → **138/138**.
+
 **Robinhood Chain pass (2026-09-25):** the project now targets the Crypto
 World's Fair Robinhood Chain track; the build plan, verified environment
 facts and work tracker live in `docs/ROBINHOOD_CHAIN_PLAN.md`. `forge test`
