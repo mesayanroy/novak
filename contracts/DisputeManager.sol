@@ -395,6 +395,23 @@ contract DisputeManager is IDisputeManager {
         return _tiers[eventId][tier].committee;
     }
 
+    function getVote(bytes32 eventId, uint8 tier, address member)
+        external
+        view
+        returns (VoteChoice)
+    {
+        return _tiers[eventId][tier].votes[member];
+    }
+
+    function getCaseSummary(bytes32 eventId)
+        external
+        view
+        returns (bool exists, bool resolved, uint8 tier, bool hasOriginalProposal)
+    {
+        DisputeCase storage c = _cases[eventId];
+        return (c.exists, c.resolved, c.tier, c.hasOriginalProposal);
+    }
+
     function getTierTally(bytes32 eventId, uint8 tier)
         external
         view
