@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useRef } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { ConnectButton } from "@/components/ConnectButton";
@@ -11,6 +12,7 @@ const navLinks = [
   { href: "/docs", label: "Docs", hasDropdown: true },
   { href: "/docs/sdk", label: "SDK" },
   { href: "/markets", label: "Markets" },
+  { href: "/feeds", label: "Feeds" },
   { href: "/calendar", label: "Calendar" },
   { href: "/guard", label: "Lending Guard" },
 ];
@@ -36,7 +38,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
         <div className="flex items-center gap-8">
           <Link href="/" className="link-plain flex items-center gap-2.5 text-lg font-bold tracking-tight">
-            <img src="/novak-logo.png" alt="Novak" className="h-7 w-7 rounded-md object-contain" />
+            <Image src="/novak-logo.png" alt="Novak" width={28} height={28} priority className="h-7 w-7 rounded-md object-contain" />
             <span>Novak</span>
           </Link>
 

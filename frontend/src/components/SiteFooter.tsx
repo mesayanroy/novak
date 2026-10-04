@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Availability, explorerUrl } from "@novak/sdk";
 import { NOVAK_CHAIN_ID, deployment, novakAddresses } from "@/lib/addresses";
 import { useEvents, useMarkets } from "@/lib/novak";
@@ -99,7 +100,7 @@ export function SiteFooter() {
           {/* Brand & Newsletter Column */}
           <div className="lg:col-span-2">
             <Link href="/" className="text-xl font-bold tracking-tight text-ink flex items-center gap-2.5">
-              <img src="/novak-logo.png" alt="Novak" className="h-6 w-6 rounded-md object-contain" />
+              <Image src="/novak-logo.png" alt="Novak" width={24} height={24} className="h-6 w-6 rounded-md object-contain" />
               <span>Novak</span>
             </Link>
             <p className="mt-3 max-w-sm text-sm text-gray-600 leading-relaxed">
