@@ -8,8 +8,9 @@ import { deployments, type NovakAddresses, type NovakDeployment } from "@novak/s
  */
 export const NOVAK_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 46630);
 
-export const deployment: NovakDeployment =
-  deployments[NOVAK_CHAIN_ID] ?? deployments[46630] ?? deployments[31337];
+/** The deployment for the configured chain ONLY — never another chain's
+ *  addresses (an anvil address has no code on Robinhood testnet). */
+export const deployment: NovakDeployment | undefined = deployments[NOVAK_CHAIN_ID];
 
 const NONE = "0x" as `0x${string}`;
 
