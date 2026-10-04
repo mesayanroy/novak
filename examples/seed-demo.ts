@@ -34,6 +34,8 @@ import {
   robinhoodTestnet,
   sourceId,
   stockLendingGuardAbi,
+  buildPriceLadderSpecs,
+  ladderBucketLabels,
   type EventSpecInput,
   type Hex,
 } from "../sdk/src/index.js";
@@ -149,6 +151,40 @@ async function main() {
     }),
   );
   console.log(`guard: NVDA liquidations paused while C is true (fail-closed until resolved)`);
+
+  // --- Distribution markets: where will the price land at T? ---
+  // 5 boundaries -> 6 ranges centred on the live Chainlink price. One tx
+  // creates the whole ladder; the creator seeds the LMSR subsidy b·ln(6).
+  if (d.distributionMarket) {
+    const rawPrice = async (feed: Hex) => {
+      const [, answer] = await source.readContract({ address: feed, abi: feedAbi, functionName: "latestRoundData" });
+      return answer;
+    };
+    const liquidity = 500_000_000n; // b = 500 USDG
+    if (d.collateralIsMock) await wait(await client.mintTestCollateral(account.address, 10_000_000_000n, account));
+    await wait(await client.approveCollateralFor(d.distributionMarket, 2n ** 255n, account));
+
+    const ladders: Array<[string, Hex, bigint]> = [
+      // [label, feed, step between boundaries in feed units (8 decimals)]
+      ["NVDA", CHAINLINK_FEEDS_MAINNET.NVDA, 0n],
+      ["TSLA", CHAINLINK_FEEDS_MAINNET.TSLA, 0n],
+      ["SGOV", CHAINLINK_FEEDS_MAINNET.SGOV, 5_000_000n], // $0.05 — a Treasury-bill ETF barely moves
+    ];
+    for (const [label, feed, fixedStep] of ladders) {
+      const spot = await rawPrice(feed);
+      // ~1% steps for equities, rounded to whole dollars (at least $1).
+      const step = fixedStep || (spot / 100n / 100_000_000n > 0n ? (spot / 100n / 100_000_000n) * 100_000_000n : 100_000_000n);
+      const centre = (spot / step) * step;
+      const thresholds = [-2n, -1n, 0n, 1n, 2n].map((k) => centre + k * step);
+      const specs = buildPriceLadderSpecs({ feed, thresholds, at, maxStaleness: 3n * DAY, openTimestamp: T, observationDeadline: T + DAY, disputeWindowSeconds: 120n });
+      const ids = await client.getCreatedEventIds(await client.createEvents(specs, account));
+      const q = `Where will ${label} be at the bell? (${ladderBucketLabels(thresholds).join(" | ")})`;
+      const mId = await client.getCreatedDistributionMarketId(
+        await client.createDistributionMarket(q.slice(0, 280), ids, T, liquidity, account),
+      );
+      console.log(`distribution market ${label}: ${mId} (spot $${Number(spot) / 1e8}, ${ids.length} boundaries)`);
+    }
+  }
   console.log(`\nobservation opens at T=${T} (in ${delay}s); resolvers + keeper take it from here.`);
 }
 
