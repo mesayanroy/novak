@@ -83,6 +83,12 @@ interface IEventRegistry {
     ///         event — permissionless event creation, permissioned resolution.
     function createEvent(EventSpec calldata eventSpec) external returns (bytes32 eventId);
 
+    /// @notice Batch `createEvent` (≤ MAX_BATCH), e.g. a DistributionMarket's
+    ///         threshold ladder in one transaction. Returns ids in input order.
+    function createEvents(EventSpec[] calldata eventSpecs)
+        external
+        returns (bytes32[] memory eventIds);
+
     /// @notice Authorized resolvers submit an observation (outcome + evidence
     ///         commitment). Once `quorumThreshold` resolvers agree on the same
     ///         `outcomeData`, the outcome is auto-proposed and the dispute
@@ -120,6 +126,17 @@ interface IEventRegistry {
     function setDisputeManager(address disputeManager) external;
 
     function isAuthorizedResolver(address resolver) external view returns (bool);
+
+    /// @notice Whether `resolver` observed `eventId`, and the boolean it
+    ///         reported (first ABI word of its payload, same for every
+    ///         specVersion). Used by the TreasuryVault to pay correct resolvers.
+    function observedOutcome(bytes32 eventId, address resolver)
+        external
+        view
+        returns (bool submitted, bool outcome);
+
+    /// @notice How many resolvers reported `outcome` for `eventId`.
+    function observedOutcomeCount(bytes32 eventId, bool outcome) external view returns (uint256);
 
     /// @notice Enumerates every currently-authorized resolver, so a
     ///         DisputeManager can draw an escalation committee from the pool.
