@@ -18,9 +18,9 @@ frontend/out/
 
 # Env
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+*.env
 
 # Editors / OS
 .vscode/
@@ -35,3 +35,7 @@ pnpm-debug.log*
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Nested workspace copy
+novak/
+
