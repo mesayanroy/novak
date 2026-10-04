@@ -20,9 +20,22 @@ committees (never a token-weighted vote), composable with AND / OR / NOT /
 BEFORE / WITHIN, and read by every protocol through one `EventBus`. Chainlink
 is one of Novak's data sources, not a competitor.
 
-Two consumers ship in this repo and read the **same** events:
+Novak is a **dispute layer** other prediction markets plug into (see
+[docs/INTEGRATE.md](docs/INTEGRATE.md)). Its value layer, the
+**TreasuryVault**, splits every fee per event in thirds:
+- ⅓ to resolvers who reported correctly;
+- ⅓ to committee members who voted correctly (or an insurance reserve);
+- ⅓ to the treasury.
 
-- **`Market`** — USDG parimutuel markets that settle on any Novak event.
+It also collects the treasury third of every forfeited dispute bond.
+
+Three consumers ship in this repo and read the **same** events:
+
+- **`DistributionMarket`** — "where will NVDA / TSLA / SGOV (tokenized
+  Treasuries) be at T?" An LMSR bucket AMM: buy or sell price ranges, and the
+  prices form the market's probability distribution. Each range boundary is a
+  Novak event, so resolution and disputes are the dispute layer's.
+- **`Market`** — USDG parimutuel yes/no markets that settle on any Novak event.
 - **`StockLendingGuard`** — a liquidation circuit-breaker: a lending protocol
   calls `canLiquidate(stockToken)` and liquidations pause while a finalized
   corporate-action/halt event is true.
@@ -42,9 +55,24 @@ Two consumers ship in this repo and read the **same** events:
 
 ## What's verified
 
-- **Contracts:** `forge test` → **112/112** passing (unit / integration / fuzz
-  / adversarial), including regression tests for the market fund-loss bug
-  fixed in this pass (see `docs/threat-model.md`).
+- **Contracts:** `forge test` → **138/138** passing (unit / integration / fuzz
+  / adversarial), including:
+  - TreasuryVault thirds, insurance and conservation fuzzing;
+  - DistributionMarket LMSR solvency fuzzing, void at 1/N, and the
+    trading-window guards;
+  - the integration example;
+  - regression tests for the market fund-loss bug (see `docs/threat-model.md`).
+- **v2 pipeline, live on a local chain from real data** (2026-10-04):
+  - Seeded NVDA, TSLA and SGOV distribution markets centred on live Chainlink
+    prices; two traders moved the distribution.
+  - Three resolvers resolved every boundary from the Chainlink round at T, and
+    the keeper settled all six markets on the correct range.
+  - The vault split the fees: resolvers claimed their third, and the insurance
+    reserve and treasury received theirs.
+  - The winner redeemed exactly 1 USDG per share.
+- **Live data routes:** `/api/feeds` (53 Chainlink Robinhood feeds),
+  `/api/rates` (Fed target range from FRED, EFFR from the NY Fed, no API
+  keys), `/api/feeds/history` (rounds + realized vol).
 - **Deployment:** the full stack simulates cleanly against the live Robinhood
   Chain testnet (46630); total cost ≈ 0.0003 ETH of faucet ETH.
 - **Resolvers on live data:** the three adapters were run against Robinhood
@@ -92,15 +120,17 @@ novak/
 ├── contracts/     EventRegistry, DisputeManager, EventComposer, EventBus,
 │                  SubscriptionManager, mocks/MockUSDG + interfaces/
 ├── derivatives/   Market (USDG), PositionManager, Settlement — IEventBus consumers
-├── consumers/     StockLendingGuard — second IEventBus consumer
+├── consumers/     StockLendingGuard — IEventBus consumer
 ├── resolver/      resolver daemon: adapters (chainlink.price-at,
 │                  rh.corporate-action, rh.trading-status), discovery,
 │                  keeper, dispute voter, /health + /evidence server
 ├── sdk/           @novak/sdk — generated ABIs, deployments, chains, source specs
-├── frontend/      Next.js app: landing, /markets, /calendar, /guard, /docs
+├── frontend/      Next.js app: landing, /markets (+ /markets/dist/[id]), /feeds,
+│                  /calendar, /guard, /docs (incl. /docs/integrate)
 ├── deployments/   <chainId>.json — addresses + startBlock (script/export-deployment.mjs)
 ├── script/        Deploy.s.sol, export-deployment.mjs
-├── examples/      end-to-end-flow.ts, seed-demo.ts
+├── examples/      end-to-end-flow.ts, seed-demo.ts, trade-demo.ts,
+│                  integrations/ExternalPredictionMarket.sol (how other markets plug in)
 ├── test/          unit/ integration/ fuzz/ adversarial/ (Foundry)
 └── docs/          architecture, protocol-spec, threat-model, SPEC_AND_TASKS,
                    ROBINHOOD_CHAIN_PLAN
@@ -114,9 +144,15 @@ two-tier committee disputes with pull payments; specVersion 2 outcomes
 (`occurredAt`) so BEFORE/WITHIN compare when facts *happened*; terminal
 `Voided`/`Expired` propagation; `EventBus.getAvailability`
 (Pending/Available/Voided); USDG markets with trading windows, refunds on
-voided events and a protocol fee; `StockLendingGuard`; real resolver
-adapters, on-chain event discovery, keeper and dispute voter; SDK with
-generated ABIs; live-data frontend with Robinhood Wallet (WalletConnect).
+voided events and a protocol fee; `StockLendingGuard`; **TreasuryVault**
+(fee thirds, insurance reserve, dispute-bond proceeds, pull claims);
+**DistributionMarket** (LMSR ranges over threshold-event ladders); real
+resolver adapters (Chainlink price-at, ERC-8056 corporate actions, trading
+status, **Fed funds rate**), on-chain event discovery, keeper, dispute voter
+and **reward claims**; SDK with generated ABIs, ladder helpers and
+`waitForOutcome`; a live-data frontend with distribution charts, a buy/sell
+panel, buy/hold/avoid insights, a `/feeds` board, and Robinhood Wallet
+(WalletConnect).
 
 Known limits (details in `docs/threat-model.md` and `docs/protocol-spec.md`):
 committee selection is block-data pseudo-randomness (Chainlink VRF is not
@@ -144,9 +180,11 @@ RESOLVER_ID=r1 RESOLVER_PRIVATE_KEY=0x.. RESOLVER_KEEPER=true RESOLVER_HTTP_PORT
 RESOLVER_ID=r2 RESOLVER_PRIVATE_KEY=0x.. pnpm --filter novak-resolver start
 RESOLVER_ID=r3 RESOLVER_PRIVATE_KEY=0x.. pnpm --filter novak-resolver start
 
-# 3. Seed the demo set (live NVDA/TSLA thresholds, a composite, markets,
-#    a corporate-action event wired into the lending guard)
-NOVAK_CHAIN_ID=46630 pnpm tsx examples/seed-demo.ts
+# 3. Seed the demo set (live NVDA/TSLA thresholds, a composite, yes/no
+#    markets, a corporate-action event wired into the lending guard, and
+#    NVDA/TSLA/SGOV distribution markets centred on live prices), then trade
+SEED_OPEN_DELAY_SECONDS=1800 NOVAK_CHAIN_ID=46630 pnpm tsx examples/seed-demo.ts
+NOVAK_CHAIN_ID=46630 TRADER_KEYS=0x..,0x.. pnpm tsx examples/trade-demo.ts
 
 # 4. Frontend (needs NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID for Robinhood Wallet)
 pnpm --filter novak-frontend dev
