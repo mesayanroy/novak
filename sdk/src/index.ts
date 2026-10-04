@@ -20,5 +20,7 @@ export {
   positionManagerAbi,
   marketAbi,
   stockLendingGuardAbi,
+  distributionMarketAbi,
+  treasuryVaultAbi,
   mockUsdgAbi,
 } from "./abis.js";
