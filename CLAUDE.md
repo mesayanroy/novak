@@ -14,7 +14,12 @@ Real-world facts about Robinhood Stock Tokens (corporate actions, trading
 status, price-at-time conditions) are resolved, finalized and stored once,
 composed (AND/OR/NOT, BEFORE/WITHIN), and consumed by many contracts.
 Chainlink is a Novak **data source**, never framed as a competitor. Two
-consumers ship: a USDG derivatives `Market` and `StockLendingGuard`.
+consumers ship: `DistributionMarket` (LMSR range markets over threshold-
+event ladders), a USDG yes/no `Market`, and `StockLendingGuard`. Novak is
+pitched as a **dispute layer** other prediction markets integrate
+(`docs/INTEGRATE.md`). The **TreasuryVault** splits every fee per event in
+thirds: correct resolvers, correct committee voters (or insurance), and the
+treasury.
 
 Deployment: **testnet only (46630)**. Resolvers READ Robinhood Chain mainnet
 (4663) — Chainlink stock feeds and ERC-8056 stock tokens exist only there —
@@ -34,8 +39,12 @@ Registry, or the Composer.** `derivatives/Market.sol` holds only a
 `Settlement` reference, `derivatives/Settlement.sol` and
 `consumers/StockLendingGuard.sol` hold only an `IEventBus` reference.
 Enforced by regression tests:
-`test/unit/Market.t.sol::test_market_onlyHoldsSettlementReference` and
-`test/unit/StockLendingGuard.t.sol::test_guard_onlyHoldsEventBusReference`.
+`test/unit/Market.t.sol::test_market_onlyHoldsSettlementReference`,
+`test/unit/DistributionMarket.t.sol::test_holdsOnlySettlementReference`,
+`test/unit/StockLendingGuard.t.sol::test_guard_onlyHoldsEventBusReference` and
+`test/unit/ExternalPredictionMarket.t.sol::test_holdsOnlyEventBusReference`.
+Consumers may also *push* fees into `ITreasuryVault`. The vault (protocol
+infrastructure) is the one that reads the Registry/DisputeManager to pay people.
 If you add a new consumer contract, add an equivalent guard test. Consumers
 that hold funds must handle `IEventBus.Availability.Voided` (Market refunds). Same principle applies
 on the TS side: the frontend and SDK read event state through
@@ -85,6 +94,18 @@ CREATE -> OPEN -> OBSERVATIONS SUBMITTED -> PROPOSED OUTCOME -> DISPUTED
   with `tradingClosesAt` (deposits AND withdrawals stop there — this fixed a
   real fund-loss bug), refunds on Voided, a protocol fee, and on-chain
   enumeration. `contracts/mocks/MockUSDG.sol` is the testnet collateral.
+- **TreasuryVault** (`contracts/TreasuryVault.sol`) — fee thirds per event
+  (resolvers whose `observedOutcome` matches; the deciding tier's members who
+  voted the outcome, else the insurance reserve, which tops up later disputed
+  events; treasury), pull claims, and `sweepDisputeProceeds` for the
+  DisputeManager's ETH treasury third. The Registry records each resolver's
+  observed boolean for this.
+- **DistributionMarket** (`derivatives/DistributionMarket.sol`) — LMSR bucket
+  AMM over N−1 ascending threshold events; winning bucket = number of TRUE
+  boundaries. Any voided or inconsistent boundary voids the market (1/N per
+  share). It re-checks `reserve ≥ C(q)` on every trade, and trading stops
+  at close or once any boundary is decided. Math comes from vendored Solady
+  (`contracts/vendor/`, fmt-ignored).
 - **SubscriptionManager** — stub only, by design. MVP is pull-only; do not
   build push/callback delivery (that's the deferred relayer, Issue #13 in
   `docs/SPEC_AND_TASKS.md`).
@@ -105,7 +126,7 @@ sdk/              @novak/sdk — GENERATED abis.ts + deployments.ts (scripts/gen
                   chains, source-spec encoders, NovakClient (viem ≥ 2.56)
 frontend/         Next.js: /, /markets, /markets/[id], /calendar, /guard, /docs;
                   api/rh-assets route; Robinhood Wallet via WalletConnect
-test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 112 tests, all passing
+test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 138 tests, all passing
 script/           Deploy.s.sol (Registry -> DisputeManager -> Composer -> Bus
                   -> Settlement -> Market)
 examples/         end-to-end-flow.ts (scripted canonical flow), seed-demo.ts
@@ -116,7 +137,10 @@ docs/             architecture.md, protocol-spec.md, threat-model.md,
 
 ## Current status
 
-`forge test` → 112/112. Verified in the 2026-09-25 pass: full-stack deploy
+`forge test` → 138/138. v2 (2026-10-04): TreasuryVault + DistributionMarket +
+Fed-rate adapter + rewards duty verified live on anvil from real mainnet
+data: six range markets settled on the correct range, fee thirds were
+claimed, and the winner redeemed 1 USDG per share. Verified in the 2026-09-25 pass: full-stack deploy
 simulates on the live Robinhood testnet; `pnpm example:e2e` runs on anvil;
 three resolver processes + keeper resolved seeded events from LIVE mainnet
 data, finalized, resolved a composite, settled markets, paused NVDA
@@ -125,7 +149,10 @@ liquidations in the guard, and handled a filed dispute end to end.
 **Still genuinely incomplete:**
 
 - **Not yet deployed to testnet** — needs the team's funded faucet keys
-  (deployer + 3 resolvers). Everything else is ready (see README quickstart).
+  (deployer + 3 resolvers). `deployments/46630.json` must only ever come
+  from a real broadcast via `export-deployment.mjs`. A previous copy of the
+  anvil addresses there pointed the frontend at addresses with no code. The
+  frontend shows badged preview markets ONLY when no deployment exists.
 - **Frontend not click-tested in a browser** — builds, typechecks, serves
   200s, API route verified with real data.
 - **Committee selection is block-data pseudo-randomness**, weaker on
