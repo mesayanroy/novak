@@ -10,6 +10,7 @@ import { Settlement } from "../../derivatives/Settlement.sol";
 import { PositionManager } from "../../derivatives/PositionManager.sol";
 import { Market } from "../../derivatives/Market.sol";
 import { MockUSDG } from "../../contracts/mocks/MockUSDG.sol";
+import { TreasuryVault } from "../../contracts/TreasuryVault.sol";
 import { IEventRegistry } from "../../contracts/interfaces/IEventRegistry.sol";
 import { IEventComposer } from "../../contracts/interfaces/IEventComposer.sol";
 
@@ -28,6 +29,7 @@ contract EndToEndFlowTest is Test {
     PositionManager internal positionManager;
     Market internal market;
     MockUSDG internal usdg;
+    TreasuryVault internal vault;
 
     address internal resolverA = address(0xA11CE);
     address internal resolverB = address(0xB0B);
@@ -45,8 +47,10 @@ contract EndToEndFlowTest is Test {
         settlement = new Settlement(address(bus));
         positionManager = new PositionManager();
         usdg = new MockUSDG();
+        vault =
+            new TreasuryVault(address(usdg), address(registry), address(composer), address(this));
         market = new Market(
-            address(settlement), address(positionManager), address(usdg), address(this), 100
+            address(settlement), address(positionManager), address(usdg), address(vault), 100
         );
         positionManager.setMarket(address(market));
 
@@ -151,6 +155,9 @@ contract EndToEndFlowTest is Test {
         vm.prank(alice);
         market.claim(marketId);
         assertEq(usdg.balanceOf(alice), aliceBalanceBefore + 200e6 - fee);
-        assertEq(usdg.balanceOf(address(this)), fee); // this test contract is the treasury
+        // The fee went to the vault, attributed half to each primitive operand
+        // of the composite the market settled on.
+        assertEq(usdg.balanceOf(address(vault)), fee);
+        assertEq(vault.pendingFees(eventA) + vault.pendingFees(eventB), fee);
     }
 }
