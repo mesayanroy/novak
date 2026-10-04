@@ -7,6 +7,7 @@ import { EventIndex } from "./discovery.js";
 import { KeeperDuty } from "./keeper.js";
 import { makeLog } from "./log.js";
 import { ResolverDuty } from "./resolve.js";
+import { RewardsDuty } from "./rewards.js";
 import { startServer } from "./server.js";
 import { VoterDuty } from "./voter.js";
 
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
   const resolver = new ResolverDuty(c, index, adapters, evidence, log);
   const voter = new VoterDuty(c, index, adapters, resolver, log);
   const keeper = new KeeperDuty(c, index, resolver, log);
+  const rewards = new RewardsDuty(c, index, log);
 
   let lastLoopAt = 0;
   let lastError: string | undefined;
@@ -63,6 +65,7 @@ async function main(): Promise<void> {
       submissions: resolver.submissions,
       votes: voter.votes,
       keeperActions: keeper.actions,
+      rewardClaims: rewards.claims,
       evidenceRecords: evidence.size,
       lastError,
     }));
@@ -79,6 +82,7 @@ async function main(): Promise<void> {
       if (authorized) await resolver.tick(now);
       if (authorized && config.voter) await voter.tick(now);
       if (config.keeper) await keeper.tick(now);
+      await rewards.tick();
       lastLoopAt = Date.now();
       lastError = undefined;
     } catch (err) {
