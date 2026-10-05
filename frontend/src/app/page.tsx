@@ -1,9 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { LayerDiagram } from "@/components/architecture/LayerDiagram";
+import { ArchitectureScroll } from "@/components/landing/ArchitectureScroll";
+import { LiveFactsFeed } from "@/components/landing/LiveFactsFeed";
+import { IntegrateSection } from "@/components/landing/IntegrateSection";
 import { BentoIdeaSection } from "@/components/BentoIdeaSection";
 import { Iphone } from "@/registry/magicui/iphone";
 import { ArrowRight, Layers, ShieldCheck, Cpu, Terminal, Sparkles, Activity, Radio, TrendingUp } from "lucide-react";
@@ -58,7 +61,7 @@ const GAP_QUOTES = [
 
 export default function Home() {
   return (
-    <main className="overflow-hidden">
+    <main className="overflow-x-clip">
       {/* Live Market Ticker Banner */}
       <div className="border-b border-gray-200 bg-gray-900 text-paper py-2 overflow-hidden">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-between text-xs font-mono">
@@ -169,8 +172,26 @@ export default function Home() {
       </section>
 
       {/* The Idea Comparison & Bento Grid Section */}
-      <section className="border-y border-gray-200 bg-gray-50 py-16">
-        <div className="mx-auto max-w-5xl px-6">
+      <section className="relative overflow-hidden border-y border-gray-200 bg-gradient-to-br from-gray-50 via-white to-violet-50/60 py-16">
+        {/* Decorative violet line-art behind the comparison cards */}
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-24 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-violet-200/30 blur-3xl" />
+          <Image
+            src="/idea-curves.webp"
+            alt=""
+            width={500}
+            height={331}
+            className="absolute -right-10 -top-6 w-[420px] opacity-90 sm:w-[560px] md:w-[640px]"
+          />
+          <Image
+            src="/idea-curves.webp"
+            alt=""
+            width={500}
+            height={331}
+            className="absolute -bottom-10 -left-16 hidden w-[460px] rotate-180 opacity-60 md:block"
+          />
+        </div>
+        <div className="relative mx-auto max-w-5xl px-6">
           <p className="font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">The idea</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl text-ink">
             A different shape of question
@@ -237,45 +258,14 @@ export default function Home() {
       {/* Bento Grid Architecture Features */}
       <BentoIdeaSection />
 
-      {/* Architecture Section */}
-      <section className="mx-auto max-w-5xl px-6 py-16">
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">Architecture</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl text-ink">
-              Five layers, one strict dependency rule
-            </h2>
-            <p className="mt-2 text-gray-600">
-              Each layer talks only to the interface directly beneath it — never around it.
-            </p>
-          </div>
-          <Link href="/docs/architecture" className="link-plain font-mono text-xs uppercase tracking-wider text-ink font-semibold border-b border-ink pb-0.5 hover:text-gray-700">
-            Read full spec →
-          </Link>
-        </div>
+      {/* Architecture: pinned, scroll-driven semicircles (stacked on phones) */}
+      <ArchitectureScroll />
 
-        <LayerDiagram />
-      </section>
+      {/* Live feeds and protocol steps, streaming */}
+      <LiveFactsFeed />
 
-      {/* Why It Matters */}
-      <section className="border-t border-gray-200 bg-gray-50 py-16">
-        <div className="mx-auto max-w-5xl px-6">
-          <p className="font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">Why it matters</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl text-ink">
-            Composable facts, not one-off integrations
-          </h2>
-          <p className="mt-4 max-w-3xl text-gray-700 text-base leading-relaxed">
-            One NVDA corporate-action event, finalized once, is read by two very different contracts on Robinhood
-            Chain: a market that settles on it, and a lending guard that pauses NVDA liquidations while it&apos;s true.
-            Neither integrates an oracle; both read the same fact through the EventBus. A multi-condition rule —
-            &ldquo;NVDA above $X AND a split within the week&rdquo; — is itself a first-class event with a canonical ID,
-            so the next protocol that needs it reuses the answer instead of rebuilding the glue.
-          </p>
-          <p className="mt-4 max-w-2xl text-sm text-gray-500 font-mono">
-            See the full comparison against other oracle designs in the <Link href="/docs" className="text-ink underline">docs specification</Link>.
-          </p>
-        </div>
-      </section>
+      {/* Why it matters + SDK terminal, plug-in hub, dispute race, comparison */}
+      <IntegrateSection />
     </main>
   );
 }
