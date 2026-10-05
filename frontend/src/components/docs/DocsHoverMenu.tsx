@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowUpRight, ShieldCheck, Layers, GitMerge, FileCode2, Scale, Terminal, BookOpen, HelpCircle } from "lucide-react";
+import { ArrowUpRight, ShieldCheck, Layers, GitMerge, FileCode2, Scale, Terminal, BookOpen, Cpu, Coins, BarChart3, Plug, MapPin } from "lucide-react";
 
 export interface DocsGridItem {
   index: string;
@@ -14,78 +14,18 @@ export interface DocsGridItem {
 }
 
 export const docsGridItems: DocsGridItem[] = [
-  {
-    index: "01",
-    href: "/docs",
-    title: "Protocol Overview",
-    tag: "INTRO",
-    description: "Core architecture, composable event bus thesis, and primary concepts.",
-    icon: BookOpen,
-  },
-  {
-    index: "02",
-    href: "/docs/architecture",
-    title: "5-Layer Architecture",
-    tag: "STACK",
-    description: "Strict layer dependencies from EventBus down to BaseRegistry.",
-    icon: Layers,
-  },
-  {
-    index: "03",
-    href: "/docs/lifecycle",
-    title: "Event Lifecycle",
-    tag: "STATES",
-    description: "Create → Observe → Disputed (T1/T2) → Finalized / Voided.",
-    icon: GitMerge,
-  },
-  {
-    index: "04",
-    href: "/docs/composition",
-    title: "Composition Engine",
-    tag: "LOGIC",
-    description: "AND, OR, NOT, BEFORE, and WITHIN(Δt) composite operators.",
-    icon: FileCode2,
-  },
-  {
-    index: "05",
-    href: "/docs/disputes",
-    title: "Disputes & Finalization",
-    tag: "SECURITY",
-    description: "Bond accounting, committee sizes, voting windows & VOID floor.",
-    icon: Scale,
-  },
-  {
-    index: "06",
-    href: "/docs/api",
-    title: "Events API Reference",
-    tag: "REST",
-    description: "On-chain read endpoints, parameter schemas, and curl examples.",
-    icon: Terminal,
-  },
-  {
-    index: "07",
-    href: "/docs/sdk",
-    title: "TypeScript SDK",
-    tag: "NPM",
-    description: "@novak/sdk package methods, client instantiation, and types.",
-    icon: FileCode2,
-  },
-  {
-    index: "08",
-    href: "/docs/threat-model",
-    title: "Threat Model",
-    tag: "SAFETY",
-    description: "DAG cycle-impossibility proof & terminal state propagation.",
-    icon: ShieldCheck,
-  },
-  {
-    index: "09",
-    href: "/docs/faq",
-    title: "Protocol FAQ",
-    tag: "HELP",
-    description: "Caveats, design trade-offs, and common questions answered.",
-    icon: HelpCircle,
-  },
+  { index: "01", href: "/docs", title: "Introduction", tag: "START", description: "What Novak is: the event & dispute layer for tokenized stocks on Robinhood Chain.", icon: BookOpen },
+  { index: "02", href: "/docs/architecture", title: "Architecture", tag: "STACK", description: "Mainnet sources → resolvers → testnet contracts, and the one rule consumers follow.", icon: Layers },
+  { index: "03", href: "/docs/contracts", title: "Deployed contracts", tag: "TESTNET", description: "Every live address on Robinhood Chain testnet (46630), verified on Blockscout.", icon: MapPin },
+  { index: "04", href: "/docs/lifecycle", title: "Event lifecycle", tag: "STATES", description: "Create → observe → propose → dispute → finalized / voided / expired.", icon: GitMerge },
+  { index: "05", href: "/docs/resolvers", title: "Resolver network", tag: "NODES", description: "Adapters, quorum, evidence, keeper, committee voting and rewards.", icon: Cpu },
+  { index: "06", href: "/docs/disputes", title: "Disputes & committees", tag: "SECURITY", description: "Bonded Tier-1 (≤7) / Tier-2 (≤15) committees, 66% rule, VOID floor.", icon: Scale },
+  { index: "07", href: "/docs/treasury", title: "Treasury & fee thirds", tag: "VALUE", description: "Every fee split ⅓ resolvers · ⅓ committee/insurance · ⅓ treasury.", icon: Coins },
+  { index: "08", href: "/docs/distribution-markets", title: "Range markets", tag: "LMSR", description: "Where will NVDA close? N ranges, prices sum to 1, settled by threshold events.", icon: BarChart3 },
+  { index: "09", href: "/docs/integrate", title: "Integrate your market", tag: "BUILD", description: "Settle your own prediction market on Novak events via the Bus or SDK.", icon: Plug },
+  { index: "10", href: "/docs/sdk", title: "TypeScript SDK", tag: "SDK", description: "@novak/sdk: client methods, spec encoders, feed catalog, ladders.", icon: FileCode2 },
+  { index: "11", href: "/docs/api", title: "Contract API", tag: "ABI", description: "On-chain read/write surface with real function signatures.", icon: Terminal },
+  { index: "12", href: "/docs/threat-model", title: "Threat model & FAQ", tag: "SAFETY", description: "Adversaries, known limitations, and honest answers.", icon: ShieldCheck },
 ];
 
 interface DocsHoverMenuProps {
@@ -110,14 +50,14 @@ export function DocsHoverMenu({ isOpen, onClose }: DocsHoverMenuProps) {
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-ink animate-pulse-subtle" />
               <span className="font-mono text-xs uppercase tracking-wider text-ink font-semibold">
-                Novak Specification Matrix &amp; Docs
+                Novak docs
               </span>
             </div>
             <div className="flex items-center gap-3 font-mono text-[11px] text-gray-500">
               <span className="border border-gray-300 px-1.5 py-0.5 rounded-sm">
-                SPEC v1.0.0
+                v2 · TESTNET
               </span>
-              <span>9 SPEC MODULES</span>
+              <span>12 MODULES</span>
             </div>
           </div>
 
