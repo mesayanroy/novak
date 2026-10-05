@@ -22,5 +22,23 @@ export const deployments: Record<number, NovakDeployment> = {
     "market": "0xb7f8bc63bbcad18155201308c8f3540b07f84f5e",
     "distributionMarket": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
     "stockLendingGuard": "0x9a676e781a523b5d0c0e43731313a708cb607508"
+  },
+  "46630": {
+    "chainId": 46630,
+    "startBlock": 128894045,
+    "deployedAt": "2026-10-04T21:09:24.845Z",
+    "collateralIsMock": true,
+    "collateral": "0xc835601951cb8efc104ebf615510024dfe003f52",
+    "eventRegistry": "0xb96f31bc07777f1f48de16533225f0964951e8f1",
+    "eventComposer": "0x8ca95b815f1c6f732ed67d0880d672d7fbc33c2e",
+    "treasuryVault": "0xf4dd6a333c66a765f1cb42e81ca2167b48217710",
+    "disputeManager": "0xf9890adf5549bd39313e16ce7f5dc8c3aef48f63",
+    "eventBus": "0xab30c697738007d5338bcdd7bb25353fddda1054",
+    "settlement": "0x1336830154365ad443bd362a994cb4dabd9d583d",
+    "subscriptionManager": "0x0b8b5b13ae378fa8a798a483e4fb5b22b4f35e9e",
+    "positionManager": "0x95fe91f6762a4cd6487a62005194784190440ea7",
+    "market": "0x73d5e83e5302019129efbf858955126db0deadad",
+    "distributionMarket": "0xbfe9786dcc4bfd6c882159caa47367ac40d3ba94",
+    "stockLendingGuard": "0x61a5a60887ecaedafbcb26c7b2b029b304ebb133"
   }
 };

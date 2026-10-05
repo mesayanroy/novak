@@ -2,6 +2,7 @@ export { NovakClient } from "./client.js";
 export * from "./types.js";
 export * from "./sources.js";
 export * from "./chains.js";
+export * from "./chainlinkFeeds.js";
 export { deployments } from "./deployments.js";
 export {
   encodeBoolOutcome,
