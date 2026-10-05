@@ -1,4 +1,6 @@
 import { CodeBlock } from "@/components/CodeBlock";
+import { DocHeader } from "@/components/docs/DocPrimitives";
+import { Boxes } from "lucide-react";
 
 export const metadata = { title: "Composition — Novak Docs" };
 
@@ -33,8 +35,7 @@ const operators = [
 export default function CompositionPage() {
   return (
     <article>
-      <p className="font-mono text-xs uppercase tracking-wide text-gray-500">Composition</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Building new events from finalized ones</h1>
+      <DocHeader icon={Boxes} eyebrow="Protocol · Composition" title="Building new events from finalized ones" />
 
       <p className="mt-6 text-gray-700">
         <code className="font-mono text-sm">EventComposer</code> builds composite events from primitive

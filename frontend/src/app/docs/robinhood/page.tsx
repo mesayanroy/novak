@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
+import { DocHeader } from "@/components/docs/DocPrimitives";
+import { Building2 } from "lucide-react";
 
 export const metadata = { title: "Robinhood Chain — Novak Docs" };
 
@@ -63,8 +65,7 @@ await client.createEvent({
 export default function RobinhoodDocsPage() {
   return (
     <article>
-      <p className="font-mono text-xs uppercase tracking-wide text-gray-500">Robinhood Chain</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">The event layer for tokenized stocks</h1>
+      <DocHeader icon={Building2} eyebrow="Start here · Robinhood Chain" title="The event layer for tokenized stocks" />
       <p className="mt-4 text-gray-700">
         Robinhood Chain ships Chainlink price feeds for its stock tokens. It does not ship the facts around those prices:
         Chainlink&apos;s docs state it &ldquo;does not provide corporate-action calendar data or automated pause

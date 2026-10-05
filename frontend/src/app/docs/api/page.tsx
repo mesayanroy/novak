@@ -1,12 +1,13 @@
 import { EndpointSection } from "@/components/docs/EndpointSection";
+import { DocHeader } from "@/components/docs/DocPrimitives";
+import { Terminal } from "lucide-react";
 
 export const metadata = { title: "Events API reference — Novak Docs" };
 
 export default function ApiReferencePage() {
   return (
     <article>
-      <p className="font-mono text-xs uppercase tracking-wide text-gray-500">Events API reference</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Events &amp; composition</h1>
+      <DocHeader icon={Terminal} eyebrow="Reference · Contract API" title="Contract API reference" />
 
       <div className="mt-6 border border-dashed border-gray-400 p-4">
         <p className="font-mono text-xs uppercase tracking-wide text-gray-600">On-chain reference, not a live REST API</p>

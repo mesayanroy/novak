@@ -1,5 +1,7 @@
 import { EventStatusPill } from "@/components/StatusPill";
 import { EventStatus } from "@novak/sdk";
+import { DocHeader } from "@/components/docs/DocPrimitives";
+import { GitMerge } from "lucide-react";
 
 export const metadata = { title: "Event lifecycle — Novak Docs" };
 
@@ -18,8 +20,7 @@ function Arrow({ label }: { label?: string }) {
 export default function LifecyclePage() {
   return (
     <article>
-      <p className="font-mono text-xs uppercase tracking-wide text-gray-500">Event lifecycle</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Create → Open → … → terminal</h1>
+      <DocHeader icon={GitMerge} eyebrow="Protocol · Event lifecycle" title="From creation to a final answer" />
 
       <p className="mt-6 text-gray-700">
         This is the actual <code className="font-mono text-sm">EventRegistry</code> /{" "}

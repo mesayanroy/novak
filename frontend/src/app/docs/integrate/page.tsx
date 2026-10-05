@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
+import { DocHeader } from "@/components/docs/DocPrimitives";
+import { Plug } from "lucide-react";
 
 export const metadata = { title: "Integrate — Novak Docs" };
 
@@ -28,8 +30,7 @@ ITreasuryVault(vault).depositFees(eventIds, fee);
 export default function IntegratePage() {
   return (
     <article>
-      <p className="font-mono text-xs uppercase tracking-wide text-gray-500">Integrate</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Use Novak as your market&apos;s dispute layer</h1>
+      <DocHeader icon={Plug} eyebrow="Markets · Integrate your market" title="Use Novak as your market's dispute layer" />
       <p className="mt-4 text-gray-700">
         Keep your own trading. Hand the question &ldquo;what actually happened?&rdquo; to Novak. Independent resolvers
         observe the source and must agree. Anyone can dispute, which escalates to bonded Tier-1 (≤7) and Tier-2 (≤15)
