@@ -13,7 +13,12 @@ cd "$(dirname "$0")/.."
 
 FORGE="${FORGE:-$(command -v forge || echo ~/.foundry/bin/forge)}"
 CAST="${CAST:-$(command -v cast || echo ~/.foundry/bin/cast)}"
-set -a; source .env; set +a
+set -a; source <(tr -d '\r' < .env); set +a
+# Accept keys with or without the 0x prefix.
+norm() { local k="${1:-}"; [[ -z "$k" ]] && return; [[ "$k" == 0x* ]] && echo "$k" || echo "0x$k"; }
+DEPLOYER_PRIVATE_KEY=$(norm "${DEPLOYER_PRIVATE_KEY:-}"); R1_PRIVATE_KEY=$(norm "${R1_PRIVATE_KEY:-}")
+R2_PRIVATE_KEY=$(norm "${R2_PRIVATE_KEY:-}"); R3_PRIVATE_KEY=$(norm "${R3_PRIVATE_KEY:-}")
+export DEPLOYER_PRIVATE_KEY
 RPC="${RPC_URL_ROBINHOOD_TESTNET:-https://rpc.testnet.chain.robinhood.com}"
 
 [[ "$($CAST chain-id --rpc-url "$RPC")" == "46630" ]] || { echo "RPC is not Robinhood Chain testnet"; exit 1; }
