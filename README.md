@@ -42,6 +42,7 @@ Three consumers ship in this repo and read the **same** events:
 
 ## Contents
 
+- [Live on Robinhood Chain testnet](#live-on-robinhood-chain-testnet)
 - [What's verified](#whats-verified)
 - [Architecture](#architecture)
 - [Repository layout](#repository-layout)
@@ -52,6 +53,25 @@ Three consumers ship in this repo and read the **same** events:
 - [Contributing](#contributing)
 - [Documentation](#documentation)
 - [License](#license)
+
+## Live on Robinhood Chain testnet
+
+Deployed 2026-10-04 (chain 46630, start block 128894045); every contract is verified on Blockscout. Resolvers: `0xFF84…B535` (r1) and `0xaD91…8980` (r2, also the deployer and keeper).
+
+| Contract | Address |
+|---|---|
+| EventRegistry | [0xb96f31bc07777f1f48de16533225f0964951e8f1](https://explorer.testnet.chain.robinhood.com/address/0xb96f31bc07777f1f48de16533225f0964951e8f1) |
+| DisputeManager | [0xf9890adf5549bd39313e16ce7f5dc8c3aef48f63](https://explorer.testnet.chain.robinhood.com/address/0xf9890adf5549bd39313e16ce7f5dc8c3aef48f63) |
+| EventComposer | [0x8ca95b815f1c6f732ed67d0880d672d7fbc33c2e](https://explorer.testnet.chain.robinhood.com/address/0x8ca95b815f1c6f732ed67d0880d672d7fbc33c2e) |
+| EventBus | [0xab30c697738007d5338bcdd7bb25353fddda1054](https://explorer.testnet.chain.robinhood.com/address/0xab30c697738007d5338bcdd7bb25353fddda1054) |
+| TreasuryVault | [0xf4dd6a333c66a765f1cb42e81ca2167b48217710](https://explorer.testnet.chain.robinhood.com/address/0xf4dd6a333c66a765f1cb42e81ca2167b48217710) |
+| Settlement | [0x1336830154365ad443bd362a994cb4dabd9d583d](https://explorer.testnet.chain.robinhood.com/address/0x1336830154365ad443bd362a994cb4dabd9d583d) |
+| Market (yes/no) | [0x73d5e83e5302019129efbf858955126db0deadad](https://explorer.testnet.chain.robinhood.com/address/0x73d5e83e5302019129efbf858955126db0deadad) |
+| DistributionMarket | [0xbfe9786dcc4bfd6c882159caa47367ac40d3ba94](https://explorer.testnet.chain.robinhood.com/address/0xbfe9786dcc4bfd6c882159caa47367ac40d3ba94) |
+| StockLendingGuard | [0x61a5a60887ecaedafbcb26c7b2b029b304ebb133](https://explorer.testnet.chain.robinhood.com/address/0x61a5a60887ecaedafbcb26c7b2b029b304ebb133) |
+| PositionManager | [0x95fe91f6762a4cd6487a62005194784190440ea7](https://explorer.testnet.chain.robinhood.com/address/0x95fe91f6762a4cd6487a62005194784190440ea7) |
+| SubscriptionManager | [0x0b8b5b13ae378fa8a798a483e4fb5b22b4f35e9e](https://explorer.testnet.chain.robinhood.com/address/0x0b8b5b13ae378fa8a798a483e4fb5b22b4f35e9e) |
+| MockUSDG (test collateral) | [0xc835601951cb8efc104ebf615510024dfe003f52](https://explorer.testnet.chain.robinhood.com/address/0xc835601951cb8efc104ebf615510024dfe003f52) |
 
 ## What's verified
 

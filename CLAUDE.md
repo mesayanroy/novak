@@ -148,8 +148,11 @@ liquidations in the guard, and handled a filed dispute end to end.
 
 **Still genuinely incomplete:**
 
-- **Not yet deployed to testnet** — needs the team's funded faucet keys
-  (deployer + 3 resolvers). `deployments/46630.json` must only ever come
+- **Deployed to Robinhood testnet 2026-10-05** (all contracts verified on
+  Blockscout; addresses in README / deployments/46630.json; run
+  `bash script/deploy-testnet.sh` to redeploy). Only TWO resolvers so far
+  (r1 + the deployer as r2) — add independent operators. Previously: the team
+  needed funded faucet keys (deployer + 3 resolvers). `deployments/46630.json` must only ever come
   from a real broadcast via `export-deployment.mjs`. A previous copy of the
   anvil addresses there pointed the frontend at addresses with no code. The
   frontend shows badged preview markets ONLY when no deployment exists.
