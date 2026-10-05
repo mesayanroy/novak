@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Availability, MarketStatus } from "@novak/sdk";
@@ -19,7 +19,7 @@ const DistributionMarketFAQ = dynamic(
 import { NOVAK_CHAIN_ID, deployment } from "@/lib/addresses";
 import { fmtTime, fmtUsdg, showingExamples, useEvents, useMarkets, type EventNode, type LiveMarket } from "@/lib/novak";
 import { ExampleDataBadge } from "@/components/ExampleDataBadge";
-import { DistributionMarketCard } from "@/components/distribution/DistributionMarketCard";
+import { MarketFeed } from "@/components/markets/MarketFeed";
 import { useDistributionMarkets } from "@/lib/distribution";
 import { shortHex, cn } from "@/lib/utils";
 import {
@@ -40,6 +40,15 @@ type MarketCategory = "all font-bold" | "all" | "corporate" | "trading" | "price
 
 export default function MarketsPage() {
   const [tab, setTab] = useState<MainTab>("markets");
+  // /markets?create=NVDA (from the /feeds board) opens the creator on that asset.
+  const [createTicker, setCreateTicker] = useState<string | undefined>();
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("create");
+    if (t) {
+      setCreateTicker(t.toUpperCase());
+      setTab("create");
+    }
+  }, []);
   const [category, setCategory] = useState<MarketCategory>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -49,8 +58,11 @@ export default function MarketsPage() {
 
 
   const list = markets.data ?? [];
-  const pooled = list.reduce((s, m) => s + m.yesPool + m.noPool, 0n);
-  const open = list.filter((m) => m.status === MarketStatus.Open).length;
+  const dists = distMarkets.data ?? [];
+  // Collateral at work: yes/no pools + range markets' reserves (LMSR subsidy + trades).
+  const pooled = list.reduce((s, m) => s + m.yesPool + m.noPool, 0n) + dists.reduce((s, d) => s + d.reserve, 0n);
+  const open =
+    list.filter((m) => m.status === MarketStatus.Open).length + dists.filter((d) => d.status === 0).length;
   const evs = events.data ?? [];
   const decided = evs.filter((e) => e.availability !== Availability.Pending).length;
 
@@ -101,8 +113,8 @@ export default function MarketsPage() {
 
       {/* Metric Cards */}
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat icon={<TrendingUp className="h-3.5 w-3.5" />} label="USDG pooled" value={fmtUsdg(pooled)} />
-        <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Markets" value={`${list.length}`} note={`${open} open`} />
+        <Stat icon={<TrendingUp className="h-3.5 w-3.5" />} label="USDG in markets" value={fmtUsdg(pooled)} />
+        <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Markets" value={`${list.length + dists.length}`} note={`${open} open · ${dists.length} range`} />
         <Stat icon={<Radio className="h-3.5 w-3.5" />} label="Events" value={`${evs.length}`} note={`${decided} decided`} />
         <Stat icon={<ShieldAlert className="h-3.5 w-3.5" />} label="Disputes" value="Tier 1 → 2" note="bonded committees, never token votes" />
       </div>
@@ -110,7 +122,7 @@ export default function MarketsPage() {
       {/* Main Tabs */}
       <div className="mt-10 flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3">
         <TabButton active={tab === "markets"} onClick={() => setTab("markets")} icon={<BarChart3 className="h-4 w-4" />}>
-          Markets Explorer ({list.length})
+          Markets Explorer ({list.length + dists.length})
         </TabButton>
         <TabButton active={tab === "events"} onClick={() => setTab("events")} icon={<Radio className="h-4 w-4" />}>
           Event Feed ({evs.length})
@@ -127,81 +139,15 @@ export default function MarketsPage() {
       </div>
 
       {/* Tab: Markets Explorer */}
-      {tab === "markets" && (distMarkets.data?.length ?? 0) > 0 && (
-        <section className="mt-6">
-          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-lg font-semibold text-ink">Distribution markets — where will the price land?</h2>
-            <span className="font-mono text-xs text-gray-500">
-              LMSR ranges · resolved by Novak threshold events on Chainlink rounds
-            </span>
-          </div>
-          <div className="grid gap-5 md:grid-cols-2">
-            {distMarkets.data!.map((v) => (
-              <DistributionMarketCard key={v.marketId} view={v} />
-            ))}
-          </div>
-          <h2 className="mt-8 text-lg font-semibold text-ink">Yes/no event markets</h2>
-        </section>
-      )}
-
       {tab === "markets" && (
         <div className="mt-6">
-          {/* Sub-Filter & Search Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-gray-50/80 p-3 border border-gray-200 rounded-sm">
-            <div className="flex flex-wrap gap-1.5 items-center">
-              <span className="font-mono text-xs text-gray-500 font-semibold mr-1 flex items-center gap-1">
-                <Filter className="h-3.5 w-3.5" /> Filter:
-              </span>
-              <CategoryChip active={category === "all"} onClick={() => setCategory("all")}>
-                All
-              </CategoryChip>
-              <CategoryChip active={category === "corporate"} onClick={() => setCategory("corporate")}>
-                Corporate Actions
-              </CategoryChip>
-              <CategoryChip active={category === "trading"} onClick={() => setCategory("trading")}>
-                Trading Status
-              </CategoryChip>
-              <CategoryChip active={category === "price"} onClick={() => setCategory("price")}>
-                Price-at-Time
-              </CategoryChip>
-              <CategoryChip active={category === "composite"} onClick={() => setCategory("composite")}>
-                Composite Events
-              </CategoryChip>
-            </div>
-
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search markets or tickers..."
-                className="w-full pl-8 pr-3 py-1 border border-gray-300 rounded font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ink bg-paper"
-              />
-            </div>
-          </div>
-
-          {markets.isLoading ? (
-            <p className="text-sm font-mono text-gray-500 py-8 text-center animate-pulse">Loading markets from chain…</p>
-          ) : markets.error ? (
-            <p className="text-sm font-mono text-rose-700 py-4">Couldn&apos;t read markets: {(markets.error as Error).message}</p>
-          ) : filteredList.length === 0 ? (
-            <div className="border border-gray-300 bg-paper p-8 text-center rounded-sm">
-              <p className="text-sm text-gray-600 font-mono">
-                No markets found matching criteria.{" "}
-                <button className="underline font-semibold text-ink" onClick={() => setTab("create")}>
-                  Create a new market
-                </button>
-                .
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2">
-              {filteredList.map((m) => (
-                <MarketCard key={m.marketId} market={m} />
-              ))}
-            </div>
-          )}
+          <MarketFeed
+            markets={markets.data ?? []}
+            dists={distMarkets.data ?? []}
+            loading={markets.isLoading || distMarkets.isLoading}
+            error={(markets.error ?? distMarkets.error) as Error | null}
+            onCreate={() => setTab("create")}
+          />
         </div>
       )}
 
@@ -232,7 +178,7 @@ export default function MarketsPage() {
       {/* Tab: Create Market */}
       {tab === "create" && (
         <div className="mt-6">
-          <CreateMarketCard onCreated={() => setTab("markets")} />
+          <CreateMarketCard key={createTicker ?? "default"} initialTicker={createTicker} onCreated={() => setTab("markets")} />
         </div>
       )}
     </div>

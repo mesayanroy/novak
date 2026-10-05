@@ -31,7 +31,7 @@ export function InsightsPanel({
 }) {
   if (!model || spot === undefined) {
     return (
-      <div className="border border-gray-300 bg-paper p-5 rounded-sm">
+      <div className="rounded-2xl border border-violet-100 bg-white p-5">
         <p className="font-semibold text-ink">Insights</p>
         <p className="mt-2 text-sm text-gray-500">Loading the live Chainlink price and volatility…</p>
       </div>
@@ -48,7 +48,7 @@ export function InsightsPanel({
   const heldOverpriced = rows.filter((r) => r.signal === "sell" && (held[r.i] ?? 0n) > 0n);
 
   return (
-    <div className="border border-gray-300 bg-paper p-5 rounded-sm">
+    <div className="rounded-2xl border border-violet-100 bg-white p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-semibold text-ink">Insights: what the market is saying</p>
         <p className="font-mono text-[11px] text-gray-500">

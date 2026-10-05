@@ -73,7 +73,7 @@ export function TradePanel({ view, bucket, onBucket }: { view: DistributionView;
 
   if (!isConnected || !client || !address) {
     return (
-      <div className="border border-gray-300 bg-paper p-5 rounded-sm">
+      <div className="rounded-2xl border border-violet-100 bg-white p-5">
         <p className="font-semibold text-ink">Trade</p>
         <p className="mt-2 text-sm text-gray-600">Connect a wallet on Robinhood Chain testnet to trade ranges.</p>
         <div className="mt-3">
@@ -84,7 +84,7 @@ export function TradePanel({ view, bucket, onBucket }: { view: DistributionView;
   }
 
   return (
-    <div className="border border-gray-300 bg-paper p-5 rounded-sm flex flex-col gap-4">
+    <div className="rounded-2xl border border-violet-100 bg-white p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="font-semibold text-ink">Trade</p>
         <span className="font-mono text-xs text-gray-500">Wallet: {balance !== undefined ? fmtUsdg(balance) : "…"} USDG</span>

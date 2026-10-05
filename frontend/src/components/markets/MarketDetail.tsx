@@ -2,6 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { LivePriceChart } from "@/components/markets/LivePriceChart";
+import { AssetBadge } from "@/components/markets/AssetIcon";
+import { SOURCES, decodePriceAtSpec, feedByAddress, sourceName } from "@novak/sdk";
+
+/** USD thresholds of every Chainlink price-at leaf under an event (for the chart). */
+function thresholdsOf(e: EventNode): number[] {
+  if (e.kind === "composite") return (e.children ?? []).flatMap(thresholdsOf);
+  if (!e.spec || sourceName(e.spec.sourceId) !== SOURCES.priceAt) return [];
+  try {
+    return [Number(decodePriceAtSpec(e.spec.spec).threshold) / 1e8];
+  } catch {
+    return [];
+  }
+}
 import { ExampleDataBadge } from "@/components/ExampleDataBadge";
 import dynamic from "next/dynamic";
 import type { Hex } from "@novak/sdk";
@@ -22,7 +36,7 @@ const DistributionMarketFAQ = dynamic(
 import { explorerUrl, marketAbi } from "@novak/sdk";
 import { useReadContract } from "wagmi";
 import { NOVAK_CHAIN_ID, novakAddresses } from "@/lib/addresses";
-import { OP_LABEL, USDG_DECIMALS, fmtTime, fmtUsdg, useMarket, type EventNode } from "@/lib/novak";
+import { OP_LABEL, USDG_DECIMALS, fmtTime, fmtUsdg, tickersOf, useMarket, type EventNode } from "@/lib/novak";
 import { shortHex, cn } from "@/lib/utils";
 import {
   GitBranch,
@@ -108,6 +122,11 @@ export function MarketDetail({ marketId }: { marketId: Hex }) {
             {market.isExample && <ExampleDataBadge />}
           </span>
           <div className="flex items-center gap-2 font-mono text-xs text-gray-500">
+            <AssetBadge
+              tickers={tickersOf(market.event)}
+              category={market.event.category}
+              name={market.event.feed ? feedByAddress(market.event.feed)?.name : undefined}
+            />
             <span className="bg-gray-100 border border-gray-200 px-2 py-0.5 rounded text-ink">
               {market.event.kind === "composite" ? "Composite Event" : "Primitive Event"}
             </span>
@@ -185,6 +204,7 @@ export function MarketDetail({ marketId }: { marketId: Hex }) {
         {activeTab === "visualizer" && (
           <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
             <div className="flex flex-col gap-8 min-w-0">
+              <LivePriceChart feed={market.event.feed} ticker={market.event.ticker} thresholds={thresholdsOf(market.event)} />
               <MarketVisualizer market={market} />
             </div>
 

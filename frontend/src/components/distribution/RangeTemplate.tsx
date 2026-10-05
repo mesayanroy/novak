@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { CHAINLINK_FEEDS_MAINNET, buildPriceLadderSpecs, ladderBucketLabels, type Hex } from "@novak/sdk";
+import { buildPriceLadderSpecs, feedBySymbol, ladderBucketLabels, type Hex } from "@novak/sdk";
+import { FeedSelect } from "@/components/markets/FeedSelect";
 import { deployment, novakAddresses } from "@/lib/addresses";
 import { useNovakClient } from "@/lib/novak";
 import { useTx } from "@/lib/useTx";
@@ -12,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { FeedRow } from "@/app/api/feeds/route";
 
-const TICKERS = Object.keys(CHAINLINK_FEEDS_MAINNET).filter((t) => !t.includes("/"));
 
 const toLocalInput = (unix: number) => {
   const d = new Date(unix * 1000);
@@ -25,14 +25,14 @@ const toLocalInput = (unix: number) => {
  * events centred on the live price (one createEvents tx), then opens an LMSR
  * DistributionMarket over them, seeded with the b·ln(N) subsidy.
  */
-export function RangeTemplate() {
+export function RangeTemplate({ initialTicker }: { initialTicker?: string }) {
   const router = useRouter();
   const { address } = useAccount();
   const client = useNovakClient();
   const { run, pending, error } = useTx();
-  const [ticker, setTicker] = useState("NVDA");
+  const [ticker, setTicker] = useState(initialTicker ?? "NVDA");
   const [ranges, setRanges] = useState(6);
-  const [stepPct, setStepPct] = useState("1");
+  const [stepPct, setStepPct] = useState(feedBySymbol(initialTicker ?? "NVDA")?.assetClass === "Bond" ? "0.05" : "1");
   const [liquidity, setLiquidity] = useState("200");
   const [at, setAt] = useState(toLocalInput(Math.floor(Date.now() / 1000) + 3600));
 
@@ -40,7 +40,7 @@ export function RangeTemplate() {
     queryKey: ["feeds"],
     queryFn: async () => (await (await fetch("/api/feeds")).json()) as { rows: FeedRow[] },
   });
-  const feed = CHAINLINK_FEEDS_MAINNET[ticker] as Hex;
+  const feed = (feedBySymbol(ticker)?.address ?? feedBySymbol("NVDA")!.address) as Hex;
   const spot = feeds.data?.rows.find((r) => r.feed.toLowerCase() === feed.toLowerCase())?.price;
 
   // Thresholds in feed units (8 decimals), centred on spot, rounded to the step.
@@ -80,11 +80,7 @@ export function RangeTemplate() {
         chosen time — including <strong>SGOV</strong>, a tokenized 0–3 month Treasury ETF.
       </p>
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <select className="h-10 border border-gray-300 px-2" value={ticker} onChange={(e) => setTicker(e.target.value)}>
-          {TICKERS.map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
+        <FeedSelect value={ticker} onChange={setTicker} />
         <span>at</span>
         <Input type="datetime-local" className="w-56" value={at} onChange={(e) => setAt(e.target.value)} />
       </div>

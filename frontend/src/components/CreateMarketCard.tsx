@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAccount, usePublicClient } from "wagmi";
 import {
-  CHAINLINK_FEEDS_MAINNET,
+  feedBySymbol,
   Comparator,
   CompositeOp,
   SOURCES,
@@ -22,10 +22,10 @@ import { Button } from "@/components/ui/button";
 import { ConnectButton } from "@/components/ConnectButton";
 import { shortHex } from "@/lib/utils";
 import { RangeTemplate } from "@/components/distribution/RangeTemplate";
+import { FeedSelect } from "@/components/markets/FeedSelect";
 
 type Template = "range" | "price" | "corporate" | "combine";
 
-const TICKERS = Object.keys(CHAINLINK_FEEDS_MAINNET).filter((t) => !t.includes("/"));
 const HOUR = 3600;
 const DAY = 24 * HOUR;
 
@@ -42,18 +42,25 @@ const fromLocalInput = (s: string) => Math.floor(new Date(s).getTime() / 1000);
  * observation window opens (the Market can't check that itself — see
  * docs/protocol-spec.md "trading window").
  */
-export function CreateMarketCard({ onCreated }: { onCreated?: (marketId: Hex) => void }) {
+export function CreateMarketCard({
+  onCreated,
+  initialTicker,
+}: {
+  onCreated?: (marketId: Hex) => void;
+  /** Preselect an asset (e.g. from the /feeds board) — opens the range template. */
+  initialTicker?: string;
+}) {
   const { address, isConnected } = useAccount();
   const client = useNovakClient();
   const publicClient = usePublicClient();
   const { data: events } = useEvents();
   const { run, pending, error } = useTx();
-  const [template, setTemplate] = useState<Template>("price");
+  const [template, setTemplate] = useState<Template>(initialTicker ? "range" : "price");
   const [created, setCreated] = useState<Hex | null>(null);
 
   // price template
   const nowSec = Math.floor(Date.now() / 1000);
-  const [ticker, setTicker] = useState("NVDA");
+  const [ticker, setTicker] = useState(initialTicker ?? "NVDA");
   const [cmp, setCmp] = useState<Comparator>(Comparator.Gte);
   const [threshold, setThreshold] = useState("250");
   const [at, setAt] = useState(toLocalInput(nowSec + HOUR));
@@ -119,7 +126,7 @@ export function CreateMarketCard({ onCreated }: { onCreated?: (marketId: Hex) =>
         openTimestamp: t,
         deadline: t + BigInt(DAY),
         spec: encodePriceAtSpec({
-          feed: CHAINLINK_FEEDS_MAINNET[ticker] as Hex,
+          feed: feedBySymbol(ticker)!.address,
           threshold: BigInt(Math.round(dollars * 1e8)),
           comparator: cmp,
           at: t,
@@ -212,11 +219,7 @@ export function CreateMarketCard({ onCreated }: { onCreated?: (marketId: Hex) =>
               effect at the chosen time.
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <select className="h-10 border border-gray-300 px-2 text-sm" value={ticker} onChange={(e) => setTicker(e.target.value)}>
-                {TICKERS.map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
+              <FeedSelect value={ticker} onChange={setTicker} />
               <select className="h-10 border border-gray-300 px-2 text-sm" value={cmp} onChange={(e) => setCmp(Number(e.target.value))}>
                 <option value={Comparator.Gte}>≥</option>
                 <option value={Comparator.Lte}>≤</option>
@@ -258,7 +261,7 @@ export function CreateMarketCard({ onCreated }: { onCreated?: (marketId: Hex) =>
           </div>
         )}
 
-        {template === "range" && <RangeTemplate />}
+        {template === "range" && <RangeTemplate initialTicker={initialTicker} />}
 
         {template === "combine" && (
           <div className="flex flex-col gap-3">

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useSwitchChain } from "wagmi";
+import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
 import { activeChain } from "@/lib/wagmi";
 import { Button } from "@/components/ui/button";
 import { shortHex } from "@/lib/utils";
@@ -12,6 +12,7 @@ export function ConnectButton() {
   const [showPopover, setShowPopover] = useState(false);
   const { chainId: walletChainId } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const { disconnect } = useDisconnect();
 
   return (
     <RainbowConnectButton.Custom>
@@ -58,6 +59,9 @@ export function ConnectButton() {
                       className="gap-2 text-rose-700 bg-rose-50 border-rose-200"
                     >
                       {isSwitching ? "Switching…" : `Switch to ${activeChain.name}`}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => disconnect()} className="text-xs text-gray-600">
+                      Disconnect
                     </Button>
                   </div>
                 );

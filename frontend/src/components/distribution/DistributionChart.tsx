@@ -25,12 +25,12 @@ export function DistributionChart({
 }) {
   const max = Math.max(0.25, ...prices, ...(model ?? []));
   return (
-    <div className="border border-gray-300 bg-paper p-5 rounded-sm">
+    <div className="rounded-2xl border border-violet-100 bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">Market distribution</p>
         <div className="flex items-center gap-4 font-mono text-[11px] text-gray-500">
           <span className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 bg-ink" /> market price
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-violet-600" /> market price
           </span>
           {model && (
             <span className="flex items-center gap-1">
@@ -49,12 +49,12 @@ export function DistributionChart({
               type="button"
               role="listitem"
               onClick={() => onSelect?.(i)}
-              className={`group relative flex h-full flex-1 flex-col justify-end rounded-sm ${isSel ? "bg-gray-100" : ""}`}
+              className={`group relative flex h-full flex-1 flex-col justify-end rounded-xl transition-colors ${isSel ? "bg-violet-50" : "hover:bg-violet-50/60"}`}
               aria-label={`${labels[i]}: ${(p * 100).toFixed(1)}%`}
             >
-              <span className="mb-1 text-center font-mono text-[11px] font-semibold text-ink">{(p * 100).toFixed(1)}%</span>
+              <span className="mb-1 text-center text-xs font-bold text-violet-700">{(p * 100).toFixed(1)}%</span>
               <div className="relative w-full" style={{ height: `${(p / max) * 80}%` }}>
-                <div className={`absolute inset-0 rounded-t-sm ${isWin ? "bg-emerald-600" : isSel ? "bg-violet-700" : "bg-ink"}`} />
+                <div className={`absolute inset-0 rounded-t-lg bg-gradient-to-t ${isWin ? "from-emerald-600 to-emerald-400" : isSel ? "from-violet-700 to-violet-500" : "from-violet-400 to-violet-300"}`} />
               </div>
               {model && (
                 <div

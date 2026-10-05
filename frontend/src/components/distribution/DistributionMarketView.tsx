@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAccount, useReadContract } from "wagmi";
-import { DistributionStatus, distributionMarketAbi, explorerUrl, type Hex } from "@novak/sdk";
+import { DistributionStatus, distributionMarketAbi, explorerUrl, feedByAddress, type Hex } from "@novak/sdk";
+import { AssetBadge } from "@/components/markets/AssetIcon";
 import { EventStatusPill } from "@/components/StatusPill";
 import { NOVAK_CHAIN_ID, novakAddresses } from "@/lib/addresses";
 import { fmtTime, fmtUsdg } from "@/lib/novak";
@@ -12,6 +13,7 @@ import { DistributionChart } from "./DistributionChart";
 import { TradePanel } from "./TradePanel";
 import { InsightsPanel } from "./InsightsPanel";
 import { ActivityFeed } from "./ActivityFeed";
+import { LivePriceChart } from "@/components/markets/LivePriceChart";
 import { ArrowLeft } from "lucide-react";
 
 const DEFAULT_VOL: Record<string, number> = { SGOV: 0.01 };
@@ -64,11 +66,14 @@ export function DistributionMarketView({ marketId }: { marketId: Hex }) {
         <ArrowLeft className="h-3.5 w-3.5" /> Back to markets
       </Link>
 
-      <div className="mt-4 border border-gray-300 bg-paper p-6 rounded-sm">
+      <div className="relative mt-4 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-6">
+        <div className="mb-3 sm:absolute sm:right-5 sm:top-5 sm:mb-0">
+          <AssetBadge ticker={view.ticker} category={view.boundaries[0]?.category} name={view.feed ? feedByAddress(view.feed)?.name : undefined} />
+        </div>
         <p className="font-mono text-xs uppercase tracking-wider text-gray-500 font-semibold">
           Distribution market · {view.ticker} · {statusText}
         </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{view.question.split(" (")[0]}</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-ink sm:pr-56 sm:text-3xl">{view.question.split(" (")[0]}</h1>
         <div className="mt-3 flex flex-wrap gap-4 font-mono text-xs text-gray-600">
           {view.at !== undefined && <span>Resolves on the Chainlink round in effect at {fmtTime(view.at)}</span>}
           <span>Liquidity b = {fmtUsdg(view.b)} USDG</span>
@@ -84,6 +89,7 @@ export function DistributionMarketView({ marketId }: { marketId: Hex }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="flex min-w-0 flex-col gap-6">
+          <LivePriceChart feed={view.feed} ticker={view.ticker} thresholds={view.thresholds} />
           <DistributionChart
             labels={view.labels}
             prices={view.prices}
@@ -98,7 +104,7 @@ export function DistributionMarketView({ marketId }: { marketId: Hex }) {
           )}
           <ActivityFeed trades={trades ?? []} labels={view.labels} startPrices={view.labels.map(() => 1 / view.nBuckets)} />
 
-          <div className="border border-gray-300 bg-paper p-5 rounded-sm">
+          <div className="rounded-2xl border border-violet-100 bg-white p-5">
             <p className="font-semibold text-ink">How this resolves (the dispute layer)</p>
             <p className="mt-1 text-sm text-gray-600">
               Each range boundary is its own yes/no Novak event. Independent resolvers read the Chainlink round at T and

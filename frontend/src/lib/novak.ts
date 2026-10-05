@@ -18,6 +18,9 @@ import {
   decodeCorporateActionSpec,
   decodePriceAtSpec,
   decodeTradingStatusSpec,
+  decodeFedRateSpec,
+  feedByAddress,
+  feedBySymbol,
   eventBusAbi,
   eventComposerAbi,
   eventRegistryAbi,
@@ -49,17 +52,37 @@ const SESSION_LABEL: Record<TradingSession, string> = {
   [TradingSession.Overnight]: "overnight",
 };
 
-/** Human-readable title + source label for a primitive event's on-chain spec. */
-export function describeSpec(spec: EventSpecInput): { title: string; source: string } {
+export type MarketCategory = "stocks" | "bonds" | "crypto" | "macro" | "corporate" | "trading" | "other";
+
+export interface SpecInfo {
+  title: string;
+  source: string;
+  /** Chainlink feed (Robinhood Chain mainnet) behind this event, if any. */
+  feed?: Hex;
+  ticker?: string;
+  category: MarketCategory;
+}
+
+const categoryForFeed = (feed: string): MarketCategory => {
+  const f = feedByAddress(feed);
+  if (!f) return "other";
+  return f.assetClass === "Bond" ? "bonds" : f.assetClass === "Equity" ? "stocks" : "crypto";
+};
+
+/** Human-readable title, source, Chainlink feed and category for a primitive event's on-chain spec. */
+export function describeSpec(spec: EventSpecInput): SpecInfo {
   const name = sourceName(spec.sourceId);
   try {
     if (name === SOURCES.priceAt) {
       const s = decodePriceAtSpec(spec.spec);
-      const t = tickerFor(s.feed, CHAINLINK_FEEDS_MAINNET);
+      const t = feedByAddress(s.feed)?.symbol ?? tickerFor(s.feed, CHAINLINK_FEEDS_MAINNET);
       const cmp = s.comparator === Comparator.Gte ? "≥" : "≤";
       return {
         title: `${t} ${cmp} $${(Number(s.threshold) / 1e8).toLocaleString()} at ${fmtTime(s.at)}`,
         source: "Chainlink price (Robinhood Chain mainnet)",
+        feed: s.feed,
+        ticker: t,
+        category: categoryForFeed(s.feed),
       };
     }
     if (name === SOURCES.corporateAction) {
@@ -69,16 +92,35 @@ export function describeSpec(spec: EventSpecInput): { title: string; source: str
       return {
         title: `${t}: ${what} corporate action effective ${fmtTime(s.windowStart)} – ${fmtTime(s.windowEnd)}`,
         source: "ERC-8056 stock token (Robinhood Chain mainnet)",
+        feed: feedBySymbol(t)?.address,
+        ticker: t,
+        category: "corporate",
       };
     }
     if (name === SOURCES.tradingStatus) {
       const s = decodeTradingStatusSpec(spec.spec);
-      return { title: `${s.symbol} NOT tradable (${SESSION_LABEL[s.session]})`, source: "Robinhood asset registry" };
+      return {
+        title: `${s.symbol} NOT tradable (${SESSION_LABEL[s.session]})`,
+        source: "Robinhood asset registry",
+        feed: feedBySymbol(s.symbol)?.address,
+        ticker: s.symbol,
+        category: "trading",
+      };
+    }
+    if (name === SOURCES.fedRate) {
+      const s = decodeFedRateSpec(spec.spec);
+      const cmp = s.comparator === Comparator.Gte ? "≥" : "≤";
+      return {
+        title: `Fed funds upper bound ${cmp} ${(s.upperBoundBps / 100).toFixed(2)}% on ${new Date(Number(s.date) * 1000).toISOString().slice(0, 10)}`,
+        source: "FRED DFEDTARU (St. Louis Fed)",
+        ticker: "FED",
+        category: "macro",
+      };
     }
   } catch {
     /* malformed spec — fall through */
   }
-  return { title: `Custom event (${spec.sourceId.slice(0, 10)}…)`, source: "custom source" };
+  return { title: `Custom event (${spec.sourceId.slice(0, 10)}…)`, source: "custom source", category: "other" };
 }
 
 export type CompositeStatusLabel = "Unresolved" | "True" | "False" | "Voided";
@@ -107,6 +149,16 @@ export interface EventNode {
   children?: EventNode[];
   /** Earliest openTimestamp among leaf primitives — when trading must close. */
   opensAt?: bigint;
+  /** Chainlink feed / ticker / category of the (first) underlying asset. */
+  feed?: Hex;
+  ticker?: string;
+  category?: MarketCategory;
+}
+
+/** Every distinct underlying ticker in an event tree (leaf order). */
+export function tickersOf(node: Pick<EventNode, "ticker" | "children">): string[] {
+  const leaves = node.children?.length ? node.children.flatMap(tickersOf) : node.ticker ? [node.ticker] : [];
+  return [...new Set(leaves)];
 }
 
 export async function loadEventNode(pc: PublicClient, id: Hex, depth = 0): Promise<EventNode> {
@@ -128,7 +180,19 @@ export async function loadEventNode(pc: PublicClient, id: Hex, depth = 0): Promi
       args: [id],
     })) as EventSpecInput;
     const d = describeSpec(spec);
-    return { id, kind: "primitive", title: d.title, source: d.source, availability, status, spec, opensAt: spec.openTimestamp };
+    return {
+      id,
+      kind: "primitive",
+      title: d.title,
+      source: d.source,
+      availability,
+      status,
+      spec,
+      opensAt: spec.openTimestamp,
+      feed: d.feed,
+      ticker: d.ticker,
+      category: d.category,
+    };
   }
 
   const [cs, cStatusRaw] = await Promise.all([
@@ -158,6 +222,9 @@ export async function loadEventNode(pc: PublicClient, id: Hex, depth = 0): Promi
         : `${OP_LABEL[op]} composite`,
     availability,
     compositeStatus: COMPOSITE_STATUS[cStatus],
+    feed: children.find((c) => c.feed)?.feed,
+    ticker: children.find((c) => c.ticker)?.ticker,
+    category: children.find((c) => c.category)?.category,
     op,
     windowSeconds: window || undefined,
     children,

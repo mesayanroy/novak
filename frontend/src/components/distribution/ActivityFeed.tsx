@@ -18,7 +18,7 @@ export function ActivityFeed({ trades, labels, startPrices }: { trades: TradeRow
   const y = (p: number) => H - p * H;
 
   return (
-    <div className="border border-gray-300 bg-paper p-5 rounded-sm">
+    <div className="rounded-2xl border border-violet-100 bg-white p-5">
       <p className="font-semibold text-ink">Activity</p>
       {trades.length === 0 ? (
         <p className="mt-2 text-sm text-gray-500">No trades yet — every range starts at an equal probability.</p>

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RainbowKitProvider, lightTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
 import { useState, type ReactNode } from "react";
-import { wagmiConfig } from "@/lib/wagmi";
+import { activeChain, wagmiConfig } from "@/lib/wagmi";
 
 // RainbowKit always has an "accent" concept (the Connect button, selected
 // states in the wallet modal) — pinned to pure black/white here so it never
@@ -24,7 +24,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={novakRainbowKitTheme}>{children}</RainbowKitProvider>
+        <RainbowKitProvider theme={novakRainbowKitTheme} initialChain={activeChain} modalSize="wide">{children}</RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

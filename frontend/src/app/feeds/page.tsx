@@ -112,6 +112,7 @@ export default function FeedsPage() {
               <th className="p-3">Updated</th>
               <th className="p-3">Hours</th>
               <th className="p-3">Feed</th>
+              <th className="p-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 font-mono bg-paper">
@@ -141,6 +142,14 @@ export default function FeedsPage() {
                     >
                       {r.feed.slice(0, 8)}…
                     </a>
+                  </td>
+                  <td className="p-3 text-right">
+                    <Link
+                      href={`/markets?create=${r.symbol}`}
+                      className="link-plain rounded-full bg-violet-600 px-3 py-1 font-sans text-[11px] font-semibold text-white hover:bg-violet-700"
+                    >
+                      Trade
+                    </Link>
                   </td>
                 </tr>
               );
