@@ -10,7 +10,7 @@ import { IEventRegistry } from "./interfaces/IEventRegistry.sol";
 ///         full design rationale and docs/protocol-spec.md /
 ///         docs/threat-model.md for the numbers and their limitations.
 /// @dev Every committee member in a given tier bonds the *same* fixed
-///      amount (`TIER1_BOND`/`TIER2_BOND`) — this is a deliberate
+///      amount (`TIER1_BOND`/`TIER2_BOND`, set once at deployment) — this is a deliberate
 ///      simplification of the "weight = min(bondStaked, cap)" idea from the
 ///      source design: with no on-chain staking token in the MVP (same
 ///      deferred-scope decision as base-layer quorum), fixed equal bonds
@@ -19,15 +19,33 @@ import { IEventRegistry } from "./interfaces/IEventRegistry.sol";
 ///      a committee, without inventing a variable-stake mechanism the rest
 ///      of the protocol doesn't have.
 contract DisputeManager is IDisputeManager {
-    uint256 public constant DISPUTE_BOND = 0.01 ether;
-    uint256 public constant TIER1_BOND = 0.03 ether;
-    uint256 public constant TIER2_BOND = 0.08 ether;
+    /// @notice Bonds scale from one deploy-time unit in a FIXED 1 : 3 : 8 ratio
+    ///         (dispute : Tier-1 vote : Tier-2 vote), so every deployment keeps
+    ///         the same escalation economics — each tier costs more to sway than
+    ///         the last. Mainnet default unit: 0.01 ETH (0.01 / 0.03 / 0.08).
+    ///         A testnet can use a smaller unit so faucet-funded resolvers can
+    ///         actually post committee bonds.
+    uint256 public constant DEFAULT_BOND_UNIT = 0.01 ether;
+    uint256 public constant TIER1_BOND_MULTIPLE = 3;
+    uint256 public constant TIER2_BOND_MULTIPLE = 8;
+    /// @dev Floor so a misconfigured deploy can't make disputes free.
+    uint256 public constant MIN_BOND_UNIT = 1e12; // 0.000001 ETH
+
+    uint256 public immutable DISPUTE_BOND;
+    uint256 public immutable TIER1_BOND;
+    uint256 public immutable TIER2_BOND;
 
     uint256 public constant TIER1_COMMITTEE_SIZE = 7;
     uint256 public constant TIER2_COMMITTEE_SIZE = 15;
 
     uint64 public constant TIER1_WINDOW = 1 hours;
     uint64 public constant TIER2_WINDOW = 2 hours;
+
+    /// @notice Commit-reveal seeding windows, used only when the authorized
+    ///         pool is larger than the tier's committee (otherwise the
+    ///         committee is the whole pool and there is nothing to draw).
+    uint64 public constant SEED_COMMIT_WINDOW = 10 minutes;
+    uint64 public constant SEED_REVEAL_WINDOW = 10 minutes;
 
     /// @dev Agreement is measured against the fixed committee size decided
     ///      at selection time, not against however many members bothered to
@@ -52,10 +70,19 @@ contract DisputeManager is IDisputeManager {
     struct Tier {
         address[] committee;
         uint256 bondAmount;
-        uint64 deadline;
+        uint64 deadline; // voting deadline; 0 until the committee is drawn
         uint256 trueVotes;
         uint256 falseVotes;
         mapping(address => VoteChoice) votes;
+        // --- commit-reveal seeding (large pools only) ---
+        bool seeding;
+        uint64 commitDeadline;
+        uint64 revealDeadline;
+        uint32 commits;
+        uint32 reveals;
+        bytes32 seedAcc; // XOR of revealed salts
+        mapping(address => bytes32) commitments;
+        mapping(address => bool) revealedSeed;
     }
 
     mapping(bytes32 => DisputeCase) private _cases;
@@ -73,9 +100,14 @@ contract DisputeManager is IDisputeManager {
     event PaymentCredited(address indexed to, uint256 amount);
     event Withdrawn(address indexed to, uint256 amount);
 
-    constructor(address registry_, address treasury_) {
+    /// @param bondUnit_ DISPUTE_BOND; Tier-1/Tier-2 vote bonds are 3x / 8x it.
+    constructor(address registry_, address treasury_, uint256 bondUnit_) {
+        require(bondUnit_ >= MIN_BOND_UNIT, "DisputeManager: bond unit too small");
         registry = IEventRegistry(registry_);
         treasury = treasury_;
+        DISPUTE_BOND = bondUnit_;
+        TIER1_BOND = bondUnit_ * TIER1_BOND_MULTIPLE;
+        TIER2_BOND = bondUnit_ * TIER2_BOND_MULTIPLE;
     }
 
     // --- Entry points ---
@@ -145,6 +177,7 @@ contract DisputeManager is IDisputeManager {
         require(c.exists && !c.resolved && c.tier == 1, "DisputeManager: not escalatable");
 
         Tier storage t1 = _tiers[eventId][1];
+        require(t1.deadline != 0, "DisputeManager: committee not drawn yet");
         require(block.timestamp >= t1.deadline, "DisputeManager: tier1 window still open");
         require(!_hasConverged(t1), "DisputeManager: tier1 already converged");
 
@@ -165,6 +198,7 @@ contract DisputeManager is IDisputeManager {
         require(c.exists && !c.resolved && c.tier == 2, "DisputeManager: not voidable");
 
         Tier storage t2 = _tiers[eventId][2];
+        require(t2.deadline != 0, "DisputeManager: committee not drawn yet");
         require(block.timestamp >= t2.deadline, "DisputeManager: tier2 window still open");
         require(!_hasConverged(t2), "DisputeManager: tier2 already converged");
 
@@ -179,6 +213,80 @@ contract DisputeManager is IDisputeManager {
         if (c.hasOriginalProposal && c.disputerBond > 0) {
             _credit(c.disputer, c.disputerBond);
         }
+    }
+
+    // --- Commit-reveal committee seeding (large pools only) ---
+
+    /// @dev Commitment = keccak256(abi.encode(eventId, tier, resolver, salt)).
+    ///      Binding the resolver's address stops anyone copying another's
+    ///      commitment and replaying its reveal.
+    function commitSeed(bytes32 eventId, bytes32 commitment) external {
+        Tier storage t = _activeSeedingTier(eventId);
+        require(block.timestamp < t.commitDeadline, "DisputeManager: commit window closed");
+        require(registry.isAuthorizedResolver(msg.sender), "DisputeManager: not an authorized resolver");
+        require(t.commitments[msg.sender] == bytes32(0), "DisputeManager: already committed");
+        require(commitment != bytes32(0), "DisputeManager: empty commitment");
+        t.commitments[msg.sender] = commitment;
+        t.commits++;
+        emit SeedCommitted(eventId, _cases[eventId].tier, msg.sender);
+    }
+
+    function revealSeed(bytes32 eventId, bytes32 salt) external {
+        Tier storage t = _activeSeedingTier(eventId);
+        uint8 tierNum = _cases[eventId].tier;
+        require(block.timestamp >= t.commitDeadline, "DisputeManager: commit window still open");
+        require(block.timestamp < t.revealDeadline, "DisputeManager: reveal window closed");
+        require(!t.revealedSeed[msg.sender], "DisputeManager: already revealed");
+        require(
+            t.commitments[msg.sender] != bytes32(0)
+                && t.commitments[msg.sender] == keccak256(abi.encode(eventId, tierNum, msg.sender, salt)),
+            "DisputeManager: reveal does not match commitment"
+        );
+        t.revealedSeed[msg.sender] = true;
+        t.reveals++;
+        t.seedAcc ^= salt; // order-independent: no advantage to revealing last
+        emit SeedRevealed(eventId, tierNum, msg.sender);
+    }
+
+    /// @notice Draws once the reveal window ends — or as soon as the commit
+    ///         window has ended and every committer has revealed.
+    function drawCommittee(bytes32 eventId) external {
+        Tier storage t = _activeSeedingTier(eventId);
+        uint8 tierNum = _cases[eventId].tier;
+        bool everyoneRevealed = t.commits > 0 && t.reveals == t.commits && block.timestamp >= t.commitDeadline;
+        require(block.timestamp >= t.revealDeadline || everyoneRevealed, "DisputeManager: seeding still in progress");
+
+        // Committers that withheld their reveal are excluded from the draw, so
+        // withholding can only remove yourself — never steer who is chosen.
+        address[] memory pool = registry.getAuthorizedResolvers();
+        address[] memory candidates = new address[](pool.length);
+        uint256 n = 0;
+        for (uint256 i = 0; i < pool.length; i++) {
+            address r = pool[i];
+            if (t.commitments[r] != bytes32(0) && !t.revealedSeed[r]) continue;
+            candidates[n++] = r;
+        }
+        assembly {
+            mstore(candidates, n)
+        }
+
+        // With no reveals at all, fall back to block data so a dispute can't
+        // stall forever (weaker, but liveness beats a stuck event).
+        bytes32 seed = t.reveals > 0
+            ? keccak256(abi.encode(eventId, tierNum, t.seedAcc, t.reveals))
+            : keccak256(abi.encode(eventId, tierNum, blockhash(block.number - 1), block.timestamp));
+
+        t.seeding = false;
+        t.committee = _draw(candidates, seed, tierNum == 1 ? TIER1_COMMITTEE_SIZE : TIER2_COMMITTEE_SIZE);
+        t.deadline = uint64(block.timestamp) + (tierNum == 1 ? TIER1_WINDOW : TIER2_WINDOW);
+        emit TierOpened(eventId, tierNum, t.committee, t.deadline);
+    }
+
+    function _activeSeedingTier(bytes32 eventId) private view returns (Tier storage t) {
+        DisputeCase storage c = _cases[eventId];
+        require(c.exists && !c.resolved, "DisputeManager: no open dispute");
+        t = _tiers[eventId][c.tier];
+        require(t.seeding, "DisputeManager: committee not seeding");
     }
 
     /// @notice Withdraws everything owed to the caller.
@@ -197,10 +305,22 @@ contract DisputeManager is IDisputeManager {
         Tier storage t = _tiers[eventId][tierNum];
         uint256 size = tierNum == 1 ? TIER1_COMMITTEE_SIZE : TIER2_COMMITTEE_SIZE;
         t.bondAmount = tierNum == 1 ? TIER1_BOND : TIER2_BOND;
-        t.deadline = uint64(block.timestamp) + (tierNum == 1 ? TIER1_WINDOW : TIER2_WINDOW);
-        t.committee = _selectCommittee(eventId, tierNum, size);
+        address[] memory pool = registry.getAuthorizedResolvers();
 
-        emit TierOpened(eventId, tierNum, t.committee, t.deadline);
+        if (pool.length <= size) {
+            // Everyone is on the committee — nothing to draw, nothing to steer.
+            t.committee = pool;
+            t.deadline = uint64(block.timestamp) + (tierNum == 1 ? TIER1_WINDOW : TIER2_WINDOW);
+            emit TierOpened(eventId, tierNum, t.committee, t.deadline);
+            return;
+        }
+
+        // Larger pool: draw from commit-reveal salts, not from block data the
+        // sequencer can predict or order around (prevrandao is 1 on Arbitrum).
+        t.seeding = true;
+        t.commitDeadline = uint64(block.timestamp) + SEED_COMMIT_WINDOW;
+        t.revealDeadline = t.commitDeadline + SEED_REVEAL_WINDOW;
+        emit SeedingStarted(eventId, tierNum, t.commitDeadline, t.revealDeadline);
     }
 
     function _submitTierVote(bytes32 eventId, uint8 tierNum, bool outcome) private {
@@ -208,6 +328,7 @@ contract DisputeManager is IDisputeManager {
         require(c.exists && !c.resolved && c.tier == tierNum, "DisputeManager: not in this tier");
 
         Tier storage t = _tiers[eventId][tierNum];
+        require(t.deadline != 0, "DisputeManager: committee not drawn yet");
         require(block.timestamp < t.deadline, "DisputeManager: tier window closed");
         require(msg.value == t.bondAmount, "DisputeManager: incorrect bond");
         require(_isCommitteeMember(t.committee, msg.sender), "DisputeManager: not on committee");
@@ -332,36 +453,23 @@ contract DisputeManager is IDisputeManager {
 
     // --- Internal: committee selection ---
 
-    /// @dev Pseudo-random, seeded from block data — sufficient to spread
-    ///      selection across the authorized-resolver pool for the MVP, but
-    ///      NOT resistant to a miner/validator choosing whether to include
-    ///      the triggering transaction in a favorable block. See
-    ///      docs/threat-model.md. When the pool is at or below the tier
-    ///      size, every authorized resolver is simply on the committee —
-    ///      this is what every test in this repo exercises, since none spin
-    ///      up 7+ resolver addresses.
-    function _selectCommittee(bytes32 eventId, uint8 tierNum, uint256 size)
+    /// @dev Partial Fisher-Yates over `candidates` with `seed`; returns the
+    ///      whole list when it already fits.
+    function _draw(address[] memory candidates, bytes32 seed, uint256 size)
         private
-        view
+        pure
         returns (address[] memory)
     {
-        address[] memory pool = registry.getAuthorizedResolvers();
-        if (pool.length <= size) {
-            return pool;
-        }
-
-        bytes32 seed =
-            keccak256(abi.encode(eventId, tierNum, blockhash(block.number - 1), block.timestamp));
-        uint256 remaining = pool.length;
+        if (candidates.length <= size) return candidates;
+        uint256 remaining = candidates.length;
         for (uint256 i = 0; i < size; i++) {
             uint256 j = i + (uint256(keccak256(abi.encode(seed, i))) % remaining);
-            (pool[i], pool[j]) = (pool[j], pool[i]);
+            (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
             remaining--;
         }
-
         address[] memory committee = new address[](size);
         for (uint256 i = 0; i < size; i++) {
-            committee[i] = pool[i];
+            committee[i] = candidates[i];
         }
         return committee;
     }
@@ -410,6 +518,15 @@ contract DisputeManager is IDisputeManager {
     {
         DisputeCase storage c = _cases[eventId];
         return (c.exists, c.resolved, c.tier, c.hasOriginalProposal);
+    }
+
+    function getSeedState(bytes32 eventId, uint8 tier)
+        external
+        view
+        returns (bool seeding, uint64 commitDeadline, uint64 revealDeadline, uint32 commits, uint32 reveals, bool drawn)
+    {
+        Tier storage t = _tiers[eventId][tier];
+        return (t.seeding, t.commitDeadline, t.revealDeadline, t.commits, t.reveals, t.deadline != 0);
     }
 
     function getTierTally(bytes32 eventId, uint8 tier)

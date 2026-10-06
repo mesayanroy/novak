@@ -17,10 +17,13 @@ pragma solidity ^0.8.24;
 ///      Every fixed number here (committee sizes, bonds, windows, the 66%
 ///      agreement bar, the burn/reward/treasury split) is a stated MVP
 ///      constant, not a final economic design — see docs/protocol-spec.md.
-///      Committee selection is pseudo-random (seeded from block data), which
-///      is NOT resistant to a miner/validator choosing when to include the
-///      selecting transaction — a documented limitation, see
-///      docs/threat-model.md.
+///      Committee selection: when the authorized pool fits in the tier
+///      (≤ committee size) the committee is the whole pool. When it doesn't,
+///      the tier opens with a commit-reveal seeding phase — resolvers commit
+///      to secret salts, reveal them, and the committee is drawn from their
+///      XOR, so no single party (sequencer included) can predict or steer the
+///      draw; committers that don't reveal are excluded from it. See
+///      docs/protocol-spec.md and docs/threat-model.md.
 interface IDisputeManager {
     enum VoteChoice {
         NotVoted,
@@ -39,6 +42,9 @@ interface IDisputeManager {
     event TierConverged(bytes32 indexed eventId, uint8 indexed tier, bool outcome);
     event TierEscalated(bytes32 indexed eventId, uint8 indexed toTier);
     event DisputeVoided(bytes32 indexed eventId);
+    event SeedingStarted(bytes32 indexed eventId, uint8 indexed tier, uint64 commitDeadline, uint64 revealDeadline);
+    event SeedCommitted(bytes32 indexed eventId, uint8 indexed tier, address indexed resolver);
+    event SeedRevealed(bytes32 indexed eventId, uint8 indexed tier, address indexed resolver);
 
     /// @notice Challenges a `ProposedOutcome` within its dispute window.
     ///         Requires posting exactly `DISPUTE_BOND` wei. Opens Tier-1.
@@ -73,6 +79,20 @@ interface IDisputeManager {
     ///         the ladder. Never escalates to a vote of any other kind.
     function voidAfterTier2Timeout(bytes32 eventId) external;
 
+    /// @notice Seeding phase (large pools only): an authorized resolver commits
+    ///         to `keccak256(abi.encode(eventId, tier, msg.sender, salt))`
+    ///         before the commit deadline.
+    function commitSeed(bytes32 eventId, bytes32 commitment) external;
+
+    /// @notice Seeding phase: reveals the committed salt between the commit and
+    ///         reveal deadlines. The salts are XOR-combined into the draw seed.
+    function revealSeed(bytes32 eventId, bytes32 salt) external;
+
+    /// @notice Permissionless: draws the active tier's committee once the reveal
+    ///         window has ended (or every committer has revealed), excluding
+    ///         committers that never revealed; then the voting window starts.
+    function drawCommittee(bytes32 eventId) external;
+
     /// @notice Withdraws all ETH (bond refunds, rewards, treasury share)
     ///         credited to the caller. Payouts are pull-based so no
     ///         recipient can block a resolution by rejecting ETH.
@@ -92,6 +112,13 @@ interface IDisputeManager {
         external
         view
         returns (bool exists, bool resolved, uint8 tier, bool hasOriginalProposal);
+
+    /// @notice Seeding state of `tier` (all zero / `drawn` true for a tier that
+    ///         never needed seeding).
+    function getSeedState(bytes32 eventId, uint8 tier)
+        external
+        view
+        returns (bool seeding, uint64 commitDeadline, uint64 revealDeadline, uint32 commits, uint32 reveals, bool drawn);
 
     function getTierTally(bytes32 eventId, uint8 tier)
         external
