@@ -38,6 +38,9 @@ import { StockLendingGuard } from "../consumers/StockLendingGuard.sol";
 ///   COLLATERAL_TOKEN_ADDRESS  (optional) see above
 ///   MARKET_FEE_BPS            (default: 100 = 1%) — binary Market fee on the losing pool
 ///   TRADE_FEE_BPS             (default: 100 = 1%) — DistributionMarket fee per trade
+///   DISPUTE_BOND_UNIT         (default: 0.01 ether) — DISPUTE_BOND; Tier-1/Tier-2 vote
+///                             bonds are 3x / 8x it (fixed ratio). Testnet uses a smaller
+///                             unit so faucet-funded resolvers can post committee bonds.
 ///
 /// Usage (Robinhood Chain testnet):
 ///   forge script script/Deploy.s.sol --rpc-url robinhood_testnet --broadcast --verify
@@ -53,6 +56,7 @@ contract Deploy is Script {
         address collateral;
         uint256 marketFeeBps;
         uint256 tradeFeeBps;
+        uint256 bondUnit;
         address[] resolvers;
     }
 
@@ -110,6 +114,7 @@ contract Deploy is Script {
         console.log("DistributionMarket:  ", address(dist));
         console.log("StockLendingGuard:   ", address(guard));
         console.log("Resolvers authorized:", cfg.resolvers.length);
+        console.log("Dispute bond unit (wei):", cfg.bondUnit);
     }
 
     function _config() internal view returns (Config memory cfg) {
@@ -120,6 +125,7 @@ contract Deploy is Script {
         cfg.collateral = vm.envOr("COLLATERAL_TOKEN_ADDRESS", address(0));
         cfg.marketFeeBps = vm.envOr("MARKET_FEE_BPS", uint256(100));
         cfg.tradeFeeBps = vm.envOr("TRADE_FEE_BPS", uint256(100));
+        cfg.bondUnit = vm.envOr("DISPUTE_BOND_UNIT", uint256(0.01 ether));
         cfg.resolvers = vm.envOr("RESOLVER_ADDRESSES", ",", new address[](0));
         require(
             cfg.collateral != address(0) || block.chainid != ROBINHOOD_MAINNET,
@@ -136,7 +142,7 @@ contract Deploy is Script {
         c.vault = new TreasuryVault(
             cfg.collateral, address(c.registry), address(c.composer), cfg.deployer
         );
-        c.disputeManager = new DisputeManager(address(c.registry), address(c.vault));
+        c.disputeManager = new DisputeManager(address(c.registry), address(c.vault), cfg.bondUnit);
         c.registry.setDisputeManager(address(c.disputeManager));
         c.vault.setDisputeManager(address(c.disputeManager));
         c.bus = new EventBus(address(c.registry), address(c.composer));

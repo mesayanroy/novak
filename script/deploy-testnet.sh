@@ -7,7 +7,11 @@
 #   bash script/deploy-testnet.sh
 #
 # .env needs: DEPLOYER_PRIVATE_KEY, R1_PRIVATE_KEY (and optionally
-# R2_PRIVATE_KEY / R3_PRIVATE_KEY; without them the deployer doubles as r2).
+# R2_PRIVATE_KEY / R3_PRIVATE_KEY; without R2 the deployer doubles as r2).
+# R3 may be given as R3_ADDRESS alone (authorize now, add the key later).
+# DISPUTE_BOND_UNIT defaults to 0.0005 ETH here (bonds 0.0005 / 0.0015 / 0.004,
+# same 1:3:8 ratio as the 0.01 ETH mainnet default) so faucet-funded resolvers
+# can afford committee bonds.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -29,10 +33,13 @@ R1=$($CAST wallet address --private-key "$R1_PRIVATE_KEY")
 R2=$DEPLOYER
 [[ -n "${R2_PRIVATE_KEY:-}" ]] && R2=$($CAST wallet address --private-key "$R2_PRIVATE_KEY")
 RESOLVERS="$R1,$R2"
-[[ -n "${R3_PRIVATE_KEY:-}" ]] && RESOLVERS="$RESOLVERS,$($CAST wallet address --private-key "$R3_PRIVATE_KEY")"
+if [[ -n "${R3_PRIVATE_KEY:-}" ]]; then RESOLVERS="$RESOLVERS,$($CAST wallet address --private-key "$R3_PRIVATE_KEY")"
+elif [[ -n "${R3_ADDRESS:-}" ]]; then RESOLVERS="$RESOLVERS,$R3_ADDRESS"; fi
+export DISPUTE_BOND_UNIT="${DISPUTE_BOND_UNIT:-500000000000000}"
 
 echo "deployer  $DEPLOYER  ($($CAST balance "$DEPLOYER" --ether --rpc-url "$RPC") ETH)"
 echo "resolvers $RESOLVERS"
+echo "bond unit $DISPUTE_BOND_UNIT wei"
 if [[ -n "${EXPECT_DEPLOYER:-}" && "${DEPLOYER,,}" != "${EXPECT_DEPLOYER,,}" ]]; then echo "deployer key does not match $EXPECT_DEPLOYER"; exit 1; fi
 if [[ -n "${EXPECT_R1:-}" && "${R1,,}" != "${EXPECT_R1,,}" ]]; then echo "r1 key does not match $EXPECT_R1"; exit 1; fi
 
@@ -42,7 +49,7 @@ RESOLVER_ADDRESSES="$RESOLVERS" "$FORGE" script script/Deploy.s.sol \
   || { echo "(if only verification failed, the deploy itself may have succeeded — continuing)"; }
 
 node script/export-deployment.mjs 46630
-pnpm --filter @novak/sdk gen && pnpm --filter @novak/sdk build
+pnpm --filter @novakoracle/sdk gen && pnpm --filter @novakoracle/sdk build
 
 echo "--- on-chain code check"
 node -e '

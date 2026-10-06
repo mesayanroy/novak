@@ -1,7 +1,7 @@
 {
   "chainId": 31337,
-  "startBlock": 6,
-  "deployedAt": "2026-10-04T17:03:54.834Z",
+  "startBlock": 5,
+  "deployedAt": "2026-10-05T22:48:55.651Z",
   "collateralIsMock": true,
   "collateral": "0x5fbdb2315678afecb367f032d93f642f64180aa3",
   "eventRegistry": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
