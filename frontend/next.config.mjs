@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   // Lets a production build run beside `next dev` without clobbering .next/.
   distDir: process.env.NEXT_DIST_DIR || ".next",
-  transpilePackages: ["@novak/sdk"],
+  transpilePackages: ["@novakoracle/sdk"],
   webpack: (config) => {
     // wagmi's Coinbase Smart Wallet connector (pulled in by "wagmi/connectors")
     // optionally depends on @coinbase/cdp-sdk's x402 payment support, which in

@@ -20,7 +20,7 @@ importers:
 
   frontend:
     dependencies:
-      '@novak/sdk':
+      '@novakoracle/sdk':
         specifier: workspace:^
         version: link:../sdk
       '@radix-ui/react-dialog':
@@ -117,7 +117,7 @@ importers:
 
   resolver:
     dependencies:
-      '@novak/sdk':
+      '@novakoracle/sdk':
         specifier: workspace:*
         version: link:../sdk
       viem:
@@ -138,10 +138,6 @@ importers:
         version: 2.1.9(@types/node@20.19.43)
 
   sdk:
-    dependencies:
-      viem:
-        specifier: ^2.56.0
-        version: 2.56.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.5.4)
     devDependencies:
       '@types/node':
         specifier: ^20.14.0
@@ -149,6 +145,9 @@ importers:
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
+      viem:
+        specifier: ^2.56.0
+        version: 2.56.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.5.4)
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.43)

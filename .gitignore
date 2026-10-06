@@ -39,3 +39,6 @@ pnpm-debug.log*
 # Nested workspace copy
 novak/
 
+
+# resolver evidence cache (RESOLVER_EVIDENCE_DIR)
+.resolver-evidence/

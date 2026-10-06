@@ -1,0 +1,68 @@
+# Render Blueprint — Novak resolver network (the backend).
+#
+# The frontend (Next.js, incl. its /api routes) is deployed separately on
+# Vercel. Everything protocol-side is on-chain, so there is no database: the
+# resolvers only need their keys and two RPC URLs.
+#
+# One web service runs all team resolver keys, each in its OWN child process
+# (own account, nonce, event index, evidence store, crash domain) — see
+# resolver/node/multi.ts. Public endpoints on the service URL:
+#   /health                     all nodes
+#   /r1/health, /r2/health…     one node
+#   /evidence/<hash>            evidence JSON behind an on-chain evidenceHash
+#
+# Plan: "starter" stays awake. "free" sleeps after 15 min without HTTP traffic,
+# which stops resolution and the keeper — only use it with an uptime pinger
+# hitting /health every few minutes.
+#
+# Secrets are NOT in this file: set RESOLVER_KEYS (and optionally
+# RESOLVER_SOURCE_RPC_URL) in the Render dashboard when the Blueprint asks.
+services:
+  - type: web
+    name: novak-resolvers
+    runtime: node
+    plan: starter
+    region: oregon
+    autoDeploy: true
+    healthCheckPath: /health
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile --filter novak-resolver... &&
+      pnpm --filter @novakoracle/sdk build &&
+      pnpm --filter novak-resolver build
+    startCommand: node resolver/dist/node/multi.js
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NOVAK_CHAIN_ID
+        value: "46630"
+      - key: RPC_URL_ROBINHOOD_TESTNET
+        value: https://rpc.testnet.chain.robinhood.com
+      # Alchemy key (recommended): resolvers then use Alchemy for both Robinhood
+      # testnet (writes) and mainnet (source reads), falling back to the public
+      # RPCs automatically when a provider is rate-limited or down.
+      - key: ALCHEMY_API_KEY
+        sync: false
+      # Optional explicit mainnet URL (takes precedence over Alchemy).
+      - key: RESOLVER_SOURCE_RPC_URL
+        sync: false
+      # Optional Slack/Discord webhook: alerts when a resolver key runs low on ETH
+      # (default threshold: 2 Tier-1 bonds + gas).
+      - key: RESOLVER_ALERT_WEBHOOK_URL
+        sync: false
+      # Comma-separated resolver private keys, in r1,r2,r3 order.
+      - key: RESOLVER_KEYS
+        sync: false
+      - key: RESOLVER_IDS
+        value: r1,r2,r3
+      # r2 (the deployer key) runs the keeper duties.
+      - key: RESOLVER_KEEPER_INDEX
+        value: "2"
+      - key: RESOLVER_POLL_INTERVAL_MS
+        value: "15000"
+      # Evidence JSON is written here and reloaded on restart; on boot each node
+      # also re-derives any missing evidence and keeps it only if its hash
+      # matches the on-chain commitment. (Add a Render disk at this path to
+      # keep it across deploys too.)
+      - key: RESOLVER_EVIDENCE_DIR
+        value: .resolver-evidence

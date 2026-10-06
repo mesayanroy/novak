@@ -46,10 +46,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build sdk + resolver
-        run: pnpm --filter @novak/sdk build && pnpm --filter novak-resolver build
+        run: pnpm --filter @novakoracle/sdk build && pnpm --filter novak-resolver build
 
       - name: Run TS tests
-        run: pnpm --filter @novak/sdk test && pnpm --filter novak-resolver test
+        run: pnpm --filter @novakoracle/sdk test && pnpm --filter novak-resolver test
 
       - name: Build frontend
         run: pnpm --filter novak-frontend build
