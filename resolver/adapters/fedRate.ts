@@ -1,4 +1,4 @@
-import { Comparator, SOURCES, decodeFedRateSpec } from "@novak/sdk";
+import { Comparator, SOURCES, decodeFedRateSpec } from "@novakoracle/sdk";
 import type { Observation, ObserveContext, SourceAdapter } from "./types.js";
 
 /** FRED's public CSV endpoint — no API key required. */

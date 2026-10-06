@@ -16,7 +16,7 @@ import {
   encodeTradingStatusSpec,
   robinhood,
   type EventSpecInput,
-} from "@novak/sdk";
+} from "@novakoracle/sdk";
 import { ChainlinkPriceAtAdapter } from "../adapters/chainlinkPriceAt.js";
 import { CorporateActionAdapter } from "../adapters/corporateAction.js";
 import { TradingStatusAdapter } from "../adapters/tradingStatus.js";

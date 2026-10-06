@@ -1,4 +1,4 @@
-import { SOURCES, TradingSession, decodeTradingStatusSpec } from "@novak/sdk";
+import { SOURCES, TradingSession, decodeTradingStatusSpec } from "@novakoracle/sdk";
 import type { Observation, ObserveContext, SourceAdapter } from "./types.js";
 
 export const RH_ASSETS_URL = "https://api.robinhood.com/rhj/assets";

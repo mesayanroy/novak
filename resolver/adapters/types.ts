@@ -1,4 +1,4 @@
-import type { EventSpecInput, Hex } from "@novak/sdk";
+import type { EventSpecInput, Hex } from "@novakoracle/sdk";
 
 /**
  * A SourceAdapter turns an on-chain event definition (`EventSpec`, whose

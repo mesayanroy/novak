@@ -53,7 +53,7 @@ implementing `SourceAdapter` (`adapters/types.ts`), registering it in
 ## Running
 
 ```bash
-pnpm --filter @novak/sdk build && pnpm --filter novak-resolver build
+pnpm --filter @novakoracle/sdk build && pnpm --filter novak-resolver build
 RESOLVER_ID=r1 RESOLVER_PRIVATE_KEY=0x... RESOLVER_KEEPER=true RESOLVER_HTTP_PORT=8787 \
   pnpm --filter novak-resolver start
 ```
@@ -61,7 +61,7 @@ RESOLVER_ID=r1 RESOLVER_PRIVATE_KEY=0x... RESOLVER_KEEPER=true RESOLVER_HTTP_POR
 Run three nodes with different keys for a 2-of-3 quorum. Each key must be
 authorized (`RESOLVER_ADDRESSES` at deploy time, or
 `setResolverAuthorization`) and hold a little testnet ETH for gas — plus the
-Tier-1 bond (0.03 ETH) to vote in disputes.
+Tier-1 bond (3 × the deployment's bond unit: 0.0015 ETH on testnet, 0.03 ETH at the default unit) to vote in disputes.
 
 | Env | Default | |
 |---|---|---|
@@ -75,7 +75,7 @@ Tier-1 bond (0.03 ETH) to vote in disputes.
 | `RESOLVER_POLL_INTERVAL_MS` | `15000` | |
 | `RESOLVER_LOG_CHUNK` | `500000` | log-scan chunk; halves automatically on RPC limits |
 
-Addresses come from `deployments/<chainId>.json` via `@novak/sdk` — no
+Addresses come from `deployments/<chainId>.json` via `@novakoracle/sdk` — no
 per-contract env vars.
 
 ## Tools

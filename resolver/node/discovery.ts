@@ -1,5 +1,5 @@
 import { parseAbiItem, type Hex, type PublicClient } from "viem";
-import type { NovakDeployment } from "@novak/sdk";
+import type { NovakDeployment } from "@novakoracle/sdk";
 
 const eventCreated = parseAbiItem(
   "event EventCreated(bytes32 indexed eventId, bytes32 indexed sourceId, uint16 specVersion)",

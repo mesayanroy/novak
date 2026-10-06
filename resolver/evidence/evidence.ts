@@ -1,3 +1,5 @@
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { keccak256, toBytes, type Hex } from "viem";
 import type { Observation } from "../adapters/types.js";
 import { toJson } from "../lib/chain.js";
@@ -33,14 +35,43 @@ export function hashEvidence(record: EvidenceRecord): Hex {
   return keccak256(toBytes(toJson(record)));
 }
 
-/** In-memory evidence store backing the /evidence endpoint. */
+/**
+ * Evidence store backing the /evidence endpoint. In memory by default; with a
+ * directory (RESOLVER_EVIDENCE_DIR) every record is also written as
+ * `<hash>.json` and reloaded on start, so a restart doesn't lose evidence.
+ * Records are content-addressed, so several nodes can share one directory.
+ */
 export class EvidenceStore {
   private readonly records = new Map<Hex, EvidenceRecord>();
 
+  constructor(private readonly dir?: string) {
+    if (!dir) return;
+    mkdirSync(dir, { recursive: true });
+    for (const f of readdirSync(dir)) {
+      if (!/^0x[0-9a-f]{64}\.json$/.test(f)) continue;
+      try {
+        this.records.set(f.slice(0, -5) as Hex, JSON.parse(readFileSync(join(dir, f), "utf8")) as EvidenceRecord);
+      } catch {
+        /* skip a corrupt file */
+      }
+    }
+  }
+
   put(record: EvidenceRecord): Hex {
-    const hash = hashEvidence(record);
+    const hash = hashEvidence(record).toLowerCase() as Hex;
     this.records.set(hash, record);
+    if (this.dir) {
+      try {
+        writeFileSync(join(this.dir, `${hash}.json`), toJson(record));
+      } catch {
+        /* disk full / read-only: memory copy still serves */
+      }
+    }
     return hash;
+  }
+
+  has(hash: Hex): boolean {
+    return this.records.has(hash.toLowerCase() as Hex);
   }
 
   get(hash: Hex): EvidenceRecord | undefined {

@@ -1,9 +1,11 @@
-import { eventRegistryAbi } from "@novak/sdk";
+import { eventRegistryAbi } from "@novakoracle/sdk";
 import { buildAdapters } from "../adapters/index.js";
 import { EvidenceStore } from "../evidence/evidence.js";
 import { loadConfig } from "../lib/config.js";
-import { chainNow, makeClients } from "../lib/chain.js";
+import { chainNow, makeClients, redactUrl } from "../lib/chain.js";
+import { BalanceWatch } from "./balanceWatch.js";
 import { EventIndex } from "./discovery.js";
+import { EvidenceBackfill } from "./evidenceBackfill.js";
 import { KeeperDuty } from "./keeper.js";
 import { makeLog } from "./log.js";
 import { ResolverDuty } from "./resolve.js";
@@ -37,17 +39,21 @@ async function main(): Promise<void> {
   });
   log.info(
     `starting ${c.account.address} on chain ${config.chainId} (registry ${c.deployment.eventRegistry}); ` +
-      `authorized=${authorized} keeper=${config.keeper} voter=${config.voter} source=${config.sourceRpcUrl}`,
+      `authorized=${authorized} keeper=${config.keeper} voter=${config.voter} ` +
+      `rpc=[${config.rpcUrls.map(redactUrl).join(" → ")}] source=[${config.sourceRpcUrls.map(redactUrl).join(" → ")}]`,
   );
   if (!authorized) log.warn("not an authorized resolver — observations will be rejected (keeper duties still work)");
 
   const index = new EventIndex(c.publicClient, c.deployment, config.logChunk);
   const adapters = buildAdapters(c.sourceClient);
-  const evidence = new EvidenceStore();
+  // RESOLVER_EVIDENCE_DIR persists evidence across restarts (shared safely: records are content-addressed).
+  const evidence = new EvidenceStore(process.env.RESOLVER_EVIDENCE_DIR || undefined);
   const resolver = new ResolverDuty(c, index, adapters, evidence, log);
   const voter = new VoterDuty(c, index, adapters, resolver, log);
   const keeper = new KeeperDuty(c, index, resolver, log);
   const rewards = new RewardsDuty(c, index, log);
+  const balance = new BalanceWatch(c, log, config.resolverId, config.minBalanceWei, config.alertWebhookUrl);
+  const backfill = new EvidenceBackfill(c, index, adapters, evidence, resolver, log, config.logChunk);
 
   let lastLoopAt = 0;
   let lastError: string | undefined;
@@ -67,6 +73,7 @@ async function main(): Promise<void> {
       keeperActions: keeper.actions,
       rewardClaims: rewards.claims,
       evidenceRecords: evidence.size,
+      ...balance.status(),
       lastError,
     }));
     log.info(`http on :${config.httpPort} (/health, /evidence/:hash)`);
@@ -79,10 +86,12 @@ async function main(): Promise<void> {
     try {
       await index.sync();
       const now = await chainNow(c.publicClient);
+      if (authorized && !backfill.done) await backfill.run(now).catch((e) => log.warn(`evidence backfill: ${(e as Error).message}`));
       if (authorized) await resolver.tick(now);
       if (authorized && config.voter) await voter.tick(now);
       if (config.keeper) await keeper.tick(now);
       await rewards.tick();
+      await balance.tick().catch((e) => log.warn(`balance check: ${(e as Error).message}`));
       lastLoopAt = Date.now();
       lastError = undefined;
     } catch (err) {

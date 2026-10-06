@@ -1,5 +1,5 @@
 import { parseAbiItem, type PublicClient } from "viem";
-import { SOURCES, decodeCorporateActionSpec } from "@novak/sdk";
+import { SOURCES, decodeCorporateActionSpec } from "@novakoracle/sdk";
 import { findBlockAtOrBefore } from "../lib/chain.js";
 import type { Observation, ObserveContext, SourceAdapter } from "./types.js";
 

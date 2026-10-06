@@ -15,8 +15,13 @@ export async function send(
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { request } = await c.publicClient.simulateContract({ account: c.account, ...(req as any) });
+    // Gas headroom: another resolver's tx can land first and change which code
+    // path ours takes (e.g. the observation that completes quorum also writes
+    // the proposal). Unused gas isn't charged.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const hash = await c.walletClient.writeContract(request as any);
+    const estimate = await c.publicClient.estimateContractGas({ account: c.account, ...(req as any) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hash = await c.walletClient.writeContract({ ...(request as any), gas: (estimate * 3n) / 2n + 100_000n });
     const receipt = await c.publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") return { ok: false, reason: `reverted on-chain (${hash})` };
     return { ok: true, hash };

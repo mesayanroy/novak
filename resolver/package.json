@@ -11,10 +11,11 @@
     "start": "node dist/node/index.js",
     "test": "vitest run",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "probe": "tsx scripts/probe-sources.ts"
+    "probe": "tsx scripts/probe-sources.ts",
+    "start:multi": "node dist/node/multi.js"
   },
   "dependencies": {
-    "@novak/sdk": "workspace:*",
+    "@novakoracle/sdk": "workspace:*",
     "viem": "^2.56.0"
   },
   "devDependencies": {
@@ -22,5 +23,8 @@
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

@@ -1,5 +1,5 @@
 import type { Abi, Hex } from "viem";
-import { EventStatus, eventRegistryAbi, treasuryVaultAbi } from "@novak/sdk";
+import { disputeManagerAbi, EventStatus, eventRegistryAbi, treasuryVaultAbi } from "@novakoracle/sdk";
 import type { Clients } from "../lib/chain.js";
 import { send } from "../lib/tx.js";
 import type { EventIndex } from "./discovery.js";
@@ -10,6 +10,8 @@ import type { Log } from "./log.js";
  * TreasuryVault's per-event thirds —
  *   - the resolver third, for events where it reported the final outcome;
  *   - the committee third, for disputes where it voted with the decision.
+ * Also withdraws whatever the DisputeManager credited this node (returned
+ * committee bonds + its share of losing bonds) — every node, not just the keeper.
  * Claims also run the vault's `allocate`, so pending fees are split on the
  * first claim. Pull-based: nothing is pushed to resolvers.
  */
@@ -24,6 +26,7 @@ export class RewardsDuty {
   ) {}
 
   async tick(): Promise<void> {
+    await this.withdrawDisputeCredits();
     const vault = this.c.deployment.treasuryVault;
     if (!vault) return;
     const me = this.c.account.address;
@@ -60,5 +63,22 @@ export class RewardsDuty {
 
   private read<T>(address: Hex, functionName: string, args: readonly unknown[]): Promise<T> {
     return this.c.publicClient.readContract({ address, abi: treasuryVaultAbi as Abi, functionName, args }) as Promise<T>;
+  }
+
+  private async withdrawDisputeCredits(): Promise<void> {
+    const dm = this.c.deployment.disputeManager;
+    if (!dm) return;
+    const owed = (await this.c.publicClient.readContract({
+      address: dm,
+      abi: disputeManagerAbi,
+      functionName: "pendingWithdrawals",
+      args: [this.c.account.address],
+    })) as bigint;
+    if (owed === 0n) return;
+    const res = await send(this.c, { address: dm, abi: disputeManagerAbi as Abi, functionName: "withdraw", args: [] });
+    if (res.ok) {
+      this.claims++;
+      this.log.info(`withdrew ${owed} wei of dispute credits tx=${res.hash}`);
+    }
   }
 }

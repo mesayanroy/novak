@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Comparator, TradingSession, encodeFedRateSpec, encodeTradingStatusSpec, type EventSpecInput } from "@novak/sdk";
+import { Comparator, TradingSession, encodeFedRateSpec, encodeTradingStatusSpec, type EventSpecInput } from "@novakoracle/sdk";
 import { evaluateQuorum, evaluateEscalationQuorum } from "../consensus/quorum.js";
 import { buildEvidence, hashEvidence, EvidenceStore } from "../evidence/evidence.js";
 import { changeBps, decideCorporateAction, type MultiplierChange } from "../adapters/corporateAction.js";
@@ -177,5 +177,75 @@ describe("macro.fomc fed-rate adapter", () => {
       throw new Error("503");
     });
     expect(await down.observe({ eventId: "0x1", spec: spec(day("2026-10-29"), 375, Comparator.Lte), now: 0n })).toBeNull();
+  });
+});
+
+describe("evidence store persistence", () => {
+  it("writes content-addressed records to disk and reloads them in a fresh store", async () => {
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { EvidenceStore, buildEvidence, hashEvidence } = await import("../evidence/evidence.js");
+    const dir = mkdtempSync(join(tmpdir(), "novak-evidence-"));
+    try {
+      const record = buildEvidence(`0x${"ab".repeat(32)}`, "chainlink.price-at.v1", {
+        outcome: true,
+        occurredAt: 1_788_998_430n,
+        rawEvidence: { roundId: 42n, answer: 23_519_000_000n },
+      });
+      const a = new EvidenceStore(dir);
+      const hash = a.put(record);
+      expect(hash).toBe(hashEvidence(record).toLowerCase());
+
+      const b = new EvidenceStore(dir); // simulated restart
+      expect(b.has(hash)).toBe(true);
+      expect(b.get(hash)).toEqual(record);
+      expect(hashEvidence(b.get(hash)!)).toBe(hashEvidence(record)); // reload keeps the on-chain commitment
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("rpc provider order + redaction", () => {
+  it("puts explicit URL, then Alchemy, then the public RPC; never logs the key", async () => {
+    const { loadConfig } = await import("../lib/config.js");
+    const { redactUrl } = await import("../lib/chain.js");
+    const key = `0x${"11".repeat(32)}`;
+    const cfg = loadConfig({ RESOLVER_PRIVATE_KEY: key, ALCHEMY_API_KEY: "secret123" } as NodeJS.ProcessEnv);
+    expect(cfg.sourceRpcUrls).toEqual([
+      "https://robinhood-mainnet.g.alchemy.com/v2/secret123",
+      "https://rpc.mainnet.chain.robinhood.com",
+    ]);
+    expect(cfg.rpcUrls[0]).toBe("https://robinhood-testnet.g.alchemy.com/v2/secret123");
+    expect(cfg.rpcUrls.at(-1)).toBe("https://rpc.testnet.chain.robinhood.com");
+    expect(redactUrl(cfg.sourceRpcUrls[0])).not.toContain("secret123");
+
+    const explicit = loadConfig({ RESOLVER_PRIVATE_KEY: key.slice(2), RESOLVER_SOURCE_RPC_URL: "https://my.node" } as NodeJS.ProcessEnv);
+    expect(explicit.sourceRpcUrls).toEqual(["https://my.node", "https://rpc.mainnet.chain.robinhood.com"]);
+    expect(explicit.privateKey).toBe(key); // 0x-less key accepted
+  });
+});
+
+describe("commit-reveal committee seeding", () => {
+  it("encodes the commitment exactly like DisputeManager (abi.encode(bytes32,uint8,address,bytes32))", async () => {
+    const { seedCommitment } = await import("./voter.js");
+    const commitment = seedCommitment(`0x${"ab".repeat(32)}`, 1, "0x0000000000000000000000000000000000001234", `0x${"cd".repeat(32)}`);
+    // reference: cast keccak $(cast abi-encode "f(bytes32,uint8,address,bytes32)" ...)
+    expect(commitment).toBe("0x77a137058bcb7c471be4961cf71457b959db81827a9f5918ea5ce35fc66e265c");
+  });
+
+  it("derives a salt that is stable per (event, tier) and differs across them", async () => {
+    const { committeeSalt } = await import("./voter.js");
+    const { privateKeyToAccount } = await import("viem/accounts");
+    const c = {
+      account: privateKeyToAccount(`0x${"11".repeat(32)}`),
+      deployment: { chainId: 46630, disputeManager: "0x00000000000000000000000000000000000000d1" },
+    } as never;
+    const e = `0x${"ab".repeat(32)}` as const;
+    const a = await committeeSalt(c, e, 1);
+    expect(await committeeSalt(c, e, 1)).toBe(a); // reproducible after a restart
+    expect(await committeeSalt(c, e, 2)).not.toBe(a);
+    expect(await committeeSalt(c, `0x${"ac".repeat(32)}`, 1)).not.toBe(a);
   });
 });

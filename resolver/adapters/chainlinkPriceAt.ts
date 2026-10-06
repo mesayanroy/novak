@@ -1,5 +1,5 @@
 import { parseAbi, type PublicClient } from "viem";
-import { Comparator, SOURCES, decodePriceAtSpec } from "@novak/sdk";
+import { Comparator, SOURCES, decodePriceAtSpec } from "@novakoracle/sdk";
 import type { Observation, ObserveContext, SourceAdapter } from "./types.js";
 
 const aggregatorAbi = parseAbi([

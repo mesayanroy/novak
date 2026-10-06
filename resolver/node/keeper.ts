@@ -10,7 +10,7 @@ import {
   eventRegistryAbi,
   marketAbi,
   treasuryVaultAbi,
-} from "@novak/sdk";
+} from "@novakoracle/sdk";
 import type { Clients } from "../lib/chain.js";
 import { send } from "../lib/tx.js";
 import type { EventIndex } from "./discovery.js";
@@ -24,10 +24,9 @@ const TERMINAL = new Set([EventStatus.Finalized, EventStatus.Voided, EventStatus
  * valid, so a demo (or a user) never has to click "finalize" / "resolve" /
  * "settle" by hand:
  *   - Registry: finalize (dispute window over), expire (nobody observed)
- *   - DisputeManager: escalateNonConvergence, escalateTier2, voidAfterTier2Timeout
+ *   - DisputeManager: escalateNonConvergence, drawCommittee (commit-reveal), escalateTier2, voidAfterTier2Timeout
  *   - Composer: tryResolve when an operand's state changed
  *   - Market: settle once the Bus reports Available/Voided
- *   - withdraw this node's credited dispute bonds/rewards
  *
  * This is NOT push delivery to consumers (deferred Issue #13): consumers
  * still pull from the Bus. It only calls functions anyone may call.
@@ -79,15 +78,25 @@ export class KeeperDuty {
           await this.poke(`finalize ${eventId}`, d.eventRegistry, eventRegistryAbi as Abi, "finalize", [eventId]);
         }
       } else if (status === EventStatus.Disputed) {
-        const [, , t2Deadline] = await this.read<[bigint, bigint, bigint, bigint]>(d.disputeManager, disputeManagerAbi as Abi, "getTierTally", [eventId, 2]);
-        if (t2Deadline !== 0n) {
-          if (now >= t2Deadline) {
-            await this.poke(`voidAfterTier2Timeout ${eventId}`, d.disputeManager, disputeManagerAbi as Abi, "voidAfterTier2Timeout", [eventId]);
+        const dm = d.disputeManager;
+        const [, , tier] = await this.read<[boolean, boolean, number, boolean]>(dm, disputeManagerAbi as Abi, "getCaseSummary", [eventId]);
+        const [seeding, commitDeadline, revealDeadline, commits, reveals] = await this.read<[boolean, bigint, bigint, number, number, boolean]>(
+          dm,
+          disputeManagerAbi as Abi,
+          "getSeedState",
+          [eventId, tier],
+        );
+        if (seeding) {
+          // Large pool: draw the committee as soon as commit-reveal allows it.
+          const everyoneRevealed = Number(commits) > 0 && Number(reveals) === Number(commits) && now >= commitDeadline;
+          if (now >= revealDeadline || everyoneRevealed) {
+            await this.poke(`drawCommittee ${eventId} tier${tier}`, dm, disputeManagerAbi as Abi, "drawCommittee", [eventId]);
           }
         } else {
-          const [, , t1Deadline] = await this.read<[bigint, bigint, bigint, bigint]>(d.disputeManager, disputeManagerAbi as Abi, "getTierTally", [eventId, 1]);
-          if (t1Deadline !== 0n && now >= t1Deadline) {
-            await this.poke(`escalateTier2 ${eventId}`, d.disputeManager, disputeManagerAbi as Abi, "escalateTier2", [eventId]);
+          const [, , deadline] = await this.read<[bigint, bigint, bigint, bigint]>(dm, disputeManagerAbi as Abi, "getTierTally", [eventId, tier]);
+          if (deadline !== 0n && now >= deadline) {
+            if (Number(tier) === 1) await this.poke(`escalateTier2 ${eventId}`, dm, disputeManagerAbi as Abi, "escalateTier2", [eventId]);
+            else await this.poke(`voidAfterTier2Timeout ${eventId}`, dm, disputeManagerAbi as Abi, "voidAfterTier2Timeout", [eventId]);
           }
         }
       }
@@ -135,9 +144,7 @@ export class KeeperDuty {
 
     await this.distributionTick();
     await this.vaultTick();
-
-    const owed = await this.read<bigint>(d.disputeManager, disputeManagerAbi as Abi, "pendingWithdrawals", [this.c.account.address]);
-    if (owed > 0n) await this.poke(`withdraw ${owed} wei`, d.disputeManager, disputeManagerAbi as Abi, "withdraw", []);
+    // (Withdrawing this node's own dispute credits lives in RewardsDuty, which every node runs.)
   }
 
   /** Settle every open DistributionMarket whose boundary events are all decided. */

@@ -1,5 +1,5 @@
 import type { PublicClient } from "viem";
-import { sourceId, type Hex } from "@novak/sdk";
+import { sourceId, type Hex } from "@novakoracle/sdk";
 import { ChainlinkPriceAtAdapter } from "./chainlinkPriceAt.js";
 import { CorporateActionAdapter } from "./corporateAction.js";
 import { TradingStatusAdapter } from "./tradingStatus.js";

@@ -1,5 +1,5 @@
 import { AbiDecodingDataSizeTooSmallError, AbiDecodingZeroDataError, type Abi, type Hex } from "viem";
-import { EventStatus, encodeOutcomeForVersion, eventRegistryAbi, type EventSpecInput } from "@novak/sdk";
+import { EventStatus, encodeOutcomeForVersion, eventRegistryAbi, type EventSpecInput } from "@novakoracle/sdk";
 import type { SourceAdapter } from "../adapters/types.js";
 import { buildEvidence, type EvidenceStore } from "../evidence/evidence.js";
 import type { Clients } from "../lib/chain.js";

@@ -1,6 +1,6 @@
-import { createPublicClient, createWalletClient, http, type Chain, type PublicClient } from "viem";
+import { createPublicClient, createWalletClient, fallback, http, type Chain, type PublicClient, type Transport } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { foundry, getDeployment, robinhood, robinhoodTestnet, type NovakDeployment } from "@novak/sdk";
+import { foundry, getDeployment, robinhood, robinhoodTestnet, type NovakDeployment } from "@novakoracle/sdk";
 import type { ResolverConfig } from "./config.js";
 
 export function chainFor(chainId: number): Chain {
@@ -19,14 +19,47 @@ export interface Clients {
   deployment: NovakDeployment;
 }
 
+/** Tries each URL in order; a rate-limited or failing provider falls through to the next. */
+const orderedTransport = (urls: string[]): Transport =>
+  urls.length === 1 ? http(urls[0], { retryCount: 2 }) : fallback(urls.map((u) => http(u, { retryCount: 1 })), { retryCount: 2 });
+
+const isAlchemy = (u: string) => /\.alchemy\.com\//.test(u);
+
+/**
+ * Like `orderedTransport`, but `eth_getLogs` prefers the non-Alchemy URLs:
+ * Alchemy's free tier caps getLogs at a 10-block range, and discovery /
+ * evidence backfill scan hundreds of thousands of blocks. Everything else
+ * (reads, gas estimates, sends) still goes to Alchemy first.
+ */
+export function transportFor(urls: string[]): Transport {
+  const main = orderedTransport(urls);
+  const logUrls = [...urls.filter((u) => !isAlchemy(u)), ...urls.filter(isAlchemy)];
+  if (!urls.some(isAlchemy) || urls.every(isAlchemy)) return main;
+  const logs = orderedTransport(logUrls);
+  return (opts) => {
+    const m = main(opts);
+    const l = logs(opts);
+    const request = ((args: { method: string }, o?: unknown) =>
+      args.method === "eth_getLogs" ? (l.request as (a: unknown, o?: unknown) => unknown)(args, o) : (m.request as (a: unknown, o?: unknown) => unknown)(args, o)) as typeof m.request;
+    return { ...m, request };
+  };
+}
+
+/** Hides API keys in logs: https://…alchemy.com/v2/abcd… → …/v2/•••• */
+export const redactUrl = (u: string) => u.replace(/(\/v2\/)[^/?#]+/, "$1••••");
+
 export function makeClients(config: ResolverConfig): Clients {
   const chain = chainFor(config.chainId);
   const account = privateKeyToAccount(config.privateKey);
+  const rpc = transportFor(config.rpcUrls?.length ? config.rpcUrls : [config.rpcUrl]);
   return {
-    publicClient: createPublicClient({ chain, transport: http(config.rpcUrl) }) as PublicClient,
-    walletClient: createWalletClient({ account, chain, transport: http(config.rpcUrl) }),
+    publicClient: createPublicClient({ chain, transport: rpc }) as PublicClient,
+    walletClient: createWalletClient({ account, chain, transport: rpc }),
     account,
-    sourceClient: createPublicClient({ chain: robinhood, transport: http(config.sourceRpcUrl) }) as PublicClient,
+    sourceClient: createPublicClient({
+      chain: robinhood,
+      transport: transportFor(config.sourceRpcUrls?.length ? config.sourceRpcUrls : [config.sourceRpcUrl]),
+    }) as PublicClient,
     deployment: getDeployment(config.chainId),
   };
 }
