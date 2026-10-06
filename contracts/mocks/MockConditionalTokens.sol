@@ -11,14 +11,31 @@ contract MockConditionalTokens is IConditionalTokens {
     mapping(bytes32 => uint256[]) private _numerators;
     mapping(bytes32 => uint256) public payoutDenominator;
 
-    event ConditionPreparation(bytes32 indexed conditionId, address indexed oracle, bytes32 indexed questionId, uint256 outcomeSlotCount);
-    event ConditionResolution(bytes32 indexed conditionId, address indexed oracle, bytes32 indexed questionId, uint256 outcomeSlotCount, uint256[] payoutNumerators);
+    event ConditionPreparation(
+        bytes32 indexed conditionId,
+        address indexed oracle,
+        bytes32 indexed questionId,
+        uint256 outcomeSlotCount
+    );
+    event ConditionResolution(
+        bytes32 indexed conditionId,
+        address indexed oracle,
+        bytes32 indexed questionId,
+        uint256 outcomeSlotCount,
+        uint256[] payoutNumerators
+    );
 
-    function getConditionId(address oracle, bytes32 questionId, uint256 outcomeSlotCount) public pure returns (bytes32) {
+    function getConditionId(address oracle, bytes32 questionId, uint256 outcomeSlotCount)
+        public
+        pure
+        returns (bytes32)
+    {
         return keccak256(abi.encodePacked(oracle, questionId, outcomeSlotCount));
     }
 
-    function prepareCondition(address oracle, bytes32 questionId, uint256 outcomeSlotCount) external {
+    function prepareCondition(address oracle, bytes32 questionId, uint256 outcomeSlotCount)
+        external
+    {
         require(outcomeSlotCount <= 256, "too many outcome slots");
         require(outcomeSlotCount > 1, "there should be more than one outcome slot");
         bytes32 conditionId = getConditionId(oracle, questionId, outcomeSlotCount);
@@ -31,7 +48,9 @@ contract MockConditionalTokens is IConditionalTokens {
         uint256 outcomeSlotCount = payouts.length;
         require(outcomeSlotCount > 1, "there should be more than one outcome slot");
         bytes32 conditionId = getConditionId(msg.sender, questionId, outcomeSlotCount);
-        require(_numerators[conditionId].length == outcomeSlotCount, "condition not prepared or found");
+        require(
+            _numerators[conditionId].length == outcomeSlotCount, "condition not prepared or found"
+        );
         require(payoutDenominator[conditionId] == 0, "payout denominator already set");
         uint256 den = 0;
         for (uint256 i = 0; i < outcomeSlotCount; i++) {

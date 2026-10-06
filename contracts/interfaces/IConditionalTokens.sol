@@ -10,7 +10,10 @@ interface IConditionalTokens {
 
     function reportPayouts(bytes32 questionId, uint256[] calldata payouts) external;
 
-    function getConditionId(address oracle, bytes32 questionId, uint256 outcomeSlotCount) external pure returns (bytes32);
+    function getConditionId(address oracle, bytes32 questionId, uint256 outcomeSlotCount)
+        external
+        pure
+        returns (bytes32);
 
     function payoutDenominator(bytes32 conditionId) external view returns (uint256);
 

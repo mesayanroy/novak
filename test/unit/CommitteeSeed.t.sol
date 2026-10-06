@@ -71,7 +71,11 @@ contract CommitteeSeedTest is Test {
         dm.revealSeed(id, _salt(i));
     }
 
-    function _seed(bytes32 id) internal view returns (bool seeding, uint64 c, uint64 r, uint32 commits, uint32 reveals, bool drawn) {
+    function _seed(bytes32 id)
+        internal
+        view
+        returns (bool seeding, uint64 c, uint64 r, uint32 commits, uint32 reveals, bool drawn)
+    {
         return dm.getSeedState(id, 1);
     }
 
@@ -111,10 +115,14 @@ contract CommitteeSeedTest is Test {
     function test_commitReveal_excludesWithholder_drawIsDeterministic() public {
         _setUp(10);
         bytes32 id = _disputedEvent();
-        for (uint256 i = 0; i < 5; i++) _commit(id, i);
+        for (uint256 i = 0; i < 5; i++) {
+            _commit(id, i);
+        }
 
         vm.warp(block.timestamp + dm.SEED_COMMIT_WINDOW());
-        for (uint256 i = 0; i < 4; i++) _reveal(id, i); // pool[4] withholds
+        for (uint256 i = 0; i < 4; i++) {
+            _reveal(id, i); // pool[4] withholds
+        }
 
         vm.expectRevert(bytes("DisputeManager: seeding still in progress"));
         dm.drawCommittee(id);
@@ -127,7 +135,9 @@ contract CommitteeSeedTest is Test {
         for (uint256 i = 0; i < committee.length; i++) {
             assertTrue(committee[i] != pool[4], "withholder must be excluded");
             assertTrue(registry.isAuthorizedResolver(committee[i]));
-            for (uint256 j = i + 1; j < committee.length; j++) assertTrue(committee[i] != committee[j], "no duplicates");
+            for (uint256 j = i + 1; j < committee.length; j++) {
+                assertTrue(committee[i] != committee[j], "no duplicates");
+            }
         }
         (bool seeding,,,, uint32 reveals, bool drawn) = _seed(id);
         assertFalse(seeding);
@@ -140,15 +150,21 @@ contract CommitteeSeedTest is Test {
         vm.prank(address(0xBEEF));
         dm.drawCommittee(id);
         address[] memory again = dm.getCommittee(id, 1);
-        for (uint256 i = 0; i < 7; i++) assertEq(again[i], committee[i]);
+        for (uint256 i = 0; i < 7; i++) {
+            assertEq(again[i], committee[i]);
+        }
     }
 
     function test_everyoneRevealed_drawsWithoutWaitingForRevealDeadline() public {
         _setUp(10);
         bytes32 id = _disputedEvent();
-        for (uint256 i = 0; i < 3; i++) _commit(id, i);
+        for (uint256 i = 0; i < 3; i++) {
+            _commit(id, i);
+        }
         vm.warp(block.timestamp + dm.SEED_COMMIT_WINDOW());
-        for (uint256 i = 0; i < 3; i++) _reveal(id, i);
+        for (uint256 i = 0; i < 3; i++) {
+            _reveal(id, i);
+        }
         dm.drawCommittee(id);
         assertEq(dm.getCommittee(id, 1).length, 7);
     }
@@ -200,9 +216,13 @@ contract CommitteeSeedTest is Test {
     function test_afterDraw_committeeDecides_andTier2FitsWholePool() public {
         _setUp(10);
         bytes32 id = _disputedEvent();
-        for (uint256 i = 0; i < 4; i++) _commit(id, i);
+        for (uint256 i = 0; i < 4; i++) {
+            _commit(id, i);
+        }
         vm.warp(block.timestamp + dm.SEED_COMMIT_WINDOW());
-        for (uint256 i = 0; i < 4; i++) _reveal(id, i);
+        for (uint256 i = 0; i < 4; i++) {
+            _reveal(id, i);
+        }
         dm.drawCommittee(id);
 
         address[] memory committee = dm.getCommittee(id, 1);

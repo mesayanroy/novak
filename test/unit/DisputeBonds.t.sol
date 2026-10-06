@@ -96,8 +96,8 @@ contract DisputeBondsTest is Test {
         assertEq(dm.pendingWithdrawals(B), tier1Bond + perWinner);
         assertEq(dm.pendingWithdrawals(C), 0, "wrong voter and wrong disputer get nothing back");
         // Treasury: its third of the losing pool + dust, plus 2/3 of the forfeited dispute bond.
-        uint256 treasuryExpected =
-            (losing / 3) + (losing - losing / 3 - losing / 3 - perWinner * 2) + (disputeBond - disputeBond / 3);
+        uint256 treasuryExpected = (losing / 3) + (losing - losing / 3 - losing / 3 - perWinner * 2)
+            + (disputeBond - disputeBond / 3);
         assertEq(dm.pendingWithdrawals(TREASURY), treasuryExpected);
         assertEq(BURN.balance, losing / 3 + disputeBond / 3);
 

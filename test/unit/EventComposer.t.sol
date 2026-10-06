@@ -489,7 +489,8 @@ contract EventComposerTest is Test {
     ///      DisputeManager's Tier-2-timeout path (the only way a primitive
     ///      reaches `Voided` in this protocol).
     function _createVoidedPrimitive() internal returns (bytes32 eventId) {
-        DisputeManager disputeManager = new DisputeManager(address(registry), address(0xC0DE), 0.01 ether);
+        DisputeManager disputeManager =
+            new DisputeManager(address(registry), address(0xC0DE), 0.01 ether);
         // A fresh registry has no dispute manager wired yet in most tests,
         // but this contract's `registry` is shared across tests in this
         // file — guard against double-set.

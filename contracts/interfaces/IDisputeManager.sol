@@ -42,7 +42,9 @@ interface IDisputeManager {
     event TierConverged(bytes32 indexed eventId, uint8 indexed tier, bool outcome);
     event TierEscalated(bytes32 indexed eventId, uint8 indexed toTier);
     event DisputeVoided(bytes32 indexed eventId);
-    event SeedingStarted(bytes32 indexed eventId, uint8 indexed tier, uint64 commitDeadline, uint64 revealDeadline);
+    event SeedingStarted(
+        bytes32 indexed eventId, uint8 indexed tier, uint64 commitDeadline, uint64 revealDeadline
+    );
     event SeedCommitted(bytes32 indexed eventId, uint8 indexed tier, address indexed resolver);
     event SeedRevealed(bytes32 indexed eventId, uint8 indexed tier, address indexed resolver);
 
@@ -118,7 +120,14 @@ interface IDisputeManager {
     function getSeedState(bytes32 eventId, uint8 tier)
         external
         view
-        returns (bool seeding, uint64 commitDeadline, uint64 revealDeadline, uint32 commits, uint32 reveals, bool drawn);
+        returns (
+            bool seeding,
+            uint64 commitDeadline,
+            uint64 revealDeadline,
+            uint32 commits,
+            uint32 reveals,
+            bool drawn
+        );
 
     function getTierTally(bytes32 eventId, uint8 tier)
         external

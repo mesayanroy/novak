@@ -223,7 +223,9 @@ contract DisputeManager is IDisputeManager {
     function commitSeed(bytes32 eventId, bytes32 commitment) external {
         Tier storage t = _activeSeedingTier(eventId);
         require(block.timestamp < t.commitDeadline, "DisputeManager: commit window closed");
-        require(registry.isAuthorizedResolver(msg.sender), "DisputeManager: not an authorized resolver");
+        require(
+            registry.isAuthorizedResolver(msg.sender), "DisputeManager: not an authorized resolver"
+        );
         require(t.commitments[msg.sender] == bytes32(0), "DisputeManager: already committed");
         require(commitment != bytes32(0), "DisputeManager: empty commitment");
         t.commitments[msg.sender] = commitment;
@@ -239,7 +241,8 @@ contract DisputeManager is IDisputeManager {
         require(!t.revealedSeed[msg.sender], "DisputeManager: already revealed");
         require(
             t.commitments[msg.sender] != bytes32(0)
-                && t.commitments[msg.sender] == keccak256(abi.encode(eventId, tierNum, msg.sender, salt)),
+                && t.commitments[msg.sender]
+                    == keccak256(abi.encode(eventId, tierNum, msg.sender, salt)),
             "DisputeManager: reveal does not match commitment"
         );
         t.revealedSeed[msg.sender] = true;
@@ -253,8 +256,12 @@ contract DisputeManager is IDisputeManager {
     function drawCommittee(bytes32 eventId) external {
         Tier storage t = _activeSeedingTier(eventId);
         uint8 tierNum = _cases[eventId].tier;
-        bool everyoneRevealed = t.commits > 0 && t.reveals == t.commits && block.timestamp >= t.commitDeadline;
-        require(block.timestamp >= t.revealDeadline || everyoneRevealed, "DisputeManager: seeding still in progress");
+        bool everyoneRevealed =
+            t.commits > 0 && t.reveals == t.commits && block.timestamp >= t.commitDeadline;
+        require(
+            block.timestamp >= t.revealDeadline || everyoneRevealed,
+            "DisputeManager: seeding still in progress"
+        );
 
         // Committers that withheld their reveal are excluded from the draw, so
         // withholding can only remove yourself — never steer who is chosen.
@@ -277,7 +284,8 @@ contract DisputeManager is IDisputeManager {
             : keccak256(abi.encode(eventId, tierNum, blockhash(block.number - 1), block.timestamp));
 
         t.seeding = false;
-        t.committee = _draw(candidates, seed, tierNum == 1 ? TIER1_COMMITTEE_SIZE : TIER2_COMMITTEE_SIZE);
+        t.committee =
+            _draw(candidates, seed, tierNum == 1 ? TIER1_COMMITTEE_SIZE : TIER2_COMMITTEE_SIZE);
         t.deadline = uint64(block.timestamp) + (tierNum == 1 ? TIER1_WINDOW : TIER2_WINDOW);
         emit TierOpened(eventId, tierNum, t.committee, t.deadline);
     }
@@ -523,10 +531,18 @@ contract DisputeManager is IDisputeManager {
     function getSeedState(bytes32 eventId, uint8 tier)
         external
         view
-        returns (bool seeding, uint64 commitDeadline, uint64 revealDeadline, uint32 commits, uint32 reveals, bool drawn)
+        returns (
+            bool seeding,
+            uint64 commitDeadline,
+            uint64 revealDeadline,
+            uint32 commits,
+            uint32 reveals,
+            bool drawn
+        )
     {
         Tier storage t = _tiers[eventId][tier];
-        return (t.seeding, t.commitDeadline, t.revealDeadline, t.commits, t.reveals, t.deadline != 0);
+        return
+            (t.seeding, t.commitDeadline, t.revealDeadline, t.commits, t.reveals, t.deadline != 0);
     }
 
     function getTierTally(bytes32 eventId, uint8 tier)

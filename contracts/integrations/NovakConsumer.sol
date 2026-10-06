@@ -56,15 +56,24 @@ abstract contract NovakConsumer {
         IEventBus.Availability a = novak.getAvailability(eventId);
         if (a == IEventBus.Availability.Pending) return Resolution.Pending;
         if (a == IEventBus.Availability.Voided) return Resolution.Voided;
-        return abi.decode(novak.readOutcome(eventId).outcomeData, (bool)) ? Resolution.True : Resolution.False;
+        return abi.decode(novak.readOutcome(eventId).outcomeData, (bool))
+            ? Resolution.True
+            : Resolution.False;
     }
 
     /// @notice The range-market rule over an ascending ladder of threshold events.
     /// @return status Pending until every boundary is decided; Voided if any
     ///         boundary is voided or the TRUEs don't form a prefix; else True.
     /// @return winningBucket Number of TRUE boundaries (0…n) when status is True.
-    function novakRange(bytes32[] memory boundaries) public view returns (Resolution status, uint256 winningBucket) {
-        require(boundaries.length > 0 && boundaries.length <= NOVAK_MAX_BOUNDARIES, "NovakConsumer: bad ladder");
+    function novakRange(bytes32[] memory boundaries)
+        public
+        view
+        returns (Resolution status, uint256 winningBucket)
+    {
+        require(
+            boundaries.length > 0 && boundaries.length <= NOVAK_MAX_BOUNDARIES,
+            "NovakConsumer: bad ladder"
+        );
         bool sawFalse;
         bool voided;
         for (uint256 i = 0; i < boundaries.length; i++) {
@@ -84,8 +93,15 @@ abstract contract NovakConsumer {
     }
 
     /// @notice A finalized outcome and when it happened. Reverts unless Available.
-    function _novakOutcome(bytes32 eventId) internal view returns (bool outcome, uint64 occurredAt) {
-        require(novak.getAvailability(eventId) == IEventBus.Availability.Available, "NovakConsumer: not available");
+    function _novakOutcome(bytes32 eventId)
+        internal
+        view
+        returns (bool outcome, uint64 occurredAt)
+    {
+        require(
+            novak.getAvailability(eventId) == IEventBus.Availability.Available,
+            "NovakConsumer: not available"
+        );
         IEventRegistry.Outcome memory o = novak.readOutcome(eventId);
         if (o.outcomeData.length == 64) {
             (outcome, occurredAt) = abi.decode(o.outcomeData, (bool, uint64)); // specVersion 2

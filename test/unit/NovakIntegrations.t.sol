@@ -94,12 +94,20 @@ contract NovakIntegrationsTest is Test {
 
     function _ladder(uint256 n) internal returns (bytes32[] memory ids) {
         ids = new bytes32[](n);
-        for (uint256 i = 0; i < n; i++) ids[i] = _event(1);
+        for (uint256 i = 0; i < n; i++) {
+            ids[i] = _event(1);
+        }
     }
 
-    function _payouts(bytes32 conditionId, uint256 slots) internal view returns (uint256[] memory p) {
+    function _payouts(bytes32 conditionId, uint256 slots)
+        internal
+        view
+        returns (uint256[] memory p)
+    {
         p = new uint256[](slots);
-        for (uint256 i = 0; i < slots; i++) p[i] = ctf.payoutNumerators(conditionId, i);
+        for (uint256 i = 0; i < slots; i++) {
+            p[i] = ctf.payoutNumerators(conditionId, i);
+        }
     }
 
     // --- architectural guards (CLAUDE.md) ------------------------------------
@@ -297,7 +305,9 @@ contract NovakIntegrationsTest is Test {
         _decide(ids[1], true); // inconsistent
         adapter.resolve(q);
         uint256[] memory p = _payouts(cond, 3);
-        for (uint256 i = 0; i < 3; i++) assertEq(p[i], 1);
+        for (uint256 i = 0; i < 3; i++) {
+            assertEq(p[i], 1);
+        }
     }
 
     function test_ctf_resolveGuards() public {

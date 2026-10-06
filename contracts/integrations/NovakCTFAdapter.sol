@@ -33,7 +33,13 @@ contract NovakCTFAdapter is NovakConsumer {
     IConditionalTokens public immutable ctf;
     mapping(bytes32 => Question) private _questions;
 
-    event QuestionPrepared(bytes32 indexed questionId, bytes32 indexed conditionId, bytes32[] eventIds, uint256 outcomeSlots, bool range);
+    event QuestionPrepared(
+        bytes32 indexed questionId,
+        bytes32 indexed conditionId,
+        bytes32[] eventIds,
+        uint256 outcomeSlots,
+        bool range
+    );
     event QuestionResolved(bytes32 indexed questionId, uint256[] payouts, bool voided);
 
     constructor(address eventBus, address conditionalTokens) NovakConsumer(eventBus) {
@@ -52,7 +58,10 @@ contract NovakCTFAdapter is NovakConsumer {
         return keccak256(abi.encode("novak.range.v1", boundaries));
     }
 
-    function prepareBinary(bytes32 eventId) external returns (bytes32 questionId, bytes32 conditionId) {
+    function prepareBinary(bytes32 eventId)
+        external
+        returns (bytes32 questionId, bytes32 conditionId)
+    {
         bytes32[] memory ids = new bytes32[](1);
         ids[0] = eventId;
         questionId = binaryQuestionId(eventId);
@@ -60,16 +69,28 @@ contract NovakCTFAdapter is NovakConsumer {
     }
 
     /// @param boundaries Ascending threshold events ("value ≥ t_i"); n boundaries ⇒ n+1 outcome slots.
-    function prepareRange(bytes32[] calldata boundaries) external returns (bytes32 questionId, bytes32 conditionId) {
-        require(boundaries.length > 0 && boundaries.length <= NOVAK_MAX_BOUNDARIES, "NovakCTFAdapter: bad ladder");
+    function prepareRange(bytes32[] calldata boundaries)
+        external
+        returns (bytes32 questionId, bytes32 conditionId)
+    {
+        require(
+            boundaries.length > 0 && boundaries.length <= NOVAK_MAX_BOUNDARIES,
+            "NovakCTFAdapter: bad ladder"
+        );
         questionId = rangeQuestionId(boundaries);
         conditionId = _prepare(questionId, boundaries, uint8(boundaries.length + 1), true);
     }
 
-    function _prepare(bytes32 questionId, bytes32[] memory ids, uint8 slots, bool range) private returns (bytes32 conditionId) {
+    function _prepare(bytes32 questionId, bytes32[] memory ids, uint8 slots, bool range)
+        private
+        returns (bytes32 conditionId)
+    {
         require(_questions[questionId].slots == 0, "NovakCTFAdapter: already prepared");
         for (uint256 i = 0; i < ids.length; i++) {
-            require(novakResolution(ids[i]) == Resolution.Pending, "NovakCTFAdapter: outcome already known");
+            require(
+                novakResolution(ids[i]) == Resolution.Pending,
+                "NovakCTFAdapter: outcome already known"
+            );
         }
         Question storage q = _questions[questionId];
         q.eventIds = ids;
@@ -112,7 +133,9 @@ contract NovakCTFAdapter is NovakConsumer {
             if (!voided) payouts[r == Resolution.True ? 0 : 1] = 1;
         }
         if (voided) {
-            for (uint256 i = 0; i < payouts.length; i++) payouts[i] = 1; // CTF "invalid": equal split = refund
+            for (uint256 i = 0; i < payouts.length; i++) {
+                payouts[i] = 1; // CTF "invalid": equal split = refund
+            }
         }
         q.resolved = true;
         ctf.reportPayouts(questionId, payouts);
