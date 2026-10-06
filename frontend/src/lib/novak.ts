@@ -28,7 +28,7 @@ import {
   type EventSpecInput,
   type Hex,
   type MarketDef,
-} from "@novak/sdk";
+} from "@novakoracle/sdk";
 import { deployment, novakAddresses } from "./addresses";
 
 export const USDG_DECIMALS = 6;

@@ -1,4 +1,4 @@
-import { deployments, type NovakAddresses, type NovakDeployment } from "@novak/sdk";
+import { deployments, type NovakAddresses, type NovakDeployment } from "@novakoracle/sdk";
 
 /**
  * Which chain the app talks to: Robinhood Chain testnet (46630) by default,

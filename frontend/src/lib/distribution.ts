@@ -9,7 +9,7 @@ import {
   decodePriceAtSpec,
   ladderBucketLabels,
   type Hex,
-} from "@novak/sdk";
+} from "@novakoracle/sdk";
 import { deployment, novakAddresses } from "./addresses";
 import { loadEventNode, useNovakClient, type EventNode } from "./novak";
 

@@ -4,7 +4,7 @@ import {
   type Wallet,
   type WalletDetailsParams,
 } from "@rainbow-me/rainbowkit";
-import { createPublicClient, type Chain, type EIP1193Provider } from "viem";
+import { createPublicClient, fallback, type Chain, type EIP1193Provider, type Transport } from "viem";
 import { createConfig, createConnector, createStorage, http } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { foundry, robinhoodTestnet } from "wagmi/chains";
@@ -116,10 +116,23 @@ const connectors = connectorsForWallets(
 // what NEXT_PUBLIC_CHAIN_ID is set to: activeChain above never resolves to
 // Robinhood Chain mainnet, so this key is never used against it.
 const alchemyKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-const rpcUrl =
-  activeChain.id === robinhoodTestnet.id && alchemyKey
-    ? `https://robinhood-testnet.g.alchemy.com/v2/${alchemyKey}`
-    : process.env.NEXT_PUBLIC_RPC_URL ?? activeChain.rpcUrls.default.http[0];
+const publicRpc = process.env.NEXT_PUBLIC_RPC_URL ?? activeChain.rpcUrls.default.http[0];
+const alchemyRpc = activeChain.id === robinhoodTestnet.id && alchemyKey ? `https://robinhood-testnet.g.alchemy.com/v2/${alchemyKey}` : undefined;
+
+/**
+ * Reads go to Alchemy first (public RPC as backup). Log scans (events list,
+ * timelines, trade history) go to the public RPC first: Alchemy's free tier
+ * caps eth_getLogs at a 10-block range.
+ */
+const rpcTransport: Transport = alchemyRpc
+  ? (opts) => {
+      const main = fallback([http(alchemyRpc), http(publicRpc)])(opts);
+      const logs = fallback([http(publicRpc), http(alchemyRpc)])(opts);
+      const request = ((args: { method: string }, o?: unknown) =>
+        args.method === "eth_getLogs" ? (logs.request as (a: unknown, o?: unknown) => unknown)(args, o) : (main.request as (a: unknown, o?: unknown) => unknown)(args, o)) as typeof main.request;
+      return { ...main, request };
+    }
+  : http(publicRpc);
 
 export const wagmiConfig = createConfig({
   connectors,
@@ -130,7 +143,7 @@ export const wagmiConfig = createConfig({
   // into a single eth_call instead of one RPC round trip each (the RPC has
   // noticeable per-request latency, so this materially speeds up event/
   // market loading, which fires several reads per item).
-  client: ({ chain }) => createPublicClient({ chain, transport: http(rpcUrl), batch: { multicall: true } }),
+  client: ({ chain }) => createPublicClient({ chain, transport: rpcTransport, batch: { multicall: true } }),
   ssr: true,
   // Fresh storage key: drops any stale "recent"/auto-reconnect connector
   // (e.g. a different browser wallet) remembered by earlier builds.

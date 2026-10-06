@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { Hex } from "@novak/sdk";
+import type { Hex } from "@novakoracle/sdk";
 import type { FeedRow } from "@/app/api/feeds/route";
 
 /**
