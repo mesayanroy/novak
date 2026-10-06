@@ -7,6 +7,7 @@ import {
   marketAbi,
   treasuryVaultAbi,
   mockUsdgAbi,
+  novakCtfAdapterAbi,
   settlementAbi,
   stockLendingGuardAbi,
   subscriptionManagerAbi,
@@ -24,6 +25,7 @@ import type {
   NovakAddresses,
   Outcome,
 } from "./types.js";
+import { matchesEvent, rankMatches, selectPriceLadder, type EventMatch, type KnownEvent, type LadderQuery, type LadderRung } from "./reuse.js";
 
 const eventCreatedEvent = parseAbiItem(
   "event EventCreated(bytes32 indexed eventId, bytes32 indexed sourceId, uint16 specVersion)",
@@ -133,6 +135,37 @@ export class NovakClient {
       specVersion: Number(l.args.specVersion),
       blockNumber: l.blockNumber,
     }));
+  }
+
+  /** `listEvents` plus each event's spec and status — the catalog the reuse helpers search. */
+  async listKnownEvents(fromBlock: bigint): Promise<KnownEvent[]> {
+    const created = await this.listEvents(fromBlock);
+    const out: KnownEvent[] = [];
+    for (let i = 0; i < created.length; i += 50) {
+      const batch = created.slice(i, i + 50);
+      const rows = await Promise.all(
+        batch.map(async (e) => {
+          const [spec, status] = await Promise.all([this.getEventSpec(e.eventId), this.getEventStatus(e.eventId)]);
+          return { eventId: e.eventId, spec, status: Number(status), blockNumber: e.blockNumber };
+        }),
+      );
+      out.push(...rows);
+    }
+    return out;
+  }
+
+  /**
+   * Reuse before you create: events that already ask exactly this question
+   * (same source + spec bytes), best first. Point your market at
+   * `matches[0].eventId` instead of paying resolvers to answer it twice.
+   */
+  async findMatchingEvents(match: EventMatch, fromBlock: bigint): Promise<KnownEvent[]> {
+    return rankMatches((await this.listKnownEvents(fromBlock)).filter((e) => matchesEvent(e, match)));
+  }
+
+  /** Existing "feed ≥ X at T" boundary events for one (feed, T), ascending by X. See `planLadder`. */
+  async findPriceLadder(query: LadderQuery, fromBlock: bigint): Promise<LadderRung[]> {
+    return selectPriceLadder(await this.listKnownEvents(fromBlock), query);
   }
 
   // --- Composition ---
@@ -700,6 +733,53 @@ export class NovakClient {
       if (Date.now() > deadline) throw new Error(`NovakClient: timed out waiting for ${eventId}`);
       await new Promise((r) => setTimeout(r, interval));
     }
+  }
+
+  // --- Conditional Tokens (Polymarket-style) adapter ---
+  // `adapter` is a NovakCTFAdapter you (or the venue) deployed next to its CTF.
+
+  async ctfPrepareBinary(adapter: Address, eventId: Hex, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: adapter,
+      abi: novakCtfAdapterAbi,
+      functionName: "prepareBinary",
+      args: [eventId],
+    });
+  }
+
+  async ctfPrepareRange(adapter: Address, boundaryEventIds: Hex[], account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: adapter,
+      abi: novakCtfAdapterAbi,
+      functionName: "prepareRange",
+      args: [boundaryEventIds],
+    });
+  }
+
+  /** Permissionless: reports Novak's answer into the CTF once every event is decided (void ⇒ equal payouts). */
+  async ctfResolve(adapter: Address, questionId: Hex, account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: adapter,
+      abi: novakCtfAdapterAbi,
+      functionName: "resolve",
+      args: [questionId],
+    });
+  }
+
+  async ctfCanResolve(adapter: Address, questionId: Hex): Promise<boolean> {
+    return this.publicClient.readContract({ address: adapter, abi: novakCtfAdapterAbi, functionName: "canResolve", args: [questionId] });
+  }
+
+  async ctfQuestionId(adapter: Address, eventIdOrBoundaries: Hex | Hex[]): Promise<Hex> {
+    return Array.isArray(eventIdOrBoundaries)
+      ? this.publicClient.readContract({ address: adapter, abi: novakCtfAdapterAbi, functionName: "rangeQuestionId", args: [eventIdOrBoundaries] })
+      : this.publicClient.readContract({ address: adapter, abi: novakCtfAdapterAbi, functionName: "binaryQuestionId", args: [eventIdOrBoundaries] });
   }
 
   private requireWallet(): WalletClient {

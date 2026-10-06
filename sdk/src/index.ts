@@ -4,6 +4,7 @@ export * from "./sources.js";
 export * from "./chains.js";
 export * from "./chainlinkFeeds.js";
 export { deployments } from "./deployments.js";
+export * from "./reuse.js";
 export {
   encodeBoolOutcome,
   decodeBoolOutcome,
@@ -24,4 +25,6 @@ export {
   distributionMarketAbi,
   treasuryVaultAbi,
   mockUsdgAbi,
+  novakCtfAdapterAbi,
+  mockConditionalTokensAbi,
 } from "./abis.js";

@@ -2,7 +2,7 @@
 // Snapshots Chainlink's public directory of Robinhood Chain MAINNET feeds into
 // sdk/src/chainlinkFeeds.ts, so every tokenized stock / bond / crypto feed has
 // a symbol + class in the SDK (titles, icons, market templates). Re-run when
-// Chainlink lists new feeds:  pnpm --filter @novak/sdk gen:feeds
+// Chainlink lists new feeds:  pnpm --filter @novakoracle/sdk gen:feeds
 // (The frontend's /api/feeds route still reads the directory + prices live.)
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";

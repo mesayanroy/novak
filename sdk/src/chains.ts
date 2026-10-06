@@ -18,7 +18,7 @@ export function getDeployment(chainId: number): NovakDeployment {
   if (!d) {
     throw new Error(
       `No Novak deployment for chain ${chainId}. Deploy (script/Deploy.s.sol), run ` +
-        "`node script/export-deployment.mjs <chainId>`, then `pnpm --filter @novak/sdk gen`.",
+        "`node script/export-deployment.mjs <chainId>`, then `pnpm --filter @novakoracle/sdk gen`.",
     );
   }
   return d;

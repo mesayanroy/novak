@@ -1,27 +1,71 @@
 {
-  "name": "@novak/sdk",
-  "version": "0.1.0",
-  "description": "TypeScript SDK for Novak (Neural Event Network): create events, query finalized outcomes, compose events, and interact with the derivatives market.",
+  "name": "@novakoracle/sdk",
+  "version": "0.2.0",
+  "description": "TypeScript SDK for Novak \u2014 the dispute-layer oracle for prediction markets and range (LMSR) AMMs on Robinhood Chain. Create or reuse events, read finalized outcomes, compose events, trade range markets, settle Conditional Tokens.",
+  "keywords": [
+    "novak",
+    "oracle",
+    "prediction-market",
+    "dispute",
+    "lmsr",
+    "amm",
+    "conditional-tokens",
+    "robinhood-chain",
+    "arbitrum",
+    "viem",
+    "tokenized-stocks"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mesayanroy/novak.git",
+    "directory": "sdk"
+  },
+  "homepage": "https://github.com/mesayanroy/novak/tree/main/sdk#readme",
+  "bugs": {
+    "url": "https://github.com/mesayanroy/novak/issues"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "gen": "node scripts/gen.mjs",
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "test": "vitest run",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "gen:feeds": "node scripts/gen-feeds.mjs"
+    "gen:feeds": "node scripts/gen-feeds.mjs",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test"
   },
-  "dependencies": {
+  "peerDependencies": {
     "viem": "^2.56.0"
   },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.14.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "viem": "^2.56.0"
   }
 }
