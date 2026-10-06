@@ -33,7 +33,7 @@ contract TreasuryVaultTest is Test {
         composer = new EventComposer(address(registry));
         vault =
             new TreasuryVault(address(usdg), address(registry), address(composer), address(this));
-        dm = new DisputeManager(address(registry), address(vault));
+        dm = new DisputeManager(address(registry), address(vault), 0.01 ether);
         registry.setDisputeManager(address(dm));
         vault.setDisputeManager(address(dm));
 

@@ -47,7 +47,7 @@ contract DisputeManagerTest is Test {
 
     function setUp() public {
         registry = new EventRegistry();
-        disputeManager = new DisputeManager(address(registry), treasury);
+        disputeManager = new DisputeManager(address(registry), treasury, 0.01 ether);
         registry.setDisputeManager(address(disputeManager));
 
         registry.setResolverAuthorization(resolverA, true);

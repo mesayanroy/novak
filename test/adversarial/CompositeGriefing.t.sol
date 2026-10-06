@@ -26,7 +26,7 @@ contract CompositeGriefingTest is Test {
     function setUp() public {
         registry = new EventRegistry();
         composer = new EventComposer(address(registry));
-        disputeManager = new DisputeManager(address(registry), address(0xC0DE));
+        disputeManager = new DisputeManager(address(registry), address(0xC0DE), 0.01 ether);
         registry.setDisputeManager(address(disputeManager));
 
         registry.setResolverAuthorization(resolverA, true);

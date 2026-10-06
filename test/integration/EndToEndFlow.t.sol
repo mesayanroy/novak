@@ -40,7 +40,7 @@ contract EndToEndFlowTest is Test {
 
     function setUp() public {
         registry = new EventRegistry();
-        disputeManager = new DisputeManager(address(registry), address(this));
+        disputeManager = new DisputeManager(address(registry), address(this), 0.01 ether);
         registry.setDisputeManager(address(disputeManager));
         composer = new EventComposer(address(registry));
         bus = new EventBus(address(registry), address(composer));
