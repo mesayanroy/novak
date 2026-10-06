@@ -38,7 +38,7 @@ creating a second `frontend/`-like workspace, since one already existed.
   code blocks). Every protocol-status glyph (event/dispute/composite state)
   is a hand-drawn inline SVG in `StatusPill.tsx`, not a lucide icon — kept
   deliberately distinct so status glyphs form one consistent custom set.
-- `@novak/sdk: workspace:*` — unchanged, real dependency, used throughout.
+- `@novakoracle/sdk: workspace:*` — unchanged, real dependency, used throughout.
 
 ## Design tokens (exact)
 

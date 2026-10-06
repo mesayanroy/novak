@@ -60,7 +60,7 @@ determinism) unless marked unresolved.
 
 4. **Dispute spam / griefing.** Repeated frivolous disputes stall
    finalization of a correct outcome.
-   - *Mitigation:* a flat `DISPUTE_BOND` (0.01 ETH) is forfeited (burned +
+   - *Mitigation:* a flat `DISPUTE_BOND` (one bond unit — 0.01 ETH by default, 0.0005 ETH on the testnet deployment) is forfeited (burned +
      sent to treasury) if the committee upholds the original proposal, so
      each frivolous dispute costs the griefer real ETH — the same economic
      shape as before, just decided by a bonded committee instead of an
@@ -164,9 +164,21 @@ determinism) unless marked unresolved.
     proposer-builder-separation chain, whoever controls block building)
     could choose whether to include a `dispute`/`escalateNonConvergence`/
     `escalateTier2` transaction in a block whose `blockhash`/`prevrandao`
-    happens to seed a committee favorable to them, since
-    `DisputeManager._selectCommittee` derives its seed from block data.
-    - *Status:* **unresolved, stated plainly.** This is standard
+    happens to seed a committee favorable to them, if the seed came from
+    block data.
+    - *Status (2026-10-06):* **mitigated with commit-reveal.** When the pool
+      exceeds the tier size, the tier opens in a seeding phase: authorized
+      resolvers commit `keccak256(eventId, tier, resolver, salt)`, reveal
+      after the commit window, and `drawCommittee` seeds the draw with the
+      XOR of the revealed salts. No party — sequencer included — can predict
+      or steer the draw unless *every* revealer colludes. Residual: the last
+      revealer can choose to withhold, which only excludes them from the
+      draw (one bit of influence, at the cost of their own seat); if nobody
+      reveals, the draw falls back to block data for liveness. Tests:
+      `test/unit/CommitteeSeed.t.sol`. Resolver nodes commit/reveal
+      automatically with a salt derived from their own signature, so a
+      restart can't make them miss a reveal.
+    - *Original analysis (kept for context):* This is standard
       block-data-pseudo-randomness weakness, not specific to this protocol —
       but it's real, and the fix (a VRF or commit-reveal seed) is
       deliberately out of scope for the MVP alongside the rest of "no

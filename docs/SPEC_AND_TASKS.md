@@ -11,10 +11,10 @@ proceeds), DistributionMarket (LMSR range markets over threshold-event
 ladders), `createEvents` + per-resolver observed outcomes, Fed-rate adapter
 (`macro.fomc.v1`), rewards duty, live feeds and rates routes, distribution
 UI with insights, and the integration guide (`docs/INTEGRATE.md`) with a
-tested example consumer. `forge test` → **138/138**.
+tested example consumer. `forge test` → **173/173**.
 
-**Robinhood Chain pass (2026-09-25):** the project now targets the Crypto
-World's Fair Robinhood Chain track; the build plan, verified environment
+**Robinhood Chain pass (2026-09-25):** the project now targets Robinhood
+Chain; the build plan, verified environment
 facts and work tracker live in `docs/ROBINHOOD_CHAIN_PLAN.md`. `forge test`
 → **112/112**. Items below are updated where that pass closed them.
 
@@ -25,7 +25,7 @@ see `docs/protocol-spec.md` for what "Gap 1–5" refers to):**
 `test/adversarial/CompositeGriefing.t.sol`, plus expanded
 `EventComposer.t.sol`/`EventRegistry.t.sol`/`MaliciousResolver.t.sol`
 coverage for canonicalization, DAG bounds, terminal-state propagation, and
-the tiered dispute ladder); `pnpm --filter @novak/sdk test` and
+the tiered dispute ladder); `pnpm --filter @novakoracle/sdk test` and
 `pnpm --filter novak-resolver test` both green after syncing the SDK's ABI/
 types to the new `EventRegistry`/`DisputeManager` surface.
 `examples/end-to-end-flow.ts` doesn't exercise disputes and is unaffected by
@@ -37,7 +37,7 @@ assertions are unchanged), is covered by
 
 **Also done since that pass, not yet reflected anywhere else but here:** the
 frontend MVP (Issue #21) — a real landing page, a full `/docs` hub (9
-sub-pages), and `/markets` + `/markets/[id]` wired to the live `@novak/sdk`
+sub-pages), and `/markets` + `/markets/[id]` wired to the live `@novakoracle/sdk`
 ABIs wherever a real read/write makes sense — was built out in this
 environment on top of the pre-existing minimal scaffold. See
 `docs/FRONTEND_SPEC.md` for the exact stack, route map, component inventory,
@@ -356,7 +356,7 @@ tracked here regardless of which repo-ownership row it falls under.
       black/white/gray design system (Geist + Geist Mono), no accent color
       anywhere including status — every event/dispute/composite state is a
       distinct shape+icon+label combination, never color-coded
-- [x] Wired to the real `@novak/sdk` ABIs/types wherever a live read/write
+- [x] Wired to the real `@novakoracle/sdk` ABIs/types wherever a live read/write
       makes sense (`EventStatusCard`, `MarketPositionCard`,
       `CreateMarketCard`); `/markets`' list is explicitly mock data with a
       visible "Example data" badge, since `Market.sol` has no market
@@ -458,7 +458,7 @@ ABI/types kept in sync.
 backend:** a full Next.js 14 site — landing page, a 9-page `/docs` hub, and
 `/markets` + `/markets/[id]` — hand-restyled to a strict black/white/gray
 design system with RainbowKit/wagmi wallet connection, wired to the real
-`@novak/sdk` ABIs everywhere a live read/write is possible (mock data used
+`@novakoracle/sdk` ABIs everywhere a live read/write is possible (mock data used
 only where the contracts have no enumeration getter to make it live, and
 always visibly badged as mock). See `docs/FRONTEND_SPEC.md` for the exact
 route map, component inventory, and live/mock data breakdown, and Issue #21

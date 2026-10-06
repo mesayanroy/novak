@@ -105,17 +105,23 @@ why that design was explicitly flagged as a real limitation rather than
 assumed away, and what changed.
 
 Disputing (`IDisputeManager.dispute`, within the dispute window, posting
-`DISPUTE_BOND` = 0.01 ETH) or a non-converging quorum (see above) both open
+`DISPUTE_BOND` = one bond unit, 0.01 ETH by default) or a non-converging quorum (see above) both open
 **Tier-1**: a committee is drawn from `EventRegistry.getAuthorizedResolvers()`
 — the full pool if it's at or below `TIER1_COMMITTEE_SIZE` (7), otherwise a
-block-data-seeded pseudo-random sample of 7. Each committee member may cast
-one bonded re-resolution vote (`TIER1_BOND` = 0.03 ETH). The instant `>=66%`
+sample of 7 drawn by **commit-reveal**: the tier opens with a
+`SEED_COMMIT_WINDOW` (10 min) in which authorized resolvers `commitSeed`
+`keccak256(abi.encode(eventId, tier, resolver, salt))`, then a
+`SEED_REVEAL_WINDOW` (10 min) in which they `revealSeed(salt)`; anyone then
+calls `drawCommittee`, which seeds a partial Fisher-Yates draw with the XOR
+of the revealed salts (order-independent) and **excludes committers that
+never revealed**. The voting window starts at the draw. Each committee member may cast
+one bonded re-resolution vote (`TIER1_BOND` = 3 units, 0.03 ETH by default). The instant `>=66%`
 of the **fixed committee size** (not of however many members bothered to
 vote) agrees on one outcome, the event finalizes with that outcome. If the
 `TIER1_WINDOW` (1 hour) elapses without 66% agreement, anyone can call
 `escalateTier2`, which refunds every Tier-1 bond in full (no decision was
 reached, so nobody is "wrong") and opens **Tier-2**: same mechanics,
-`TIER2_COMMITTEE_SIZE` = 15, `TIER2_BOND` = 0.08 ETH, `TIER2_WINDOW` = 2
+`TIER2_COMMITTEE_SIZE` = 15, `TIER2_BOND` = 8 units (0.08 ETH by default), `TIER2_WINDOW` = 2
 hours. If Tier-2 also fails to converge, `voidAfterTier2Timeout` marks the
 event **permanently `Voided`** — the hard floor of the ladder — and refunds
 every remaining bond (Tier-2 committee bonds and the original disputer's
@@ -134,10 +140,13 @@ burn/treasury split (not redistributed to the committee — a documented
 gas/complexity simplification, one extra payout loop avoided).
 
 **Stated MVP simplifications, not final economic design:**
-- **Committee selection is pseudo-random** (seeded from block data via
-  `keccak256(eventId, tier, blockhash, timestamp)`), not VRF-based — not
-  resistant to a miner/validator choosing whether to include the triggering
-  transaction in a favorable block. See `docs/threat-model.md`.
+- **Committee selection is commit-reveal, not VRF** (Chainlink VRF is not on
+  Robinhood Chain). One honest revealer makes the seed unpredictable; the
+  residual bias is the last revealer's choice to withhold, which can only
+  remove *themselves* from the draw. If nobody reveals at all, the draw falls
+  back to block data so the dispute can't stall. Pools at or below the tier
+  size skip seeding entirely (the committee is the whole pool). See
+  `docs/threat-model.md` item 10.
 - **No variable staking.** The source design for this ladder described
   committee vote weight as `min(bondStaked, MAX_WEIGHT_CAP)`, implying
   resolvers choose their own stake per vote. The MVP has no on-chain
@@ -382,8 +391,8 @@ deployment (needs a funded key/RPC — see `docs/SPEC_AND_TASKS.md` Issue #20).
 owner deciding disputes to a bonded, two-tier committee ladder
 (`DisputeManager`) that never escalates to a token-governance vote — a real
 structural change, not a relabeling. It is still not what "decentralized"
-would mean at full maturity: committee selection is block-data
-pseudo-randomness (not VRF-based, not front-running-resistant), and there is
+would mean at full maturity: committee selection is commit-reveal among
+the resolvers themselves (no external randomness beacon), and there is
 no on-chain staking/reputation token behind committee membership, so "every
 committee member posts the same fixed bond" is a stand-in for genuine
 stake-weighted selection. Don't present this as fully solved — see

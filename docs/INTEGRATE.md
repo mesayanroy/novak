@@ -13,12 +13,41 @@ question to Novak and reads back a final answer:
 You never run an oracle, a quorum or a dispute process. You never trust a
 single reporter.
 
-## 1. Pick or create the event
+```bash
+npm i @novakoracle/sdk viem
+```
 
-Reuse an existing event ID (anyone's markets can settle on the same event), or
-create one. These are the event types (`sourceId` = `keccak256(name)`):
+Three ways in, from least to most code:
 
-| Source | Question | Encoder (`@novak/sdk`) |
+| You are… | Use | Code |
+|---|---|---|
+| A Solidity market or AMM | Inherit `NovakConsumer` | [`contracts/integrations/NovakConsumer.sol`](../contracts/integrations/NovakConsumer.sol) |
+| A Conditional Tokens (Polymarket-style) venue | Make `NovakCTFAdapter` your condition's oracle | [`contracts/integrations/NovakCTFAdapter.sol`](../contracts/integrations/NovakCTFAdapter.sol) |
+| An off-chain settlement service | `NovakClient.waitForOutcome` | [`sdk/`](../sdk/README.md) |
+
+## 1. Reuse or create the event
+
+**Reuse first.** An event is observed, disputed and finalized once. Every
+market that reads it settles on the same answer, and you pay no extra resolver
+work:
+
+```ts
+const from = BigInt(getDeployment(46630).startBlock);
+// The exact same question (same source + spec bytes), undecided events first:
+const [existing] = await novak.findMatchingEvents({ sourceId, spec, onlyOpen: true }, from);
+
+// Range markets: which "NVDA ≥ X at T" boundaries already exist?
+const rungs = await novak.findPriceLadder({ feed: CHAINLINK_FEEDS_MAINNET.NVDA, at: T }, from);
+const { reuse, create } = planLadder(rungs, thresholds); // only create what's missing
+```
+
+In the app, every event page has a **Reuse this event** panel (ID, its ladder,
+ready-to-paste code, one-click market). The Builder console warns you before
+you create a duplicate.
+
+To create a new one, these are the event types (`sourceId` = `keccak256(name)`):
+
+| Source | Question | Encoder (`@novakoracle/sdk`) |
 |---|---|---|
 | `chainlink.price-at.v1` | NVDA / TSLA / SGOV (tokenized Treasury) ≥ or ≤ X at time T | `encodePriceAtSpec` |
 | `rh.corporate-action.v1` | A stock token had a split- or dividend-sized multiplier change in a window | `encodeCorporateActionSpec` |
@@ -27,7 +56,7 @@ create one. These are the event types (`sourceId` = `keccak256(name)`):
 
 ```ts
 import { NovakClient, getDeployment, robinhoodTestnet, SOURCES, sourceId,
-  encodePriceAtSpec, CHAINLINK_FEEDS_MAINNET, Comparator } from "@novak/sdk";
+  encodePriceAtSpec, CHAINLINK_FEEDS_MAINNET, Comparator } from "@novakoracle/sdk";
 
 const novak = new NovakClient(publicClient, walletClient, getDeployment(robinhoodTestnet.id));
 const T = 1_791_000_000n; // when the question is decided
@@ -51,11 +80,38 @@ For a **range question** ("where will NVDA be at T?"), create a ladder with
 when exactly *k* boundaries resolve YES. Novak's own `DistributionMarket`
 works this way.
 
-## 2a. Settle on-chain: three reads from the Event Bus
+## 2a. Settle on-chain: inherit `NovakConsumer`
 
-Hold **only** an `IEventBus` reference. Full example:
-[`examples/integrations/ExternalPredictionMarket.sol`](../examples/integrations/ExternalPredictionMarket.sol)
-(tested in `test/unit/ExternalPredictionMarket.t.sol`).
+`NovakConsumer` holds **only** an `IEventBus` reference and gives you the
+whole settlement surface:
+
+```solidity
+import { NovakConsumer } from "novak/contracts/integrations/NovakConsumer.sol";
+
+contract MyMarket is NovakConsumer {
+    bytes32 public immutable eventId;
+    constructor(address bus, bytes32 id) NovakConsumer(bus) { eventId = id; }
+
+    function deposit(bool yes) external payable whenNovakPending(eventId) { /* … */ }
+    function resolve() external { _settleWithNovak(eventId); }   // calls exactly one hook
+
+    function _onNovakResolved(bytes32, bool yes) internal override { /* pay winners */ }
+    function _onNovakVoided(bytes32) internal override { /* refund everyone */ }
+}
+```
+
+| Helper | Does |
+|---|---|
+| `novakResolution(id)` | `Pending` / `True` / `False` / `Voided` in one call |
+| `whenNovakPending(id)` | modifier: no trading once the answer is known |
+| `_settleWithNovak(id)` | routes to `_onNovakResolved` or `_onNovakVoided`; reverts while pending |
+| `novakRange(boundaries)` | `(status, winningBucket)` for an ascending ladder; a voided or inconsistent ladder is `Voided` |
+| `_novakOutcome(id)` | `(outcome, occurredAt)`: v2 payloads carry `occurredAt`, v1 falls back to `finalizedAt` |
+
+Tested in `test/unit/NovakIntegrations.t.sol`, including the guard test that
+the consumer holds only the Bus. If you'd rather not inherit anything, it
+comes down to three reads (see
+[`examples/integrations/ExternalPredictionMarket.sol`](../examples/integrations/ExternalPredictionMarket.sol)):
 
 ```solidity
 IEventBus.Availability a = novak.getAvailability(eventId);
@@ -72,7 +128,29 @@ Rules:
 - The outcome's first ABI word is the bool in every spec version, so
   `abi.decode(outcomeData, (bool))` is always valid.
 
-## 2b. Settle off-chain (Polymarket-style venues)
+## 2b. Conditional Tokens venues: `NovakCTFAdapter`
+
+Polymarket-style venues hold positions as Gnosis Conditional Tokens and
+settle when the condition's oracle calls `reportPayouts`. Deploy
+`NovakCTFAdapter(eventBus, conditionalTokens)` and it **is** that oracle,
+answering from Novak:
+
+```ts
+await novak.ctfPrepareBinary(adapter, eventId, account);         // slot 0 = YES, slot 1 = NO
+await novak.ctfPrepareRange(adapter, boundaryEventIds, account); // n boundaries ⇒ n+1 slots
+// … trade the condition's outcome tokens exactly as today …
+if (await novak.ctfCanResolve(adapter, questionId))
+  await novak.ctfResolve(adapter, questionId, account);          // permissionless
+```
+
+- The `questionId` is deterministic per event (or per ladder), so two
+  venues on the same Novak event share one condition.
+- If Novak voids the event, every slot pays equally. That's the CTF's
+  "invalid" outcome: everyone gets their collateral back.
+- Disputes happen in Novak's committees *before* `resolve` can run. The
+  venue never posts a bond.
+
+## 2c. Settle off-chain
 
 ```ts
 const result = await novak.waitForOutcome(eventId, { intervalMs: 15_000 });
@@ -105,5 +183,5 @@ Novak's own `Market` and `DistributionMarket` do exactly this.
 
 ## Addresses
 
-`@novak/sdk` ships them: `getDeployment(46630)` for Robinhood Chain testnet.
+`@novakoracle/sdk` ships them: `getDeployment(46630)` for Robinhood Chain testnet.
 Read `eventBus` for on-chain consumers and `treasuryVault` for fee sharing.

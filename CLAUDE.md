@@ -7,8 +7,8 @@ and the invariants you must not break.
 ## What this project is
 
 **Novak (Neural Event Network / NEN)** — the event layer for tokenized stocks
-on **Robinhood Chain** (Arbitrum Orbit L2), entered in the Colosseum Crypto
-World's Fair **Robinhood Chain track** (deadline 2026-10-12). Positioning:
+on **Robinhood Chain** (Arbitrum Orbit L2). Team target: feature-complete
+by 2026-10-10. Never name any contest/event in repo docs or UI. Positioning:
 "Chainlink tells your contract the price. Novak tells it what happened."
 Real-world facts about Robinhood Stock Tokens (corporate actions, trading
 status, price-at-time conditions) are resolved, finalized and stored once,
@@ -41,8 +41,11 @@ Registry, or the Composer.** `derivatives/Market.sol` holds only a
 Enforced by regression tests:
 `test/unit/Market.t.sol::test_market_onlyHoldsSettlementReference`,
 `test/unit/DistributionMarket.t.sol::test_holdsOnlySettlementReference`,
-`test/unit/StockLendingGuard.t.sol::test_guard_onlyHoldsEventBusReference` and
-`test/unit/ExternalPredictionMarket.t.sol::test_holdsOnlyEventBusReference`.
+`test/unit/StockLendingGuard.t.sol::test_guard_onlyHoldsEventBusReference`,
+`test/unit/ExternalPredictionMarket.t.sol::test_holdsOnlyEventBusReference` and
+`test/unit/NovakIntegrations.t.sol::test_consumer_holdsOnlyEventBusReference` /
+`test_adapter_holdsOnlyEventBusAndCtf` (the `contracts/integrations/` drop-in
+`NovakConsumer` base and the Conditional Tokens `NovakCTFAdapter`).
 Consumers may also *push* fees into `ITreasuryVault`. The vault (protocol
 infrastructure) is the one that reads the Registry/DisputeManager to pay people.
 If you add a new consumer contract, add an equivalent guard test. Consumers
@@ -122,11 +125,15 @@ deployments/      <chainId>.json (addresses + startBlock), from
                   script/export-deployment.mjs — the single address source
 resolver/         daemon: node/ (discovery, resolve, keeper, voter, server)
                   adapters/ evidence/ consensus/ lib/ scripts/probe-sources.ts
-sdk/              @novak/sdk — GENERATED abis.ts + deployments.ts (scripts/gen.mjs),
+sdk/              @novakoracle/sdk — GENERATED abis.ts + deployments.ts (scripts/gen.mjs),
                   chains, source-spec encoders, NovakClient (viem ≥ 2.56)
-frontend/         Next.js: /, /markets, /markets/[id], /calendar, /guard, /docs;
-                  api/rh-assets route; Robinhood Wallet via WalletConnect
-test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 138 tests, all passing
+frontend/         Next.js: /, /markets, /markets/[id], /markets/dist/[id],
+                  /disputes (Dispute Center), /events + /events/[id] (explorer:
+                  log timeline + evidence), /network (resolver nodes + vault
+                  fee thirds), /build (builder console + code gen), /feeds,
+                  /calendar, /guard, /docs; api/ routes; MetaMask (EIP-6963).
+                  NEXT_PUBLIC_RESOLVER_URL = the resolver service (Render)
+test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 173 tests, all passing
 script/           Deploy.s.sol (Registry -> DisputeManager -> Composer -> Bus
                   -> Settlement -> Market)
 examples/         end-to-end-flow.ts (scripted canonical flow), seed-demo.ts
@@ -137,7 +144,7 @@ docs/             architecture.md, protocol-spec.md, threat-model.md,
 
 ## Current status
 
-`forge test` → 138/138. v2 (2026-10-04): TreasuryVault + DistributionMarket +
+`forge test` → 173/173. v2 (2026-10-04): TreasuryVault + DistributionMarket +
 Fed-rate adapter + rewards duty verified live on anvil from real mainnet
 data: six range markets settled on the correct range, fee thirds were
 claimed, and the winner redeemed 1 USDG per share. Verified in the 2026-09-25 pass: full-stack deploy
@@ -150,18 +157,23 @@ liquidations in the guard, and handled a filed dispute end to end.
 
 - **Deployed to Robinhood testnet 2026-10-05** (all contracts verified on
   Blockscout; addresses in README / deployments/46630.json; run
-  `bash script/deploy-testnet.sh` to redeploy). Only TWO resolvers so far
-  (r1 + the deployer as r2) — add independent operators. Previously: the team
-  needed funded faucet keys (deployer + 3 resolvers). `deployments/46630.json` must only ever come
+  `bash script/deploy-testnet.sh` to redeploy). **Redeployed 2026-10-06** with
+  THREE authorized resolvers (r1, the deployer as r2 + keeper, r3 =
+  0x09BB…00b2; quorum 2 of 3) and `DISPUTE_BOND_UNIT` = 0.0005 ETH (bonds
+  0.0005 / 0.0015 / 0.004 — the 1:3:8 ratio, sized so faucet-funded resolvers
+  can vote). Still all team-run — add independent operators. Resolvers are
+  hosted via `render.yaml` (one service, one child process per key:
+  `resolver/node/multi.ts`). `deployments/46630.json` must only ever come
   from a real broadcast via `export-deployment.mjs`. A previous copy of the
   anvil addresses there pointed the frontend at addresses with no code. The
   frontend shows badged preview markets ONLY when no deployment exists.
 - **Frontend not click-tested in a browser** — builds, typechecks, serves
   200s, API route verified with real data.
-- **Committee selection is block-data pseudo-randomness**, weaker on
-  Arbitrum chains (`prevrandao` = 1, `blockhash` insecure) and Chainlink VRF
-  is not on Robinhood Chain. Mitigation plan: commit-reveal; keep the
-  resolver pool ≤ 7 meanwhile. See `docs/threat-model.md` items 10, 16.
+- **Committee selection is commit-reveal** for pools larger than the tier
+  (DisputeManager `commitSeed`/`revealSeed`/`drawCommittee`; resolvers take
+  part automatically, the keeper draws). Residual: last-revealer withholding
+  (self-exclusion only) and a block-data fallback when nobody reveals. No VRF
+  on Robinhood Chain. See `docs/threat-model.md` items 10, 16.
 - **No push/relayer delivery** (Issue #13) — the keeper only calls
   permissionless functions; consumers still pull.
 - **No staking/reputation token** behind resolver authorization or
@@ -214,15 +226,15 @@ design — see `docs/protocol-spec.md`).
   gitignored except for `.gitmodules`, so a fresh clone must re-run that
   install step.
 - **pnpm workspaces** (not Turborepo) tie together `resolver/`, `sdk/`,
-  `frontend/`. `resolver/` depends on `@novak/sdk` (workspace link) for
+  `frontend/`. `resolver/` depends on `@novakoracle/sdk` (workspace link) for
   shared ABIs and the outcome codec — build `sdk/` before `resolver/` on a
-  clean install (`pnpm --filter @novak/sdk build` first).
+  clean install (`pnpm --filter @novakoracle/sdk build` first).
 - `derivatives/*.sol` and `consumers/*.sol` are NOT under Foundry's `src`
   (`contracts/`) — they're picked up because `test/` files (and
   `script/Deploy.s.sol`) import them directly. A new contract nothing imports
   won't be compiled by `forge build`.
 - **ABIs are generated, never hand-edited:** after any contract change run
-  `forge build && pnpm --filter @novak/sdk gen && pnpm --filter @novak/sdk build`.
+  `forge build && pnpm --filter @novakoracle/sdk gen && pnpm --filter @novakoracle/sdk build`.
   Addresses come from `deployments/<chainId>.json`
   (`node script/export-deployment.mjs <chainId>` after a deploy).
 - **Arbitrum/Orbit quirks:** inside contracts `block.number` is an L1
@@ -259,7 +271,7 @@ forge test -vvv
 
 # TS workspaces
 pnpm install
-pnpm --filter @novak/sdk build   # build sdk first — resolver depends on it
+pnpm --filter @novakoracle/sdk build   # build sdk first — resolver depends on it
 pnpm build                        # resolver + sdk + frontend
 pnpm test                         # forge test + all TS tests
 pnpm --filter novak-resolver dev
@@ -267,7 +279,7 @@ pnpm --filter novak-frontend dev
 
 # Deploy (testnet; MockUSDG auto-deployed) and export addresses
 forge script script/Deploy.s.sol --rpc-url robinhood_testnet --broadcast --verify
-node script/export-deployment.mjs 46630 && pnpm --filter @novak/sdk gen
+node script/export-deployment.mjs 46630 && pnpm --filter @novakoracle/sdk gen
 
 # Resolvers (3 keys; one with RESOLVER_KEEPER=true), live-source probe, demo seed
 pnpm --filter novak-resolver start

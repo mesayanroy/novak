@@ -56,26 +56,26 @@ Three consumers ship in this repo and read the **same** events:
 
 ## Live on Robinhood Chain testnet
 
-Deployed 2026-10-04 (chain 46630, start block 128894045); every contract is verified on Blockscout. Resolvers: `0xFF84…B535` (r1) and `0xaD91…8980` (r2, also the deployer and keeper).
+Deployed 2026-10-06 (chain 46630, start block 129498402; DisputeManager with commit-reveal committee draws); every contract is verified on Blockscout. Three authorized resolvers, quorum 2 of 3: `0xFF84…B535` (r1), `0xaD91…8980` (r2, also the deployer and keeper) and `0x09BB…00b2` (r3). Dispute bonds use a 0.0005 ETH unit on testnet (0.0005 / 0.0015 / 0.004 ETH — the fixed 1:3:8 ratio; the default unit is 0.01 ETH).
 
 | Contract | Address |
 |---|---|
-| EventRegistry | [0xb96f31bc07777f1f48de16533225f0964951e8f1](https://explorer.testnet.chain.robinhood.com/address/0xb96f31bc07777f1f48de16533225f0964951e8f1) |
-| DisputeManager | [0xf9890adf5549bd39313e16ce7f5dc8c3aef48f63](https://explorer.testnet.chain.robinhood.com/address/0xf9890adf5549bd39313e16ce7f5dc8c3aef48f63) |
-| EventComposer | [0x8ca95b815f1c6f732ed67d0880d672d7fbc33c2e](https://explorer.testnet.chain.robinhood.com/address/0x8ca95b815f1c6f732ed67d0880d672d7fbc33c2e) |
-| EventBus | [0xab30c697738007d5338bcdd7bb25353fddda1054](https://explorer.testnet.chain.robinhood.com/address/0xab30c697738007d5338bcdd7bb25353fddda1054) |
-| TreasuryVault | [0xf4dd6a333c66a765f1cb42e81ca2167b48217710](https://explorer.testnet.chain.robinhood.com/address/0xf4dd6a333c66a765f1cb42e81ca2167b48217710) |
-| Settlement | [0x1336830154365ad443bd362a994cb4dabd9d583d](https://explorer.testnet.chain.robinhood.com/address/0x1336830154365ad443bd362a994cb4dabd9d583d) |
-| Market (yes/no) | [0x73d5e83e5302019129efbf858955126db0deadad](https://explorer.testnet.chain.robinhood.com/address/0x73d5e83e5302019129efbf858955126db0deadad) |
-| DistributionMarket | [0xbfe9786dcc4bfd6c882159caa47367ac40d3ba94](https://explorer.testnet.chain.robinhood.com/address/0xbfe9786dcc4bfd6c882159caa47367ac40d3ba94) |
-| StockLendingGuard | [0x61a5a60887ecaedafbcb26c7b2b029b304ebb133](https://explorer.testnet.chain.robinhood.com/address/0x61a5a60887ecaedafbcb26c7b2b029b304ebb133) |
-| PositionManager | [0x95fe91f6762a4cd6487a62005194784190440ea7](https://explorer.testnet.chain.robinhood.com/address/0x95fe91f6762a4cd6487a62005194784190440ea7) |
-| SubscriptionManager | [0x0b8b5b13ae378fa8a798a483e4fb5b22b4f35e9e](https://explorer.testnet.chain.robinhood.com/address/0x0b8b5b13ae378fa8a798a483e4fb5b22b4f35e9e) |
-| MockUSDG (test collateral) | [0xc835601951cb8efc104ebf615510024dfe003f52](https://explorer.testnet.chain.robinhood.com/address/0xc835601951cb8efc104ebf615510024dfe003f52) |
+| EventRegistry | [0x22699a7961a6538a7cea21c4636c1dc0f4cacc51](https://explorer.testnet.chain.robinhood.com/address/0x22699a7961a6538a7cea21c4636c1dc0f4cacc51) |
+| DisputeManager | [0x632a4adc51dc1fae7b6895bfdd16bcb263ac82e7](https://explorer.testnet.chain.robinhood.com/address/0x632a4adc51dc1fae7b6895bfdd16bcb263ac82e7) |
+| EventComposer | [0x59e868fd1dc7a222613c52aac0e073ff89cfafb0](https://explorer.testnet.chain.robinhood.com/address/0x59e868fd1dc7a222613c52aac0e073ff89cfafb0) |
+| EventBus | [0x1e4537aff9f93a8d2dc90f8b56761dd6a358b32c](https://explorer.testnet.chain.robinhood.com/address/0x1e4537aff9f93a8d2dc90f8b56761dd6a358b32c) |
+| TreasuryVault | [0x765a4ba67c3c28b24806e94f395bc4e02708c6fb](https://explorer.testnet.chain.robinhood.com/address/0x765a4ba67c3c28b24806e94f395bc4e02708c6fb) |
+| Settlement | [0x76ff164df1a3b6f032e7a3cf9dd5c0aa069851fd](https://explorer.testnet.chain.robinhood.com/address/0x76ff164df1a3b6f032e7a3cf9dd5c0aa069851fd) |
+| Market (yes/no) | [0xd6efcb2e3e0f3ddf7951878847bc5422dc9a7d75](https://explorer.testnet.chain.robinhood.com/address/0xd6efcb2e3e0f3ddf7951878847bc5422dc9a7d75) |
+| DistributionMarket | [0xc3af31add18d0d427a702516e92657c838c6b498](https://explorer.testnet.chain.robinhood.com/address/0xc3af31add18d0d427a702516e92657c838c6b498) |
+| StockLendingGuard | [0x530bd96cc480476506cdf97289a66b6587a928fb](https://explorer.testnet.chain.robinhood.com/address/0x530bd96cc480476506cdf97289a66b6587a928fb) |
+| PositionManager | [0xed6bb54f0aa711859f2ecd108f59f97d667aadf2](https://explorer.testnet.chain.robinhood.com/address/0xed6bb54f0aa711859f2ecd108f59f97d667aadf2) |
+| SubscriptionManager | [0xbb579fd3ff188fd34d7da2da0b64e258bd2edfad](https://explorer.testnet.chain.robinhood.com/address/0xbb579fd3ff188fd34d7da2da0b64e258bd2edfad) |
+| MockUSDG (test collateral) | [0xe90a7ffe1cbf704193a6635df0be70a756e523e6](https://explorer.testnet.chain.robinhood.com/address/0xe90a7ffe1cbf704193a6635df0be70a756e523e6) |
 
 ## What's verified
 
-- **Contracts:** `forge test` → **138/138** passing (unit / integration / fuzz
+- **Contracts:** `forge test` → **173/173** passing (unit / integration / fuzz
   / adversarial), including:
   - TreasuryVault thirds, insurance and conservation fuzzing;
   - DistributionMarket LMSR solvency fuzzing, void at 1/N, and the
@@ -144,7 +144,7 @@ novak/
 ├── resolver/      resolver daemon: adapters (chainlink.price-at,
 │                  rh.corporate-action, rh.trading-status), discovery,
 │                  keeper, dispute voter, /health + /evidence server
-├── sdk/           @novak/sdk — generated ABIs, deployments, chains, source specs
+├── sdk/           @novakoracle/sdk — generated ABIs, deployments, chains, source specs
 ├── frontend/      Next.js app: landing, /markets (+ /markets/dist/[id]), /feeds,
 │                  /calendar, /guard, /docs (incl. /docs/integrate)
 ├── deployments/   <chainId>.json — addresses + startBlock (script/export-deployment.mjs)
@@ -175,8 +175,8 @@ panel, buy/hold/avoid insights, a `/feeds` board, and Robinhood Wallet
 (WalletConnect).
 
 Known limits (details in `docs/threat-model.md` and `docs/protocol-spec.md`):
-committee selection is block-data pseudo-randomness (Chainlink VRF is not
-available on Robinhood Chain); no staking/reputation token behind resolvers;
+committee selection is commit-reveal among resolvers (Chainlink VRF is not
+available on Robinhood Chain), with a block-data fallback only if nobody reveals; no staking/reputation token behind resolvers;
 testnet only — Robinhood Chain mainnet is read, not written; no push/relayer
 delivery to consumers (the keeper only calls permissionless functions).
 
@@ -193,7 +193,7 @@ cp .env.example .env    # DEPLOYER_PRIVATE_KEY, RESOLVER_ADDRESSES, ...
 # 1. Deploy + verify (MockUSDG is deployed automatically on testnet)
 forge script script/Deploy.s.sol --rpc-url robinhood_testnet --broadcast --verify
 node script/export-deployment.mjs 46630          # -> deployments/46630.json
-pnpm --filter @novak/sdk gen && pnpm --filter @novak/sdk build
+pnpm --filter @novakoracle/sdk gen && pnpm --filter @novakoracle/sdk build
 
 # 2. Run 3 resolvers (different keys; one also runs the keeper)
 RESOLVER_ID=r1 RESOLVER_PRIVATE_KEY=0x.. RESOLVER_KEEPER=true RESOLVER_HTTP_PORT=8787 pnpm --filter novak-resolver start
@@ -220,7 +220,7 @@ anvil
 RESOLVER_ADDRESSES=0x70997970C51812dc3A010C7d01b50e0d17dc79C8,0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC,0x90F79bf6EB2c4f870365E785982E1f101E93b906 \
   DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
-node script/export-deployment.mjs 31337 && pnpm --filter @novak/sdk gen
+node script/export-deployment.mjs 31337 && pnpm --filter @novakoracle/sdk gen
 pnpm example:e2e                                  # canonical flow, scripted
 cast rpc evm_setIntervalMining 2                  # resolvers need blocks to see time pass
 NOVAK_CHAIN_ID=31337 ... pnpm --filter novak-resolver start   # as above, anvil keys #1-#3
@@ -249,8 +249,8 @@ Run the same checks locally before pushing:
 forge fmt --check && forge build && forge test -vvv
 
 pnpm install --frozen-lockfile
-pnpm --filter novak-resolver build && pnpm --filter @novak/sdk build
-pnpm --filter novak-resolver test && pnpm --filter @novak/sdk test
+pnpm --filter novak-resolver build && pnpm --filter @novakoracle/sdk build
+pnpm --filter novak-resolver test && pnpm --filter @novakoracle/sdk test
 pnpm --filter novak-frontend build
 ```
 
@@ -258,7 +258,7 @@ A PR is mergeable once both jobs are green.
 
 ## Contributing
 
-This is a 3-person ETHOnline team project. Roles and per-milestone
+This is a 3-person team project. Roles and per-milestone
 owners/support are tracked in `docs/SPEC_AND_TASKS.md`'s **Repository
 Ownership** table — check there before assuming who to loop in on a review.
 The "Owner" column reflects who's leading an area, not a gate on whether work
@@ -302,9 +302,9 @@ notes" for the exact test files this has hit before.
 | `docs/threat-model.md`         | Adversary list, mitigations, and residual gaps                      |
 | `docs/SPEC_AND_TASKS.md`       | Milestone-by-milestone deliverables checklist and ownership          |
 | `docs/FRONTEND_SPEC.md`        | Frontend stack, route map, component inventory, live/mock data map  |
+| `docs/DEPLOY.md`               | Vercel (frontend), Render (resolver network), redeploy + reseed     |
 
 ## License
 
-No license file has been added yet — this is an ETHOnline hackathon
-submission. Until one is added, treat the repository as all-rights-reserved
+No license file has been added yet. Until one is added, treat the repository as all-rights-reserved
 by its authors rather than open for reuse.

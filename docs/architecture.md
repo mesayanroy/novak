@@ -204,7 +204,7 @@ see below.
 ## Why this is architecturally ahead of UMA (our closest competitor)
 
 Chainlink and UMA both have live TVL, audits, and years of adversarial
-testing that a hackathon MVP hasn't earned yet — this section is not a
+testing that a testnet MVP hasn't earned yet — this section is not a
 security claim. It's a claim about **what the reusable unit of truth is**,
 and how tightly an application is coupled to how that truth was produced.
 

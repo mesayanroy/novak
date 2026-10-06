@@ -1,7 +1,7 @@
-# Novak on Robinhood Chain — Track Plan & Build Checklist
+# Novak on Robinhood Chain — Build Plan & Checklist
 
-Target: **Crypto World's Fair → Robinhood Chain track** (single track).
-Deadline: **Oct 12, 2026, 11:59pm PT**. Aim to submit by **Oct 11**.
+Target: **Robinhood Chain** (testnet deployment; mainnet as read-only data source).
+Team target: feature-complete by **Oct 10, 2026**.
 Written: Sep 25, 2026, from a full pass over `contracts/`, `derivatives/`,
 `script/`, `resolver/`, `sdk/`, `frontend/`, and `docs/`.
 
