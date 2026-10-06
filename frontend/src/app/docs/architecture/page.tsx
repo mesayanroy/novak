@@ -138,7 +138,7 @@ export default function ArchitecturePage() {
           ["/api/rh-assets", "Corporate-action calendar: Robinhood's asset registry + each token's ERC-8056 multiplier state", "5 min"],
         ]}
       />
-      <H3>SDK (@novak/sdk)</H3>
+      <H3>SDK (@novakoracle/sdk)</H3>
       <P>
         Generated ABIs and deployment addresses (never hand-edited), a typed <C>NovakClient</C>, source-spec encoders, the
         53-feed Chainlink catalog and ladder helpers. See the <a href="/docs/sdk">SDK reference</a>.

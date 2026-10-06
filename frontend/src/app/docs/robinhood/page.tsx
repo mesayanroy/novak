@@ -46,7 +46,7 @@ contract MyLendingPool {
     }
 }`;
 
-const CREATE = `import { NovakClient, SOURCES, sourceId, encodeCorporateActionSpec, STOCK_TOKENS_MAINNET } from "@novak/sdk";
+const CREATE = `import { NovakClient, SOURCES, sourceId, encodeCorporateActionSpec, STOCK_TOKENS_MAINNET } from "@novakoracle/sdk";
 
 await client.createEvent({
   specVersion: 2,                                   // outcome carries occurredAt

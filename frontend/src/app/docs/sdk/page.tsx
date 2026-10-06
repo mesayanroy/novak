@@ -116,7 +116,7 @@ export default function SdkReferencePage() {
     <article>
       <DocHeader
         icon={FileCode2}
-        eyebrow="Reference · @novak/sdk"
+        eyebrow="Reference · @novakoracle/sdk"
         title="The TypeScript SDK"
         lead={
           <>
@@ -145,9 +145,9 @@ export default function SdkReferencePage() {
         className="mt-3"
         label="terminal"
         code={`pnpm install
-pnpm --filter @novak/sdk build      # → sdk/dist
+pnpm --filter @novakoracle/sdk build      # → sdk/dist
 # after any contract change:
-forge build && pnpm --filter @novak/sdk gen && pnpm --filter @novak/sdk build`}
+forge build && pnpm --filter @novakoracle/sdk gen && pnpm --filter @novakoracle/sdk build`}
       />
 
       <H2>Quickstart</H2>
@@ -162,7 +162,7 @@ forge build && pnpm --filter @novak/sdk gen && pnpm --filter @novak/sdk build`}
           <CodeBlock
             variant="dark"
             code={`import { createPublicClient, http } from "viem";
-import { NovakClient, getDeployment, robinhoodTestnet } from "@novak/sdk";
+import { NovakClient, getDeployment, robinhoodTestnet } from "@novakoracle/sdk";
 
 const publicClient = createPublicClient({ chain: robinhoodTestnet, transport: http() });
 const client = new NovakClient(publicClient, undefined, getDeployment(robinhoodTestnet.id));
@@ -187,7 +187,7 @@ if (result.voided) {
         <TabsContent value="trade">
           <CodeBlock
             variant="dark"
-            code={`import { NovakClient, getDeployment, robinhoodTestnet } from "@novak/sdk";
+            code={`import { NovakClient, getDeployment, robinhoodTestnet } from "@novakoracle/sdk";
 
 const client = new NovakClient(publicClient, walletClient, getDeployment(robinhoodTestnet.id));
 

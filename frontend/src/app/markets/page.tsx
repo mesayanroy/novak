@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Availability, MarketStatus } from "@novak/sdk";
+import { Availability, MarketStatus } from "@novakoracle/sdk";
 import { MarketCard } from "@/components/markets/MarketCard";
 import { CreateMarketCard } from "@/components/CreateMarketCard";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";

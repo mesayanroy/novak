@@ -186,7 +186,7 @@ export default function DistributionMarketsPage() {
       </P>
       <CodeBlock
         label="create-range-market.ts"
-        code={`import { NovakClient, buildPriceLadderSpecs, ladderBucketLabels, feedBySymbol, getDeployment } from "@novak/sdk";
+        code={`import { NovakClient, buildPriceLadderSpecs, ladderBucketLabels, feedBySymbol, getDeployment } from "@novakoracle/sdk";
 
 const dep = getDeployment(46630);                       // Robinhood Chain testnet addresses
 const client = new NovakClient(publicClient, walletClient, dep);

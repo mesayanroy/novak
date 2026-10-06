@@ -71,7 +71,7 @@ export default function DocsIntroPage() {
           ["Yes/no markets", "USDG parimutuel market on any event, with refunds on VOID.", "derivatives/Market.sol"],
           ["Lending guard", "Pauses liquidations of a stock token while a risky event is open.", "consumers/StockLendingGuard.sol"],
           ["Resolver node", "Discovers events, observes 4 real sources, votes in committees, keeps, claims rewards.", "resolver/"],
-          ["SDK", "Typed client, spec encoders, the 53-feed catalog, ladder helpers.", "sdk/ (@novak/sdk)"],
+          ["SDK", "Typed client, spec encoders, the 53-feed catalog, ladder helpers.", "sdk/ (@novakoracle/sdk)"],
         ]}
       />
 
@@ -104,9 +104,9 @@ export default function DocsIntroPage() {
       />
 
       <Callout tone="warn" title="Honest status">
-        Testnet only (Robinhood Chain testnet, chain 46630); sources are read from mainnet. Two resolvers run today, both
+        Testnet only (Robinhood Chain testnet, chain 46630); sources are read from mainnet. Three resolvers run today (quorum 2 of 3), all
         operated by the team — the quorum and committee rules are built for many independent operators, and onboarding
-        them is next. Committee selection uses block-data randomness, which is weak on Arbitrum chains. The contracts are
+        them is next. Committees are drawn by commit-reveal among resolvers (no VRF on Robinhood Chain). The contracts are
         unaudited. See the <a href="/docs/threat-model">threat model</a>.
       </Callout>
 

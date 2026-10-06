@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { usePublicClient } from "wagmi";
 import type { PublicClient } from "viem";
-import { STOCK_TOKENS_MAINNET, stockLendingGuardAbi, type Hex } from "@novak/sdk";
+import { STOCK_TOKENS_MAINNET, stockLendingGuardAbi, type Hex } from "@novakoracle/sdk";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";
 import { CodeBlock } from "@/components/CodeBlock";
 import { deployment, novakAddresses } from "@/lib/addresses";

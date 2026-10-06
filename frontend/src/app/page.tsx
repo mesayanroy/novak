@@ -10,7 +10,7 @@ import { IntegrateSection } from "@/components/landing/IntegrateSection";
 import { BentoIdeaSection } from "@/components/BentoIdeaSection";
 import { Iphone } from "@/registry/magicui/iphone";
 import { ArrowRight, Layers, ShieldCheck, Cpu, Terminal, Sparkles, Activity, Radio, TrendingUp } from "lucide-react";
-import { Availability } from "@novak/sdk";
+import { Availability } from "@novakoracle/sdk";
 import { deployment } from "@/lib/addresses";
 import { useEvents } from "@/lib/novak";
 

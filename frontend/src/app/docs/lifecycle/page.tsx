@@ -1,5 +1,5 @@
 import { EventStatusPill } from "@/components/StatusPill";
-import { EventStatus } from "@novak/sdk";
+import { EventStatus } from "@novakoracle/sdk";
 import { DocHeader } from "@/components/docs/DocPrimitives";
 import { GitMerge } from "lucide-react";
 
@@ -87,7 +87,7 @@ export default function LifecyclePage() {
           <p className="font-mono text-xs uppercase tracking-wide text-gray-500">Tier 1</p>
           <ul className="mt-2 flex flex-col gap-1 text-sm text-gray-700">
             <li>Committee: up to 7 resolvers</li>
-            <li>Bond per vote: 0.03 ETH</li>
+            <li>Bond per vote: 3 bond units (0.03 ETH default)</li>
             <li>Window: 1 hour</li>
             <li>Agreement bar: ≥66% of committee size</li>
           </ul>
@@ -96,7 +96,7 @@ export default function LifecyclePage() {
           <p className="font-mono text-xs uppercase tracking-wide text-gray-500">Tier 2</p>
           <ul className="mt-2 flex flex-col gap-1 text-sm text-gray-700">
             <li>Committee: up to 15 resolvers</li>
-            <li>Bond per vote: 0.08 ETH</li>
+            <li>Bond per vote: 8 bond units (0.08 ETH default)</li>
             <li>Window: 2 hours</li>
             <li>Agreement bar: ≥66% of committee size</li>
           </ul>

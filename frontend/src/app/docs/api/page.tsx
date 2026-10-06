@@ -176,7 +176,7 @@ const { resolved, outcome } = await client.getResolvedComposite(compositeId);`}
 curl -X POST "https://api.novak.xyz/observations" \\
   -H "Authorization: Bearer <resolver-signing-key>" \\
   -d '{"eventId":"0x1a2b...9f1a2b","outcomeData":"0x...","evidenceHash":"0x..."}'`}
-          typescript={`// Deliberately NOT wrapped by @novak/sdk's NovakClient — resolver-only.
+          typescript={`// Deliberately NOT wrapped by @novakoracle/sdk's NovakClient — resolver-only.
 // See resolver/node/index.ts for the real submission path.
 await walletClient.writeContract({
   address: addresses.eventRegistry,

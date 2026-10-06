@@ -19,7 +19,7 @@ export default function ResolversPage() {
           { label: "Source adapters", value: "4", hint: "price-at · corporate action · trading status · Fed rate" },
           { label: "Duties per node", value: "5", hint: "discover · resolve · vote · keep · claim" },
           { label: "Quorum", value: "N-of-M", hint: "exact match of the outcome payload" },
-          { label: "Live today", value: "2", hint: "authorized resolvers on testnet (team-run)" },
+          { label: "Live today", value: "3", hint: "authorized resolvers · quorum 2 of 3 (team-run)" },
         ]}
       />
 
@@ -135,7 +135,7 @@ export default function ResolversPage() {
       <CodeBlock
         label="terminal"
         code={`pnpm install
-pnpm --filter @novak/sdk build          # the resolver imports the SDK
+pnpm --filter @novakoracle/sdk build          # the resolver imports the SDK
 pnpm --filter novak-resolver build      # start runs the compiled dist/
 RESOLVER_PRIVATE_KEY=0x… RESOLVER_ID=r1 RESOLVER_HTTP_PORT=8787 \\
   pnpm --filter novak-resolver start
@@ -146,7 +146,7 @@ pnpm --filter novak-resolver probe`}
       <Callout tone="warn" title="Becoming a resolver">
         A key must be authorized on the Registry (<C>setResolverAuthorization</C>, owner-only today) before its observations
         count. There is no staking token: resolvers post flat ETH bonds when they vote in a dispute. Committees are drawn from
-        the authorized pool, so keep that pool ≤ 7 until commit-reveal committee selection lands (see the threat model).
+        the authorized pool; above the tier size they&apos;re drawn by commit-reveal, which every node takes part in automatically.
       </Callout>
     </article>
   );

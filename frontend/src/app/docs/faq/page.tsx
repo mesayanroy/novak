@@ -51,7 +51,7 @@ const SECTIONS: { title: string; faqs: { q: string; a: string }[] }[] = [
     faqs: [
       {
         q: "How many resolvers are there?",
-        a: "Two authorized resolvers run today, both operated by the team. The quorum and committee rules are designed for many independent operators; adding them is the next step. Until committee selection uses commit-reveal, the pool is kept at ≤ 7 so a committee is simply the whole pool.",
+        a: "Three authorized resolvers run today (quorum 2 of 3), all operated by the team. The quorum and committee rules are designed for many independent operators; adding them is the next step. With 7 or fewer resolvers a committee is the whole pool; above that, committees are drawn by commit-reveal.",
       },
       {
         q: "How long does resolution take?",
@@ -63,7 +63,7 @@ const SECTIONS: { title: string; faqs: { q: string; a: string }[] }[] = [
       },
       {
         q: "Is decentralized dispute arbitration finished?",
-        a: "No. The bonded two-tier committee ladder replaced single-owner arbitration and never falls back to a token vote, but committee selection is still block-data pseudo-randomness (weak on Arbitrum chains, and Chainlink VRF isn't available on Robinhood Chain), bonds are flat, and there is no staking or reputation yet. See the threat model.",
+        a: "No. The bonded two-tier committee ladder replaced single-owner arbitration and never falls back to a token vote, committees are drawn by commit-reveal among resolvers rather than an external randomness beacon (Chainlink VRF isn't available on Robinhood Chain), bonds are flat, and there is no staking or reputation yet. See the threat model.",
       },
     ],
   },

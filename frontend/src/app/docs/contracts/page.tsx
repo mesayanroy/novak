@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import { deployments, explorerUrl, feedBySymbol, TESTNET_FAUCET_URL } from "@novak/sdk";
+import { deployments, explorerUrl, feedBySymbol, TESTNET_FAUCET_URL } from "@novakoracle/sdk";
 import { C, Callout, DataTable, DocHeader, H2, P } from "@/components/docs/DocPrimitives";
 
 export const metadata = { title: "Deployed contracts — Novak Docs" };
@@ -88,8 +88,8 @@ export default function ContractsPage() {
         rows={[
           ["tradeFeeBps", "100 (1%)", "DistributionMarket"],
           ["feeBps", "100 (1%)", "Market"],
-          ["Authorized resolvers", "2", "EventRegistry.getAuthorizedResolvers()"],
-          ["Dispute / Tier-1 / Tier-2 bonds", "0.01 / 0.03 / 0.08 ETH", "DisputeManager"],
+          ["Authorized resolvers", "3 (quorum 2 of 3)", "EventRegistry.getAuthorizedResolvers()"],
+          ["Dispute / Tier-1 / Tier-2 bonds", "0.0005 / 0.0015 / 0.004 ETH (unit 0.0005, ratio 1:3:8)", "DisputeManager"],
           ["Treasury of DisputeManager", "TreasuryVault", "DisputeManager.treasury()"],
         ]}
       />
@@ -109,7 +109,7 @@ export default function ContractsPage() {
       />
       <P className="text-sm text-gray-500">
         The full list of 53 Chainlink feeds is in the SDK as <C>CHAINLINK_FEED_CATALOG</C> (regenerate with{" "}
-        <C>pnpm --filter @novak/sdk gen:feeds</C>) and live on the <a href="/feeds">Feeds</a> page.
+        <C>pnpm --filter @novakoracle/sdk gen:feeds</C>) and live on the <a href="/feeds">Feeds</a> page.
       </P>
     </article>
   );
