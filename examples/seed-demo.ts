@@ -5,7 +5,7 @@
  *   A  chainlink.price-at  "NVDA >= $<now, rounded> at T"            (v2)
  *   B  chainlink.price-at  "TSLA <= $<now, rounded> at T"            (v2)
  *   AB AND(A, B) composite
- *   C  rh.corporate-action "any NVDA multiplier change in [-20d, +7d]" (v2) — true already (Sep 10 2026 dividend update)
+ *   C  rh.corporate-action "any NVDA multiplier change in [-40d, +7d]" (v2) — covers the Sep 10 2026 dividend update, so it resolves TRUE right away
  *   D  rh.trading-status   "NVDA NOT tradable overnight, now"          (v1)
  *   Markets on A, B and AB (trading closes at T); a StockLendingGuard rule
  *   pausing NVDA liquidations while C is true.
@@ -14,8 +14,9 @@
  * then resolve everything on their own.
  *
  *   NOVAK_CHAIN_ID=46630 DEPLOYER_PRIVATE_KEY=0x... pnpm tsx examples/seed-demo.ts
+ *   (SEED_ONLY=ranges seeds only the distribution markets.)
  */
-import { createPublicClient, createWalletClient, http, parseAbi, type PublicClient } from "viem";
+import { createPublicClient, createWalletClient, http, nonceManager, parseAbi, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
   CHAINLINK_FEEDS_MAINNET,
@@ -47,6 +48,8 @@ const rpcUrl =
     ? (process.env.RPC_URL_LOCAL ?? "http://127.0.0.1:8545")
     : (process.env.RPC_URL_ROBINHOOD_TESTNET ?? "https://rpc.testnet.chain.robinhood.com");
 const delay = BigInt(process.env.SEED_OPEN_DELAY_SECONDS ?? 600);
+/** Long enough for someone to actually file a dispute in a live demo. */
+const disputeWindow = BigInt(process.env.SEED_DISPUTE_WINDOW_SECONDS ?? 1800);
 const HOUR = 3600n;
 const DAY = 24n * HOUR;
 
@@ -57,7 +60,8 @@ const feedAbi = parseAbi([
 async function main() {
   const key = process.env.DEPLOYER_PRIVATE_KEY as Hex | undefined;
   if (!key) throw new Error("Set DEPLOYER_PRIVATE_KEY (the deployer is also the guard's risk admin)");
-  const account = privateKeyToAccount(key);
+  // Local nonce tracking: a public RPC can briefly report a stale nonce between back-to-back txs.
+  const account = privateKeyToAccount(key, { nonceManager });
   const d = getDeployment(chainId);
 
   const publicClient = createPublicClient({ chain, transport: http(rpcUrl) }) as PublicClient;
@@ -87,7 +91,7 @@ async function main() {
 
   const create = async (label: string, e: Omit<EventSpecInput, "disputeWindowSeconds" | "quorumThreshold">) => {
     const id = await client.getCreatedEventId(
-      await client.createEvent({ ...e, disputeWindowSeconds: 120n, quorumThreshold: 2 }, account),
+      await client.createEvent({ ...e, disputeWindowSeconds: disputeWindow, quorumThreshold: 2 }, account),
     );
     console.log(`${label}: ${id}`);
     return id;
@@ -102,55 +106,58 @@ async function main() {
       spec: encodePriceAtSpec({ feed, threshold, comparator, at, maxStaleness: 3n * DAY }),
     });
 
-  const a = await priceEvent(`A  NVDA >= $${nvda / 100_000_000n}`, CHAINLINK_FEEDS_MAINNET.NVDA, nvda, Comparator.Gte);
-  const b = await priceEvent(`B  TSLA <= $${tsla / 100_000_000n}`, CHAINLINK_FEEDS_MAINNET.TSLA, tsla, Comparator.Lte);
+  // SEED_ONLY=ranges re-runs just the range markets (e.g. after a partial run).
+  if (process.env.SEED_ONLY !== "ranges") {
+    const a = await priceEvent(`A  NVDA >= $${nvda / 100_000_000n}`, CHAINLINK_FEEDS_MAINNET.NVDA, nvda, Comparator.Gte);
+    const b = await priceEvent(`B  TSLA <= $${tsla / 100_000_000n}`, CHAINLINK_FEEDS_MAINNET.TSLA, tsla, Comparator.Lte);
 
-  const abTx = await client.createComposite({ op: CompositeOp.And, operands: [a, b], window: 0n }, account);
-  const abLog = (await wait(abTx)).logs.find((l) => l.address.toLowerCase() === d.eventComposer.toLowerCase());
-  const ab = abLog!.topics[1] as Hex;
-  console.log(`AB AND(A,B): ${ab}`);
+    const abTx = await client.createComposite({ op: CompositeOp.And, operands: [a, b], window: 0n }, account);
+    const abLog = (await wait(abTx)).logs.find((l) => l.address.toLowerCase() === d.eventComposer.toLowerCase());
+    const ab = abLog!.topics[1] as Hex;
+    console.log(`AB AND(A,B): ${ab}`);
 
-  const c = await create("C  NVDA corporate action (any multiplier change, -20d..+7d)", {
-    specVersion: 2,
-    sourceId: sourceId(SOURCES.corporateAction),
-    openTimestamp: protoNow,
-    observationDeadline: protoNow + 8n * DAY,
-    spec: encodeCorporateActionSpec({
-      stockToken: STOCK_TOKENS_MAINNET.NVDA,
-      windowStart: sourceNow - 20n * DAY,
-      windowEnd: sourceNow + 7n * DAY,
-      minChangeBps: 0,
-    }),
-  });
+    const c = await create("C  NVDA corporate action (any multiplier change, -40d..+7d)", {
+      specVersion: 2,
+      sourceId: sourceId(SOURCES.corporateAction),
+      openTimestamp: protoNow,
+      observationDeadline: protoNow + 8n * DAY,
+      spec: encodeCorporateActionSpec({
+        stockToken: STOCK_TOKENS_MAINNET.NVDA,
+        windowStart: sourceNow - 40n * DAY,
+        windowEnd: sourceNow + 7n * DAY,
+        minChangeBps: 0,
+      }),
+    });
 
-  await create("D  NVDA not tradable overnight (snapshot)", {
-    specVersion: 1,
-    sourceId: sourceId(SOURCES.tradingStatus),
-    openTimestamp: protoNow,
-    observationDeadline: protoNow + 15n * 60n,
-    spec: encodeTradingStatusSpec({ symbol: "NVDA", session: TradingSession.Overnight }),
-  });
+    await create("D  NVDA not tradable overnight (snapshot)", {
+      specVersion: 1,
+      sourceId: sourceId(SOURCES.tradingStatus),
+      openTimestamp: protoNow,
+      observationDeadline: protoNow + 15n * 60n,
+      spec: encodeTradingStatusSpec({ symbol: "NVDA", session: TradingSession.Overnight }),
+    });
 
-  for (const [eventId, q] of [
-    [a, `Will NVDA be >= $${nvda / 100_000_000n} at the bell?`],
-    [b, `Will TSLA be <= $${tsla / 100_000_000n} at the bell?`],
-    [ab, "NVDA up AND TSLA down?"],
-  ] as const) {
-    const marketId = await client.getCreatedMarketId(await client.createMarket(eventId, T, q, account));
-    console.log(`market "${q}": ${marketId}`);
+    for (const [eventId, q] of [
+      [a, `Will NVDA be >= $${nvda / 100_000_000n} at the bell?`],
+      [b, `Will TSLA be <= $${tsla / 100_000_000n} at the bell?`],
+      [ab, "NVDA up AND TSLA down?"],
+    ] as const) {
+      const marketId = await client.getCreatedMarketId(await client.createMarket(eventId, T, q, account));
+      console.log(`market "${q}": ${marketId}`);
+    }
+
+    await wait(
+      await walletClient.writeContract({
+        account,
+        chain,
+        address: d.stockLendingGuard,
+        abi: stockLendingGuardAbi,
+        functionName: "addRiskRule",
+        args: [STOCK_TOKENS_MAINNET.NVDA, c, protoNow, protoNow + 7n * DAY, true],
+      }),
+    );
+    console.log(`guard: NVDA liquidations paused while C is true (fail-closed until resolved)`);
   }
-
-  await wait(
-    await walletClient.writeContract({
-      account,
-      chain,
-      address: d.stockLendingGuard,
-      abi: stockLendingGuardAbi,
-      functionName: "addRiskRule",
-      args: [STOCK_TOKENS_MAINNET.NVDA, c, protoNow, protoNow + 7n * DAY, true],
-    }),
-  );
-  console.log(`guard: NVDA liquidations paused while C is true (fail-closed until resolved)`);
 
   // --- Distribution markets: where will the price land at T? ---
   // 5 boundaries -> 6 ranges centred on the live Chainlink price. One tx
@@ -176,7 +183,7 @@ async function main() {
       const step = fixedStep || (spot / 100n / 100_000_000n > 0n ? (spot / 100n / 100_000_000n) * 100_000_000n : 100_000_000n);
       const centre = (spot / step) * step;
       const thresholds = [-2n, -1n, 0n, 1n, 2n].map((k) => centre + k * step);
-      const specs = buildPriceLadderSpecs({ feed, thresholds, at, maxStaleness: 3n * DAY, openTimestamp: T, observationDeadline: T + DAY, disputeWindowSeconds: 120n });
+      const specs = buildPriceLadderSpecs({ feed, thresholds, at, maxStaleness: 3n * DAY, openTimestamp: T, observationDeadline: T + DAY, disputeWindowSeconds: disputeWindow });
       const ids = await client.getCreatedEventIds(await client.createEvents(specs, account));
       const q = `Where will ${label} be at the bell? (${ladderBucketLabels(thresholds).join(" | ")})`;
       const mId = await client.getCreatedDistributionMarketId(

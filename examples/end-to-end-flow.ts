@@ -17,7 +17,7 @@
  *   1. anvil
  *   2. RESOLVER_ADDRESSES=0x70997970C51812dc3A010C7d01b50e0d17dc79C8,0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC \
  *        forge script script/Deploy.s.sol --rpc-url local --broadcast
- *   3. node script/export-deployment.mjs 31337 && pnpm --filter @novak/sdk gen
+ *   3. node script/export-deployment.mjs 31337 && pnpm --filter @novakoracle/sdk gen
  *   4. pnpm example:e2e
  *
  * The keys below are anvil's well-known, publicly documented default test
