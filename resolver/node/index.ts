@@ -7,6 +7,7 @@ import { BalanceWatch } from "./balanceWatch.js";
 import { EventIndex } from "./discovery.js";
 import { EvidenceBackfill } from "./evidenceBackfill.js";
 import { KeeperDuty } from "./keeper.js";
+import { ListerDuty, listerConfig } from "./lister.js";
 import { makeLog } from "./log.js";
 import { ResolverDuty } from "./resolve.js";
 import { RewardsDuty } from "./rewards.js";
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
   const resolver = new ResolverDuty(c, index, adapters, evidence, log);
   const voter = new VoterDuty(c, index, adapters, resolver, log);
   const keeper = new KeeperDuty(c, index, resolver, log);
+  const lister = new ListerDuty(c, listerConfig(), log, config.logChunk);
   const rewards = new RewardsDuty(c, index, log);
   const balance = new BalanceWatch(c, log, config.resolverId, config.minBalanceWei, config.alertWebhookUrl);
   const backfill = new EvidenceBackfill(c, index, adapters, evidence, resolver, log, config.logChunk);
@@ -71,6 +73,7 @@ async function main(): Promise<void> {
       submissions: resolver.submissions,
       votes: voter.votes,
       keeperActions: keeper.actions,
+      marketsListed: lister.listed,
       rewardClaims: rewards.claims,
       evidenceRecords: evidence.size,
       ...balance.status(),
@@ -90,6 +93,7 @@ async function main(): Promise<void> {
       if (authorized) await resolver.tick(now);
       if (authorized && config.voter) await voter.tick(now);
       if (config.keeper) await keeper.tick(now);
+      await lister.tick(now).catch((e) => log.warn(`lister: ${(e as Error).message}`));
       await rewards.tick();
       await balance.tick().catch((e) => log.warn(`balance check: ${(e as Error).message}`));
       lastLoopAt = Date.now();

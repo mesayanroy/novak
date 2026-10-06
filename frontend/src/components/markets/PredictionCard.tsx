@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { DistributionStatus, MarketStatus } from "@novakoracle/sdk";
-import { fmtTime, fmtUsdg, tickersOf, type LiveMarket, type MarketCategory } from "@/lib/novak";
+import { categoryForFeed, fmtTime, fmtUsdg, tickersOf, type LiveMarket, type MarketCategory } from "@/lib/novak";
 import type { DistributionView } from "@/lib/distribution";
 import { fmtPrice, useFeedRounds, useFeedRow } from "@/lib/feeds";
 import { ExampleDataBadge } from "@/components/ExampleDataBadge";
@@ -121,7 +121,7 @@ function RangeCard({ view }: { view: DistributionView }) {
   const top = order.slice(0, 3).sort((a, b) => a.i - b.i);
   const volume = view.outstanding.reduce((s, q) => s + q, 0n);
   const closed = !settled && now() >= view.tradingClosesAt;
-  const category: MarketCategory = view.ticker === "SGOV" ? "bonds" : "stocks";
+  const category: MarketCategory = view.feed ? categoryForFeed(view.feed) : "stocks";
 
   return (
     <Shell href={`/markets/dist/${view.marketId}`}>

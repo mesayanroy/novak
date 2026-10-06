@@ -5,6 +5,7 @@ import { parseAbiItem, type PublicClient } from "viem";
 import { usePublicClient } from "wagmi";
 import {
   CHAINLINK_FEEDS_MAINNET,
+  feedByAddress,
   DistributionStatus,
   decodePriceAtSpec,
   ladderBucketLabels,
@@ -53,7 +54,9 @@ export interface TradeRow {
 }
 
 const tickerOf = (feed?: string) =>
-  Object.entries(CHAINLINK_FEEDS_MAINNET).find(([, a]) => a.toLowerCase() === feed?.toLowerCase())?.[0] ?? "Asset";
+  (feed && feedByAddress(feed)?.symbol) ||
+  Object.entries(CHAINLINK_FEEDS_MAINNET).find(([, a]) => a.toLowerCase() === feed?.toLowerCase())?.[0] ||
+  "Asset";
 
 async function loadDistribution(client: NonNullable<ReturnType<typeof useNovakClient>>, pc: PublicClient, id: Hex): Promise<DistributionView> {
   const m = await client.getDistributionMarket(id);
@@ -96,7 +99,7 @@ export function useDistributionMarkets() {
   return useQuery({
     queryKey: ["novak", "distribution", "list", deployment?.distributionMarket],
     enabled: Boolean(client && pc && deployment?.distributionMarket),
-    refetchInterval: 15_000,
+    refetchInterval: 20_000,
     queryFn: async () => {
       const list = await client!.listDistributionMarkets();
       const views = await Promise.all(list.map((m) => loadDistribution(client!, pc as PublicClient, m.marketId)));

@@ -26,7 +26,19 @@ Novak events. Every poll interval it:
    and the committee third for disputes where it voted with the decision.
    The keeper also settles DistributionMarkets, allocates vault fees and
    sweeps dispute proceeds into the vault.
-6. **Serves** `GET /health` and `GET /evidence/:hash` (`RESOLVER_HTTP_PORT`),
+6. **Lists markets** (`node/lister.ts`, the keeper node; `RESOLVER_LISTER=false`
+   turns it off). Every Chainlink stock, ETF, Treasury and major crypto feed
+   (stablecoins and wrapped duplicates skipped) always has a live market:
+   - 5 "price ≥ X at T" boundary events centred on the live mainnet price,
+     created in one `createEvents` transaction. T is the next 4pm New York
+     close, or 20:00 UTC daily for 24/7 feeds.
+   - a 6-range LMSR `DistributionMarket` on that ladder.
+   - a yes/no `Market` on the centre boundary, which reuses the same Novak
+     event.
+
+   When T comes within an hour, the feed is listed again for the next close.
+   At most `RESOLVER_LIST_MAX_PER_PASS` feeds are listed per pass.
+7. **Serves** `GET /health` and `GET /evidence/:hash` (`RESOLVER_HTTP_PORT`),
    so anyone can check exactly what a resolver saw behind an on-chain
    evidence hash.
 
@@ -71,6 +83,9 @@ Tier-1 bond (3 × the deployment's bond unit: 0.0015 ETH on testnet, 0.03 ETH at
 | `RESOLVER_PRIVATE_KEY` | — | required |
 | `RESOLVER_KEEPER` | `false` | enable keeper duties on one node |
 | `RESOLVER_VOTER` | `true` | vote in dispute committees |
+| `RESOLVER_LISTER` | on for the keeper | `false` disables the market lister |
+| `RESOLVER_LIST_SYMBOLS` | all | comma-separated subset, e.g. `NVDA,TSLA,SPY,SGOV,BTC` |
+| `RESOLVER_LIST_MAX_PER_PASS` / `RESOLVER_LIST_LIQUIDITY` | `4` / `200000000` | listings per pass / LMSR `b` (200 USDG) |
 | `RESOLVER_HTTP_PORT` | off | `/health`, `/evidence/:hash` |
 | `RESOLVER_POLL_INTERVAL_MS` | `15000` | |
 | `RESOLVER_LOG_CHUNK` | `500000` | log-scan chunk; halves automatically on RPC limits |
@@ -82,6 +97,7 @@ per-contract env vars.
 
 ```bash
 pnpm --filter novak-resolver probe   # run every adapter against live sources, print what it would vote
+pnpm --filter novak-resolver list-markets  # one-shot: list every due feed now (RESOLVER_PRIVATE_KEY = a funded key)
 pnpm --filter novak-resolver test    # decision logic, evidence determinism, quorum mirrors
 ```
 

@@ -85,7 +85,7 @@ export function ValueChart({ history }: { history: HistoryPoint[] }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4 text-xs text-gray-600">
           <span className="flex items-center gap-1.5">
-            <span className="h-0.5 w-4 rounded" style={{ background: SERIES[0] }} /> Value (marked to market)
+            <span className="h-0.5 w-4 rounded" style={{ background: SERIES[0] }} /> Value
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded" style={{ background: SERIES[1] }} /> Net invested

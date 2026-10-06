@@ -63,9 +63,10 @@ export interface SpecInfo {
   category: MarketCategory;
 }
 
-const categoryForFeed = (feed: string): MarketCategory => {
+export const categoryForFeed = (feed: string): MarketCategory => {
   const f = feedByAddress(feed);
   if (!f) return "other";
+  if (f.symbol === "GLD") return "stocks"; // a gold ETF token, filed under Crypto by the feed directory
   return f.assetClass === "Bond" ? "bonds" : f.assetClass === "Equity" ? "stocks" : "crypto";
 };
 
@@ -161,7 +162,15 @@ export function tickersOf(node: Pick<EventNode, "ticker" | "children">): string[
   return [...new Set(leaves)];
 }
 
+// An event's spec never changes, and a primitive in a terminal state never
+// changes again: cache both so lists of many markets refresh cheaply.
+const specCache = new Map<string, EventSpecInput>();
+const finalNodes = new Map<string, EventNode>();
+const FINAL = new Set([EventStatus.Finalized, EventStatus.Voided, EventStatus.Expired]);
+
 export async function loadEventNode(pc: PublicClient, id: Hex, depth = 0): Promise<EventNode> {
+  const cached = finalNodes.get(id.toLowerCase());
+  if (cached) return cached;
   // getAvailability and getEvent don't depend on each other — fire them
   // concurrently (and, with multicall batching enabled on the client,
   // collapsed into a single RPC round trip) instead of waiting in series.
@@ -173,14 +182,18 @@ export async function loadEventNode(pc: PublicClient, id: Hex, depth = 0): Promi
   const status = Number(statusRaw) as EventStatus;
 
   if (status !== EventStatus.None) {
-    const spec = (await pc.readContract({
-      address: novakAddresses.eventRegistry,
-      abi: eventRegistryAbi,
-      functionName: "getEventSpec",
-      args: [id],
-    })) as EventSpecInput;
+    let spec = specCache.get(id.toLowerCase());
+    if (!spec) {
+      spec = (await pc.readContract({
+        address: novakAddresses.eventRegistry,
+        abi: eventRegistryAbi,
+        functionName: "getEventSpec",
+        args: [id],
+      })) as EventSpecInput;
+      specCache.set(id.toLowerCase(), spec);
+    }
     const d = describeSpec(spec);
-    return {
+    const node: EventNode = {
       id,
       kind: "primitive",
       title: d.title,
@@ -193,6 +206,8 @@ export async function loadEventNode(pc: PublicClient, id: Hex, depth = 0): Promi
       ticker: d.ticker,
       category: d.category,
     };
+    if (FINAL.has(status)) finalNodes.set(id.toLowerCase(), node);
+    return node;
   }
 
   const [cs, cStatusRaw] = await Promise.all([
@@ -375,7 +390,7 @@ export function useMarkets() {
   return useQuery({
     queryKey: ["novak", "markets", deployment?.market],
     enabled: showingExamples || Boolean(client && pc),
-    refetchInterval: showingExamples ? false : 10_000,
+    refetchInterval: showingExamples ? false : 20_000,
     queryFn: async (): Promise<LiveMarket[]> => {
       if (showingExamples) return MOCK_MARKETS;
       const markets = await client!.listMarkets();

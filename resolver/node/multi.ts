@@ -54,6 +54,8 @@ function start(i: number) {
   env.RESOLVER_ID = n.id;
   env.RESOLVER_HTTP_PORT = String(n.port);
   env.RESOLVER_KEEPER = keeperIndex === i + 1 ? "true" : "false";
+  // Only the keeper lists markets, even if RESOLVER_LISTER=true is set service-wide.
+  if (keeperIndex !== i + 1) env.RESOLVER_LISTER = "false";
   const child = spawn(process.execPath, [entry], { env, stdio: "inherit" });
   n.child = child;
   child.on("exit", (code, signal) => {

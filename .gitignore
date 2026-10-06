@@ -11,6 +11,9 @@ node_modules/
 dist/
 build/
 .turbo/
+# ...but these are Next.js ROUTES, not build output (/build, /markets/dist/[id])
+!frontend/src/app/build/
+!frontend/src/app/markets/dist/
 
 # Next.js
 frontend/.next/

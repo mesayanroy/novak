@@ -26,7 +26,9 @@ export interface RangePosition {
   shares: bigint[];
   redeemed: boolean;
   payout: bigint;
-  /** Mark-to-market: Σ shares × current LMSR price (USDG, 6 decimals). */
+  /** Exit value: what selling every share right now would pay, after the fee
+   *  and price impact (DistributionMarket.quoteSell). Falls back to
+   *  Σ shares × price only if the quote is unavailable. USDG, 6 decimals. */
   value: bigint;
 }
 
@@ -94,6 +96,33 @@ async function load(pc: PublicClient, who: Address, markets: LiveMarket[], dists
     const value = shares.reduce((sum, s, b) => sum + BigInt(Math.round(Number(s) * (d.prices[b] ?? 0))), 0n);
     positions.push({ kind: "range", view: d, shares, redeemed, payout, value });
   });
+
+  // Value open range positions at their real exit price, not at the post-trade
+  // LMSR price (which sits above what you paid right after any buy).
+  const quotes = positions.flatMap((p) =>
+    p.kind === "range" && p.view.status === DistributionStatus.Open && dm
+      ? p.shares.flatMap((sh, b) => (sh > 0n ? [{ p, b, sh }] : []))
+      : [],
+  );
+  if (quotes.length && dm) {
+    const res = await pc.multicall({
+      allowFailure: true,
+      contracts: quotes.map((q) => ({
+        address: dm,
+        abi: distributionMarketAbi,
+        functionName: "quoteSell" as const,
+        args: [(q.p as RangePosition).view.marketId, q.b, q.sh] as const,
+      })),
+    });
+    const exit = new Map<RangePosition, bigint>();
+    let ok = true;
+    res.forEach((r, i) => {
+      const p = quotes[i].p as RangePosition;
+      if (r.status !== "success") ok = false;
+      else exit.set(p, (exit.get(p) ?? 0n) + (r.result as readonly [bigint, bigint])[0]);
+    });
+    if (ok) exit.forEach((v, p) => (p.value = v));
+  }
 
   const isOpen = (p: Position) => (p.kind === "binary" ? p.market.status === MarketStatus.Open : p.view.status === DistributionStatus.Open);
   const claimable = positions.filter((p) => p.payout > 0n);

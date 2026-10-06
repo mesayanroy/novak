@@ -4,6 +4,7 @@ import {
   type Wallet,
   type WalletDetailsParams,
 } from "@rainbow-me/rainbowkit";
+import { metaMaskWallet } from "@rainbow-me/rainbowkit/wallets";
 import { createPublicClient, fallback, type Chain, type EIP1193Provider, type Transport } from "viem";
 import { createConfig, createConnector, createStorage, http } from "wagmi";
 import { injected } from "wagmi/connectors";
@@ -63,35 +64,50 @@ const IMPOSTOR_FLAGS = [
   "isAvalanche", "isMathWallet", "isKuCoinWallet", "isPortal", "isTokenary", "isBackpack", "isExodus",
 ];
 
+/**
+ * The genuine MetaMask extension, or nothing:
+ *  1. its EIP-6963 announcement (rdns "io.metamask"), which is what MetaMask
+ *     itself publishes and other wallets can't claim without lying about rdns;
+ *  2. for MetaMask builds older than EIP-6963, an injected provider that has
+ *     `isMetaMask` AND MetaMask's private `_metamask` API, and none of the
+ *     flags other wallets set when they impersonate it.
+ */
 export function findMetaMaskProvider(): EIP1193Provider | undefined {
   if (typeof window === "undefined") return undefined;
   if (announcedMetaMask) return announcedMetaMask;
   const eth = (window as { ethereum?: FlaggedProvider }).ethereum;
   const candidates = eth?.providers?.length ? eth.providers : eth ? [eth] : [];
-  return candidates.find((p) => p.isMetaMask && !IMPOSTOR_FLAGS.some((f) => p[f]));
+  return candidates.find((p) => p.isMetaMask && typeof p._metamask === "object" && !IMPOSTOR_FLAGS.some((f) => p[f]));
 }
 
-const METAMASK_CONNECTOR_ID = "novakMetaMask";
+const METAMASK_CONNECTOR_ID = "io.metamask";
 
-const metaMaskExtension = (): Wallet => ({
-  id: "metamask-extension",
-  name: "MetaMask",
-  iconUrl:
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#F6851B"/><path d="M5.5 6l5.2 3.9-1-2.3zm13 0l-4.2 1.6-1 2.3zM7 15.6l1 2.8 2.6.7-.4-2.1zm10 0l-3.2 1.4-.4 2.1 2.6-.7zm-6.4-4.3L9.3 13l3 .2-.1-3.2zm2.8 0l-1.6-1.3-.1 3.2 3-.2z" fill="#fff"/></svg>',
-    ),
-  iconBackground: "#ffffff",
-  installed: typeof window !== "undefined" ? Boolean(findMetaMaskProvider()) : undefined,
-  downloadUrls: { browserExtension: "https://metamask.io/download/" },
-  createConnector: (walletDetails: WalletDetailsParams) =>
-    createConnector((config) => ({
-      ...injected({
-        target: { id: METAMASK_CONNECTOR_ID, name: "MetaMask", provider: () => findMetaMaskProvider() as never },
-      })(config),
-      ...walletDetails,
-    })),
-});
+/**
+ * RainbowKit's official MetaMask wallet (official icon, rdns, install links and
+ * instructions). Only the connector is ours: it binds to the provider
+ * `findMetaMaskProvider` returns, so another extension that sets
+ * `isMetaMask: true` on window.ethereum can never answer instead. Without the
+ * extension: the official install flow, plus MetaMask Mobile over
+ * WalletConnect once a project ID is configured.
+ */
+const metaMask = (params: Parameters<typeof metaMaskWallet>[0]): Wallet => {
+  const official = metaMaskWallet(params);
+  const installed = typeof window !== "undefined" ? Boolean(findMetaMaskProvider()) : undefined;
+  if (!installed && walletConnectConfigured) return official;
+  return {
+    ...official,
+    installed,
+    qrCode: undefined,
+    mobile: undefined,
+    createConnector: (walletDetails: WalletDetailsParams) =>
+      createConnector((config) => ({
+        ...injected({
+          target: { id: METAMASK_CONNECTOR_ID, name: "MetaMask", provider: () => findMetaMaskProvider() as never },
+        })(config),
+        ...walletDetails,
+      })),
+  };
+};
 
 // MetaMask is the ONLY browser wallet offered. Two wagmi/RainbowKit defaults
 // are what kept opening Phantom: (1) EIP-6963 multi-injected discovery lists
@@ -104,7 +120,7 @@ const connectors = connectorsForWallets(
   [
     {
       groupName: "Connect to Robinhood Chain",
-      wallets: walletConnectConfigured ? [metaMaskExtension, robinhoodWallet] : [metaMaskExtension],
+      wallets: walletConnectConfigured ? [metaMask, robinhoodWallet] : [metaMask],
     },
   ],
   { appName: "Novak", projectId: projectId || "unset" },
@@ -147,7 +163,7 @@ export const wagmiConfig = createConfig({
   ssr: true,
   // Fresh storage key: drops any stale "recent"/auto-reconnect connector
   // (e.g. a different browser wallet) remembered by earlier builds.
-  storage: createStorage({ key: "novak.wallet.v3", storage: typeof window !== "undefined" ? window.localStorage : undefined }),
+  storage: createStorage({ key: "novak.wallet.v4", storage: typeof window !== "undefined" ? window.localStorage : undefined }),
 });
 
 export { activeChain };

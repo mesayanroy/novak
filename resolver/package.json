@@ -12,6 +12,7 @@
     "test": "vitest run",
     "lint": "tsc -p tsconfig.json --noEmit",
     "probe": "tsx scripts/probe-sources.ts",
+    "list-markets": "tsx scripts/list-markets.ts",
     "start:multi": "node dist/node/multi.js"
   },
   "dependencies": {

@@ -330,7 +330,7 @@ export default function PortfolioPage() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
             <Panel title="Value over time" icon={Sparkles}>
               {actLoading && !act ? <div className="h-[330px] animate-pulse rounded-xl bg-violet-50" /> : <ValueChart history={act?.history ?? []} />}
-              <p className="mt-2 text-[11px] text-gray-500">Rebuilt from every Trade, deposit, settlement and claim log on your markets. Range positions are marked at the LMSR price after each trade.</p>
+              <p className="mt-2 text-[11px] text-gray-500">Rebuilt from every Trade, deposit, settlement and claim log on your markets. Past points mark range positions at the LMSR price of the time; the latest point is what you'd receive selling now (after fee and price impact).</p>
             </Panel>
             <Panel id="allocation" title="Allocation by asset" icon={PieChart}>
               <Donut slices={byAsset} center={usd(totals.value)} stacked />

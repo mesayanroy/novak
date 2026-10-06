@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { DistributionStatus, MarketStatus } from "@novakoracle/sdk";
 import { Marquee } from "@/components/ui/marquee";
-import type { LiveMarket, MarketCategory } from "@/lib/novak";
+import { categoryForFeed, type LiveMarket, type MarketCategory } from "@/lib/novak";
 import type { DistributionView } from "@/lib/distribution";
 import { fmtPrice, useLiveFeeds } from "@/lib/feeds";
 import { PredictionCard, type FeedItem } from "./PredictionCard";
@@ -24,12 +24,14 @@ const PILLS: Array<[Pill, string]> = [
 ];
 
 const categoryOf = (item: FeedItem): MarketCategory =>
-  item.kind === "binary" ? (item.market.event.category ?? "other") : item.view.ticker === "SGOV" ? "bonds" : "stocks";
+  item.kind === "binary" ? (item.market.event.category ?? "other") : item.view.feed ? categoryForFeed(item.view.feed) : "stocks";
+
+const PAGE = 24;
 
 /** Live Chainlink prices scrolling across the top — the raw inputs. */
 function LiveTickerStrip() {
   const { data } = useLiveFeeds();
-  const rows = (data?.rows ?? []).filter((r) => r.price !== null && (r.assetClass === "Equity" || r.symbol === "SGOV" || ["ETH", "BTC", "SOL"].includes(r.symbol)));
+  const rows = (data?.rows ?? []).filter((r) => r.price !== null && (r.assetClass === "Equity" || r.symbol === "SGOV" || ["ETH", "BTC", "LINK", "GLD"].includes(r.symbol)));
   if (rows.length === 0) return null;
   return (
     <div className="relative overflow-hidden rounded-2xl border border-violet-100 bg-white py-2">
@@ -70,12 +72,22 @@ export function MarketFeed({
 }) {
   const [pill, setPill] = useState<Pill>("all");
   const [q, setQ] = useState("");
+  const [shown, setShown] = useState(PAGE);
+
+  const all = useMemo<FeedItem[]>(
+    () => [...dists.map((view) => ({ kind: "range" as const, view })), ...markets.map((market) => ({ kind: "binary" as const, market }))],
+    [markets, dists],
+  );
+  const counts = useMemo(() => {
+    const c: Partial<Record<Pill, number>> = { all: all.length, ranges: all.filter((i) => i.kind === "range").length };
+    for (const i of all) {
+      const k = categoryOf(i) as Pill;
+      c[k] = (c[k] ?? 0) + 1;
+    }
+    return c;
+  }, [all]);
 
   const items = useMemo(() => {
-    const all: FeedItem[] = [
-      ...dists.map((view) => ({ kind: "range" as const, view })),
-      ...markets.map((market) => ({ kind: "binary" as const, market })),
-    ];
     const open = (i: FeedItem) =>
       i.kind === "binary" ? i.market.status === MarketStatus.Open : i.view.status === DistributionStatus.Open;
     const closes = (i: FeedItem) => Number(i.kind === "binary" ? i.market.tradingClosesAt : i.view.tradingClosesAt);
@@ -87,8 +99,9 @@ export function MarketFeed({
         const text = i.kind === "binary" ? `${i.market.question} ${i.market.event.title}` : i.view.question;
         return text.toLowerCase().includes(q.toLowerCase());
       })
-      .sort((a, b) => Number(open(b)) - Number(open(a)) || closes(b) - closes(a));
-  }, [markets, dists, pill, q]);
+      // Open first, soonest to close first; then settled, newest first.
+      .sort((a, b) => Number(open(b)) - Number(open(a)) || (open(a) ? closes(a) - closes(b) : closes(b) - closes(a)));
+  }, [all, pill, q]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -137,19 +150,26 @@ export function MarketFeed({
         {PILLS.map(([key, label]) => (
           <button
             key={key}
-            onClick={() => setPill(key)}
+            onClick={() => {
+              setPill(key);
+              setShown(PAGE);
+            }}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               pill === key ? "bg-gray-900 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-violet-300"
             }`}
           >
             {label}
+            {counts[key] ? <span className={`ml-1.5 font-mono text-[11px] ${pill === key ? "text-violet-200" : "text-gray-400"}`}>{counts[key]}</span> : null}
           </button>
         ))}
         <div className="relative ml-auto w-full sm:w-64">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setShown(PAGE);
+            }}
             placeholder="Search NVDA, SGOV, Fed…"
             className="w-full rounded-full border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-violet-400 focus:outline-none"
           />
@@ -173,11 +193,22 @@ export function MarketFeed({
           .
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {items.map((i) => (
-            <PredictionCard key={i.kind === "binary" ? i.market.marketId : i.view.marketId} item={i} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {items.slice(0, shown).map((i) => (
+              <PredictionCard key={i.kind === "binary" ? i.market.marketId : i.view.marketId} item={i} />
+            ))}
+          </div>
+          {items.length > shown && (
+            <button
+              type="button"
+              onClick={() => setShown((n) => n + PAGE)}
+              className="mx-auto rounded-full border border-violet-200 bg-white px-5 py-2 text-sm font-semibold text-violet-700 hover:border-violet-400"
+            >
+              Show more ({items.length - shown} more)
+            </button>
+          )}
+        </>
       )}
     </div>
   );

@@ -259,7 +259,14 @@ async function load(pc: PublicClient, who: Address, portfolio: Portfolio): Promi
     const now = Math.floor(Date.now() / 1000);
     if (st.spark.length === 0 || st.spark[st.spark.length - 1].t < now) st.spark.push({ t: now, p: st.price });
   }
-  if (history.length) history.push({ t: Math.floor(Date.now() / 1000), value: value(), invested });
+  // "Now" = what the portfolio is actually worth: exit value of open range
+  // positions, stake in open yes/no pools, payouts waiting to be collected.
+  const nowValue = portfolio.positions.reduce((s, p) => {
+    if (p.payout > 0n) return s + f6(p.payout);
+    if (p.kind === "range") return s + (p.view.status === 0 ? f6(p.value) : 0);
+    return s + (p.market.status === 0 ? f6(p.yes + p.no) : 0);
+  }, 0);
+  if (history.length) history.push({ t: Math.floor(Date.now() / 1000), value: nowValue, invested });
 
   const userTrades = trades.filter(mine);
   return {

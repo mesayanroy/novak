@@ -58,6 +58,13 @@ services:
       # r2 (the deployer key) runs the keeper duties.
       - key: RESOLVER_KEEPER_INDEX
         value: "2"
+      # Market lister (keeper node): keeps a live range market + yes/no market
+      # open on every Chainlink stock/ETF/Treasury/crypto feed, rolled daily.
+      - key: RESOLVER_LISTER
+        value: "true"
+      # Optional: comma-separated subset, e.g. NVDA,TSLA,SPY,SGOV,BTC (empty = all).
+      - key: RESOLVER_LIST_SYMBOLS
+        value: ""
       - key: RESOLVER_POLL_INTERVAL_MS
         value: "15000"
       # Evidence JSON is written here and reloaded on restart; on boot each node
