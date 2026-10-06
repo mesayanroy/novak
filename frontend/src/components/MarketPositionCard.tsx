@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { parseUnits } from "viem";
 import { useAccount, useReadContracts } from "wagmi";
-import { Availability, MarketStatus, TESTNET_FAUCET_URL, marketAbi, mockUsdgAbi } from "@novak/sdk";
+import { Availability, MarketStatus, TESTNET_FAUCET_URL, marketAbi, mockUsdgAbi } from "@novakoracle/sdk";
 import { deployment, novakAddresses } from "@/lib/addresses";
 import { USDG_DECIMALS, fmtUsdg, useNovakClient, type LiveMarket } from "@/lib/novak";
 import { useTx } from "@/lib/useTx";

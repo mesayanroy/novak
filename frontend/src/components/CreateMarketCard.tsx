@@ -12,7 +12,7 @@ import {
   encodePriceAtSpec,
   sourceId,
   type Hex,
-} from "@novak/sdk";
+} from "@novakoracle/sdk";
 import { novakAddresses } from "@/lib/addresses";
 import { useEvents, useNovakClient, type EventNode } from "@/lib/novak";
 import { useTx } from "@/lib/useTx";

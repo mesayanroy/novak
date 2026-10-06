@@ -23,7 +23,7 @@ export const docsGridItems: DocsGridItem[] = [
   { index: "07", href: "/docs/treasury", title: "Treasury & fee thirds", tag: "VALUE", description: "Every fee split ⅓ resolvers · ⅓ committee/insurance · ⅓ treasury.", icon: Coins },
   { index: "08", href: "/docs/distribution-markets", title: "Range markets", tag: "LMSR", description: "Where will NVDA close? N ranges, prices sum to 1, settled by threshold events.", icon: BarChart3 },
   { index: "09", href: "/docs/integrate", title: "Integrate your market", tag: "BUILD", description: "Settle your own prediction market on Novak events via the Bus or SDK.", icon: Plug },
-  { index: "10", href: "/docs/sdk", title: "TypeScript SDK", tag: "SDK", description: "@novak/sdk: client methods, spec encoders, feed catalog, ladders.", icon: FileCode2 },
+  { index: "10", href: "/docs/sdk", title: "TypeScript SDK", tag: "SDK", description: "@novakoracle/sdk: client methods, spec encoders, feed catalog, ladders.", icon: FileCode2 },
   { index: "11", href: "/docs/api", title: "Contract API", tag: "ABI", description: "On-chain read/write surface with real function signatures.", icon: Terminal },
   { index: "12", href: "/docs/threat-model", title: "Threat model & FAQ", tag: "SAFETY", description: "Adversaries, known limitations, and honest answers.", icon: ShieldCheck },
 ];

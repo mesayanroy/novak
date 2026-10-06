@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { NovakLogo } from "@/components/NovakLogo";
-import { Availability, explorerUrl } from "@novak/sdk";
+import { Availability, explorerUrl } from "@novakoracle/sdk";
 import { NOVAK_CHAIN_ID, deployment, novakAddresses } from "@/lib/addresses";
 import { useEvents, useMarkets } from "@/lib/novak";
 import { shortHex } from "@/lib/utils";
@@ -23,16 +23,17 @@ const footerColumns = [
     heading: "Protocol Spec",
     links: [
       { href: "/docs", label: "Overview & Thesis" },
-      { href: "/docs/architecture", label: "5-Layer Stack" },
-      { href: "/docs/disputes", label: "Dispute Guard (T1/T2)" },
+      { href: "/docs/architecture", label: "Architecture" },
+      { href: "/docs/disputes", label: "Disputes & committees" },
       { href: "/docs/threat-model", label: "Threat Model" },
     ],
   },
   {
     heading: "Developers",
     links: [
-      { href: "/docs/sdk", label: "TypeScript SDK (@novak/sdk)" },
-      { href: "/docs/api", label: "Events REST API" },
+      { href: "/docs/sdk", label: "TypeScript SDK (@novakoracle/sdk)" },
+      { href: "/build", label: "Builder console" },
+      { href: "/docs/integrate", label: "Integrate your market" },
       { href: "/docs/composition", label: "Composition Engine" },
       { href: "https://github.com/mesayanroy/novak", label: "GitHub Repository" },
     ],
@@ -41,6 +42,9 @@ const footerColumns = [
     heading: "Markets & Hub",
     links: [
       { href: "/markets", label: "Explore Markets" },
+      { href: "/disputes", label: "Dispute Center" },
+      { href: "/events", label: "Event explorer" },
+      { href: "/network", label: "Resolver network" },
       { href: "/calendar", label: "Corporate-Action Calendar" },
       { href: "/guard", label: "Lending Guard Demo" },
     ],
@@ -50,6 +54,8 @@ const footerColumns = [
 const contractRows: Array<{ label: string; address: string }> = [
   { label: "EventRegistry", address: novakAddresses.eventRegistry },
   { label: "DisputeManager", address: novakAddresses.disputeManager ?? "0x" },
+  { label: "TreasuryVault", address: novakAddresses.treasuryVault ?? "0x" },
+  { label: "DistributionMarket", address: novakAddresses.distributionMarket ?? "0x" },
   { label: "EventComposer", address: novakAddresses.eventComposer },
   { label: "EventBus", address: novakAddresses.eventBus },
   { label: "Market", address: novakAddresses.market },
@@ -110,7 +116,7 @@ export function SiteFooter() {
             {/* Event Alert Newsletter Form */}
             <div className="mt-6 border border-gray-300 bg-paper p-3.5 rounded-sm">
               <p className="font-mono text-xs font-semibold text-ink uppercase tracking-wide">
-                Open source · MIT
+                Built in the open
               </p>
               <a
                 href="https://github.com/mesayanroy/novak"

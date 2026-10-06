@@ -18,9 +18,9 @@ const Hl = ({ children }: { children: ReactNode }) => <span className="rounded-m
 
 function SdkTerminal() {
   return (
-    <Terminal title="your-amm/settle.ts — @novak/sdk" className="shadow-[0_24px_70px_-36px_rgba(109,74,255,0.65)]">
-      <TypingAnimation className="text-gray-500">$ pnpm --filter @novak/sdk build</TypingAnimation>
-      <AnimatedSpan className="text-emerald-600">✔ @novak/sdk ready · generated ABIs + Robinhood Chain testnet addresses</AnimatedSpan>
+    <Terminal title="your-amm/settle.ts — @novakoracle/sdk" className="shadow-[0_24px_70px_-36px_rgba(109,74,255,0.65)]">
+      <TypingAnimation className="text-gray-500">$ pnpm --filter @novakoracle/sdk build</TypingAnimation>
+      <AnimatedSpan className="text-emerald-600">✔ @novakoracle/sdk ready · generated ABIs + Robinhood Chain testnet addresses</AnimatedSpan>
       <TypingAnimation className="text-ink">{"> const novak = new NovakClient(publicClient, wallet, getDeployment(46630))"}</TypingAnimation>
       <AnimatedSpan className="text-emerald-600">✔ EventBus 0xab30…1054 · chain 46630</AnimatedSpan>
       <TypingAnimation className="text-ink">{"> await novak.createEvents(buildPriceLadderSpecs({ feed: NVDA, thresholds, at }), me)"}</TypingAnimation>
@@ -149,7 +149,7 @@ const TOKEN_LANE = [
 ];
 const NOVAK_LANE = [
   { t: "Quorum of resolvers", d: "identical answers + evidence hashes" },
-  { t: "Someone disputes", d: "0.01 ETH bond" },
+  { t: "Someone disputes", d: "posts a dispute bond" },
   { t: "Tier 1 committee", d: "≤7 resolvers re-check the source · 66%" },
   { t: "Tier 2 committee", d: "≤15 resolvers if Tier 1 can't agree" },
   { t: "Finalized — or VOID", d: "no agreement → markets refund, never a guess", good: true },

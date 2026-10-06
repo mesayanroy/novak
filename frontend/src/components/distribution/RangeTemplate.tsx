@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { buildPriceLadderSpecs, feedBySymbol, ladderBucketLabels, type Hex } from "@novak/sdk";
+import { buildPriceLadderSpecs, feedBySymbol, ladderBucketLabels, type Hex } from "@novakoracle/sdk";
 import { FeedSelect } from "@/components/markets/FeedSelect";
 import { deployment, novakAddresses } from "@/lib/addresses";
 import { useNovakClient } from "@/lib/novak";

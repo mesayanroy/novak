@@ -60,7 +60,7 @@ const LAYERS: Layer[] = [
     where: "DisputeManager.sol",
     body: (
       <>
-        Anyone can <Code>dispute()</Code> with a 0.01 ETH bond. Tier 1 (≤7 resolvers) needs 66% of the committee; no decision
+        Anyone can <Code>dispute()</Code> by posting a bond. Tier 1 (≤7 resolvers) needs 66% of the committee; no decision
         escalates to Tier 2 (≤15); still none → <Code>Voided</Code> and markets refund. <strong>Never a token vote.</strong>
       </>
     ),

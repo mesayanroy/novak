@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { LivePriceChart } from "@/components/markets/LivePriceChart";
+import { DisputePanel } from "@/components/disputes/DisputePanel";
 import { AssetBadge } from "@/components/markets/AssetIcon";
-import { SOURCES, decodePriceAtSpec, feedByAddress, sourceName } from "@novak/sdk";
+import { SOURCES, decodePriceAtSpec, feedByAddress, sourceName } from "@novakoracle/sdk";
 
 /** USD thresholds of every Chainlink price-at leaf under an event (for the chart). */
 function thresholdsOf(e: EventNode): number[] {
@@ -18,7 +19,7 @@ function thresholdsOf(e: EventNode): number[] {
 }
 import { ExampleDataBadge } from "@/components/ExampleDataBadge";
 import dynamic from "next/dynamic";
-import type { Hex } from "@novak/sdk";
+import type { Hex } from "@novakoracle/sdk";
 import { CompositionTree, type CompositionNode } from "@/components/markets/CompositionTree";
 import { MarketPositionCard } from "@/components/MarketPositionCard";
 import { SettlementSimulator } from "@/components/markets/SettlementSimulator";
@@ -33,7 +34,7 @@ const OracleArchitectureGuide = dynamic(
 const DistributionMarketFAQ = dynamic(
   () => import("@/components/markets/DistributionMarketFAQ").then((m) => m.DistributionMarketFAQ),
 );
-import { explorerUrl, marketAbi } from "@novak/sdk";
+import { explorerUrl, marketAbi } from "@novakoracle/sdk";
 import { useReadContract } from "wagmi";
 import { NOVAK_CHAIN_ID, novakAddresses } from "@/lib/addresses";
 import { OP_LABEL, USDG_DECIMALS, fmtTime, fmtUsdg, tickersOf, useMarket, type EventNode } from "@/lib/novak";
@@ -206,6 +207,14 @@ export function MarketDetail({ marketId }: { marketId: Hex }) {
             <div className="flex flex-col gap-8 min-w-0">
               <LivePriceChart feed={market.event.feed} ticker={market.event.ticker} thresholds={thresholdsOf(market.event)} />
               <MarketVisualizer market={market} />
+              {!market.isExample &&
+                (market.event.kind === "primitive" ? (
+                  <DisputePanel eventId={market.event.id} title="What this market settles on" />
+                ) : (
+                  (market.event.children ?? [])
+                    .filter((c) => c.kind === "primitive")
+                    .map((c) => <DisputePanel key={c.id} eventId={c.id} title={c.title} />)
+                ))}
             </div>
 
             <aside className="lg:sticky lg:top-24 h-fit">

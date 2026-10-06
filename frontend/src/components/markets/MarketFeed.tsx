@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { DistributionStatus, MarketStatus } from "@novak/sdk";
+import { DistributionStatus, MarketStatus } from "@novakoracle/sdk";
 import { Marquee } from "@/components/ui/marquee";
 import type { LiveMarket, MarketCategory } from "@/lib/novak";
 import type { DistributionView } from "@/lib/distribution";
 import { fmtPrice, useLiveFeeds } from "@/lib/feeds";
 import { PredictionCard, type FeedItem } from "./PredictionCard";
+import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
 import { ArrowRight, Search } from "lucide-react";
 
 type Pill = "all" | "stocks" | "bonds" | "crypto" | "macro" | "ranges" | "corporate";
@@ -126,6 +127,8 @@ export function MarketFeed({
           </div>
         </div>
       </div>
+
+      <SetupChecklist variant="compact" />
 
       <LiveTickerStrip />
 

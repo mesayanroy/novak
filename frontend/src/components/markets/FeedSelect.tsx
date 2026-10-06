@@ -1,6 +1,6 @@
 "use client";
 
-import { CHAINLINK_FEED_CATALOG } from "@novak/sdk";
+import { CHAINLINK_FEED_CATALOG } from "@novakoracle/sdk";
 import { useLiveFeeds, fmtPrice } from "@/lib/feeds";
 
 const GROUPS: Array<["Equity" | "Bond" | "Crypto", string]> = [

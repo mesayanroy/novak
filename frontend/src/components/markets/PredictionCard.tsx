@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { DistributionStatus, MarketStatus } from "@novak/sdk";
+import { DistributionStatus, MarketStatus } from "@novakoracle/sdk";
 import { fmtTime, fmtUsdg, tickersOf, type LiveMarket, type MarketCategory } from "@/lib/novak";
 import type { DistributionView } from "@/lib/distribution";
 import { fmtPrice, useFeedRounds, useFeedRow } from "@/lib/feeds";

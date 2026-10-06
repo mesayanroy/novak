@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAccount, useReadContract } from "wagmi";
-import { DistributionStatus, distributionMarketAbi, explorerUrl, feedByAddress, type Hex } from "@novak/sdk";
+import { DistributionStatus, distributionMarketAbi, explorerUrl, feedByAddress, type Hex } from "@novakoracle/sdk";
 import { AssetBadge } from "@/components/markets/AssetIcon";
 import { EventStatusPill } from "@/components/StatusPill";
 import { NOVAK_CHAIN_ID, novakAddresses } from "@/lib/addresses";
@@ -14,6 +14,7 @@ import { TradePanel } from "./TradePanel";
 import { InsightsPanel } from "./InsightsPanel";
 import { ActivityFeed } from "./ActivityFeed";
 import { LivePriceChart } from "@/components/markets/LivePriceChart";
+import { DisputePanel } from "@/components/disputes/DisputePanel";
 import { ArrowLeft } from "lucide-react";
 
 const DEFAULT_VOL: Record<string, number> = { SGOV: 0.01 };
@@ -115,9 +116,19 @@ export function DistributionMarketView({ marketId }: { marketId: Hex }) {
             </p>
             <ul className="mt-3 space-y-1.5">
               {view.boundaries.map((b) => (
-                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-1.5 text-sm">
-                  <span className="text-ink">{b.title}</span>
-                  {b.status !== undefined && <EventStatusPill status={b.status} />}
+                <li key={b.id} className="border-t border-gray-100 pt-1.5 text-sm">
+                  <details className="group">
+                    <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
+                      <span className="text-ink group-open:font-semibold">{b.title}</span>
+                      <span className="flex items-center gap-2">
+                        {b.status !== undefined && <EventStatusPill status={b.status} />}
+                        <span className="font-mono text-[11px] text-violet-600 group-open:hidden">dispute layer ▾</span>
+                      </span>
+                    </summary>
+                    <div className="mt-2">
+                      <DisputePanel eventId={b.id} compact />
+                    </div>
+                  </details>
                 </li>
               ))}
             </ul>

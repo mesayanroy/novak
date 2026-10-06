@@ -95,7 +95,7 @@ function useNotes(): Note[] {
         key: "quorum",
         icon: tile("bg-gradient-to-br from-violet-600 to-indigo-500", <CheckCircle2 className="h-5 w-5" />),
         title: "Quorum reached",
-        detail: "NVDA ≥ $234 at T → TRUE · 2 of 2 resolvers",
+        detail: "Trading-status snapshot · 2 of 3 resolvers agreed",
         meta: "registry",
         tone: "protocol",
       },

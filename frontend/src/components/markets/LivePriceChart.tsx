@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import type { Hex } from "@novak/sdk";
+import type { Hex } from "@novakoracle/sdk";
 import { fmtPrice, useFeedRounds, useFeedRow } from "@/lib/feeds";
 import { AssetIcon } from "./AssetIcon";
 

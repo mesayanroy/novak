@@ -4,7 +4,7 @@ import { useState } from "react";
 import { parseUnits } from "viem";
 import { useAccount, useReadContracts } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { DistributionStatus, distributionMarketAbi, mockUsdgAbi } from "@novak/sdk";
+import { DistributionStatus, distributionMarketAbi, mockUsdgAbi } from "@novakoracle/sdk";
 import { deployment, novakAddresses } from "@/lib/addresses";
 import { USDG_DECIMALS, fmtUsdg, useNovakClient } from "@/lib/novak";
 import type { DistributionView } from "@/lib/distribution";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useReadContract } from "wagmi";
-import { eventBusAbi } from "@novak/sdk";
+import { eventBusAbi } from "@novakoracle/sdk";
 import { novakAddresses } from "@/lib/addresses";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

@@ -18,7 +18,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { fmtTime, fmtUsdg, USDG_DECIMALS, type LiveMarket } from "@/lib/novak";
-import { MarketStatus } from "@novak/sdk";
+import { MarketStatus } from "@novakoracle/sdk";
 import { cn } from "@/lib/utils";
 
 export function MarketVisualizer({ market }: { market: LiveMarket }) {

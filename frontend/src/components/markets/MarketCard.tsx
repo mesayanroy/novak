@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { MarketStatus } from "@novak/sdk";
+import { MarketStatus } from "@novakoracle/sdk";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";
 import { ExampleDataBadge } from "@/components/ExampleDataBadge";
 import { fmtTime, fmtUsdg, type LiveMarket } from "@/lib/novak";

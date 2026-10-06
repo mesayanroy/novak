@@ -106,7 +106,7 @@ const telemetryNotifications = [
   {
     icon: Lock,
     title: "Challenger Bond Posted",
-    description: "0.01 ETH dispute bond posted — a Tier-1 committee is drawn",
+    description: "Dispute bond posted — a Tier-1 committee is drawn",
     time: "step 3",
     badge: "BONDED",
   },

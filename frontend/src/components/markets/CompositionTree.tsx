@@ -1,4 +1,4 @@
-import { EventStatus } from "@novak/sdk";
+import { EventStatus } from "@novakoracle/sdk";
 import { EventStatusPill, CompositeStatusPill, OperatorBadge } from "@/components/StatusPill";
 import { shortHex } from "@/lib/utils";
 

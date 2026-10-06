@@ -3,23 +3,38 @@
 import Link from "next/link";
 import { NovakLogo } from "@/components/NovakLogo";
 import { useState, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { ConnectButton } from "@/components/ConnectButton";
 import { DocsHoverMenu } from "@/components/docs/DocsHoverMenu";
 import { cn } from "@/lib/utils";
 
-const navLinks = [
-  { href: "/docs", label: "Docs", hasDropdown: true },
-  { href: "/docs/sdk", label: "SDK" },
+type NavLink = { href: string; label: string; hasDropdown?: boolean };
+
+/** Primary flow first (trade → challenge → inspect → operate → build), then Docs and the data pages. */
+const navLinks: NavLink[] = [
   { href: "/markets", label: "Markets" },
-  { href: "/feeds", label: "Feeds" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/guard", label: "Lending Guard" },
+  { href: "/disputes", label: "Disputes" },
+  { href: "/events", label: "Events" },
+  { href: "/build", label: "Build" },
+  { href: "/docs", label: "Docs", hasDropdown: true },
+];
+const dataLinks: NavLink[] = [
+  { href: "/portfolio", label: "Portfolio" },
+  { href: "/network", label: "Resolver network" },
+  { href: "/feeds", label: "Live feeds" },
+  { href: "/calendar", label: "Corporate actions" },
+  { href: "/guard", label: "Lending guard" },
+  { href: "/docs/sdk", label: "SDK reference" },
+  { href: "/start", label: "Get started" },
 ];
 
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [docsHovered, setDocsHovered] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
+  const pathname = usePathname();
+  const isActive = (href: string) => (href === "/docs" ? pathname === "/docs" || (pathname.startsWith("/docs/") && pathname !== "/docs/sdk") : pathname === href || pathname.startsWith(`${href}/`));
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMouseEnter = () => {
@@ -42,7 +57,7 @@ export function SiteHeader() {
             <span>Novak</span>
           </Link>
 
-          <nav className="relative hidden items-center gap-6 md:flex">
+          <nav className="relative hidden items-center gap-5 lg:flex">
             {navLinks.map((link) => (
               <div
                 key={link.href}
@@ -52,7 +67,10 @@ export function SiteHeader() {
               >
                 <Link
                   href={link.href}
-                  className="link-plain flex items-center gap-1 text-sm font-medium text-gray-700 transition-colors hover:text-ink"
+                  className={cn(
+                    "link-plain flex items-center gap-1 text-sm font-medium transition-colors hover:text-violet-700",
+                    isActive(link.href) ? "text-violet-700" : "text-gray-700",
+                  )}
                 >
                   {link.label}
                   {link.hasDropdown && (
@@ -68,6 +86,32 @@ export function SiteHeader() {
                 )}
               </div>
             ))}
+            <div className="relative py-4" onMouseEnter={() => setDataOpen(true)} onMouseLeave={() => setDataOpen(false)}>
+              <button
+                type="button"
+                onClick={() => setDataOpen((v) => !v)}
+                className={cn(
+                  "flex items-center gap-1 text-sm font-medium transition-colors hover:text-violet-700",
+                  dataLinks.some((l) => isActive(l.href)) ? "text-violet-700" : "text-gray-700",
+                )}
+              >
+                More <ChevronDown className={cn("h-3.5 w-3.5 text-gray-400 transition-transform", dataOpen && "rotate-180")} />
+              </button>
+              {dataOpen && (
+                <div className="absolute left-1/2 top-full z-50 w-52 -translate-x-1/2 rounded-xl border border-violet-100 bg-white p-1.5 shadow-[0_18px_40px_-20px_rgba(109,74,255,0.5)]">
+                  {dataLinks.map((l) => (
+                    <Link
+                      key={l.href}
+                      href={l.href}
+                      onClick={() => setDataOpen(false)}
+                      className={cn("link-plain block rounded-lg px-3 py-2 text-sm hover:bg-violet-50 hover:text-violet-800", isActive(l.href) ? "text-violet-700" : "text-gray-700")}
+                    >
+                      {l.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
         </div>
 
@@ -77,7 +121,7 @@ export function SiteHeader() {
           </div>
           <button
             aria-label="Toggle menu"
-            className="text-ink md:hidden"
+            className="text-ink lg:hidden"
             onClick={() => setMobileOpen((v) => !v)}
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -85,13 +129,17 @@ export function SiteHeader() {
         </div>
       </div>
 
-      <div className={cn("border-t border-gray-200 md:hidden", mobileOpen ? "block" : "hidden")}>
+      <div className={cn("border-t border-gray-200 lg:hidden", mobileOpen ? "block" : "hidden")}>
         <nav className="mx-auto flex max-w-6xl flex-col gap-1 px-6 py-3">
-          {navLinks.map((link) => (
+          {[...navLinks, ...dataLinks].map((link, i) => (
             <Link
               key={link.href}
               href={link.href}
-              className="link-plain rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-ink font-medium"
+              className={cn(
+                "link-plain rounded-lg px-2 py-2 text-sm font-medium hover:bg-violet-50 hover:text-violet-800",
+                isActive(link.href) ? "text-violet-700" : "text-gray-700",
+                i === navLinks.length && "mt-2 border-t border-gray-100 pt-3",
+              )}
               onClick={() => setMobileOpen(false)}
             >
               {link.label}

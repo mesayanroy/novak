@@ -1,4 +1,4 @@
-import { EventStatus, type CompositeOp } from "@novak/sdk";
+import { EventStatus, type CompositeOp } from "@novakoracle/sdk";
 import { cn } from "@/lib/utils";
 
 /**

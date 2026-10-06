@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { DistributionStatus } from "@novak/sdk";
+import { DistributionStatus } from "@novakoracle/sdk";
 import { fmtTime, fmtUsdg } from "@/lib/novak";
 import type { DistributionView } from "@/lib/distribution";
 import { BarChart3 } from "lucide-react";
