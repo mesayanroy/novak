@@ -45,7 +45,7 @@ const toView = (m: CommunityMarketInfo): CommunityView => {
 
 export const communityEnabled = Boolean(novakAddresses.communityMarket);
 
-/** Community markets, newest first. `live: true` keeps only those still taking stakes. */
+/** Community markets, newest first. `live: true` keeps only ACTIVE ones: not final, and staking still open or the result still due. */
 export function useCommunityMarkets(opts: { live?: boolean } = {}) {
   const client = useNovakClient();
   const pc = usePublicClient();
@@ -62,8 +62,11 @@ export function useCommunityMarkets(opts: { live?: boolean } = {}) {
         const metas = await (pc as PublicClient).multicall({ allowFailure: false, contracts: ids.map((id) => ({ ...cm, functionName: "getMarket" as const, args: [id] as const })) });
         const now = BigInt(Math.floor(Date.now() / 1000));
         keep = ids.filter((_, i) => {
-          const m = metas[i] as { status: number; closesAt: bigint };
-          return Number(m.status) === CommunityStatus.Open && m.closesAt > now;
+          const m = metas[i] as { status: number; closesAt: bigint; resolveBy: bigint };
+          const s = Number(m.status);
+          // Open (staking, or waiting for the creator's result) or Proposed (objection window).
+          // Kept until a day after the creator's deadline, when anyone can void it.
+          return (s === CommunityStatus.Open || s === CommunityStatus.Proposed) && m.resolveBy + 86_400n > now;
         });
       }
       const views = await Promise.all(keep.map(async (id) => toView(await client!.getCommunityMarket(id))));

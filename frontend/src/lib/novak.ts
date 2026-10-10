@@ -384,7 +384,14 @@ export const MOCK_MARKETS: LiveMarket[] = MOCK_MARKETS_RAW.map((m) => ({ ...m, i
 
 export const showingExamples = !deployment;
 
-/** Yes/no markets, newest first. `live: true` keeps (and hydrates) only markets still trading. */
+/** How long a closed-but-unsettled market stays listed (resolving / awaiting a result). */
+export const ACTIVE_AFTER_CLOSE_S = 7 * 86_400;
+
+/**
+ * Yes/no markets, newest first. `live: true` keeps (and hydrates) only ACTIVE
+ * markets: not yet settled, and either still trading or closed within the last
+ * week (awaiting resolution). Settled / refunded markets leave the list.
+ */
 export function useMarkets(opts: { live?: boolean } = {}) {
   const client = useNovakClient();
   const pc = usePublicClient();
@@ -398,7 +405,7 @@ export function useMarkets(opts: { live?: boolean } = {}) {
       let markets = await client!.listMarkets();
       if (live) {
         const now = BigInt(Math.floor(Date.now() / 1000));
-        markets = markets.filter((m) => m.status === MarketStatus.Open && m.tradingClosesAt > now);
+        markets = markets.filter((m) => m.status === MarketStatus.Open && m.tradingClosesAt + BigInt(ACTIVE_AFTER_CLOSE_S) > now);
       }
       const withEvents = await Promise.all(
         markets.map(async (m) => ({ ...m, event: await loadEventNode(pc as PublicClient, m.eventId) })),

@@ -13,7 +13,7 @@ import {
   type Hex,
 } from "@novakoracle/sdk";
 import { deployment, novakAddresses } from "./addresses";
-import { loadEventNode, useNovakClient, type EventNode } from "./novak";
+import { ACTIVE_AFTER_CLOSE_S, loadEventNode, useNovakClient, type EventNode } from "./novak";
 
 export interface DistributionView {
   marketId: Hex;
@@ -95,10 +95,10 @@ async function loadDistribution(client: NonNullable<ReturnType<typeof useNovakCl
 }
 
 /**
- * Range markets. `live: true` (the markets page) keeps only markets still
- * trading, and only those are hydrated (boundaries, prices) — finished
- * markets cost one batched metadata read, not a full load. Without it, every
- * market is returned (the portfolio needs finished ones to collect payouts).
+ * Range markets. `live: true` (the markets page) keeps only ACTIVE markets —
+ * not yet settled, still trading or closed within the last week — and only
+ * those are hydrated (boundaries, prices). Without it, every market is
+ * returned (the portfolio needs finished ones to collect payouts).
  */
 export function useDistributionMarkets(opts: { live?: boolean } = {}) {
   const client = useNovakClient();
@@ -124,7 +124,7 @@ export function useDistributionMarkets(opts: { live?: boolean } = {}) {
         const now = BigInt(Math.floor(Date.now() / 1000));
         keep = ids.filter((_, i) => {
           const m = metas[i] as { status: number; tradingClosesAt: bigint };
-          return Number(m.status) === DistributionStatus.Open && m.tradingClosesAt > now;
+          return Number(m.status) === DistributionStatus.Open && m.tradingClosesAt + BigInt(ACTIVE_AFTER_CLOSE_S) > now;
         });
       }
       const views = await Promise.all(keep.map((id) => loadDistribution(client!, pc as PublicClient, id)));

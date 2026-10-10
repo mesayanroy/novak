@@ -112,7 +112,7 @@ export default function MarketsPage() {
       {/* Metric Cards */}
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat icon={<TrendingUp className="h-3.5 w-3.5" />} label="USDG in markets" value={fmtUsdg(pooled)} />
-        <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Live markets" value={`${list.length + dists.length + (communityMarkets.data?.length ?? 0)}`} note={`${dists.length} range · ${communityMarkets.data?.length ?? 0} community`} />
+        <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Active markets" value={`${list.length + dists.length + (communityMarkets.data?.length ?? 0)}`} note={`${dists.length} range · ${communityMarkets.data?.length ?? 0} community`} />
         <Stat icon={<Radio className="h-3.5 w-3.5" />} label="Events" value={counts.data ? `${counts.data.total}` : "…"} note={counts.data ? `${counts.data.decided} decided` : ""} />
         <Stat icon={<ShieldAlert className="h-3.5 w-3.5" />} label="Disputes" value="Tier 1 → 2" note="bonded committees, never token votes" />
       </div>

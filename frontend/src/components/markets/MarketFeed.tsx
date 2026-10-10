@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAccount } from "wagmi";
 import Image from "next/image";
 import Link from "next/link";
 import { DistributionStatus, MarketStatus } from "@novakoracle/sdk";
@@ -32,6 +33,12 @@ const categoryOf = (item: FeedItem): MarketCategory | "community" =>
       : item.view.feed
         ? categoryForFeed(item.view.feed)
         : "stocks";
+const nowS = () => Math.floor(Date.now() / 1000);
+const closesOf = (i: FeedItem) => Number(i.kind === "binary" ? i.market.tradingClosesAt : i.kind === "community" ? i.view.closesAt : i.view.tradingClosesAt);
+const creatorOf = (i: FeedItem) => (i.kind === "binary" ? i.market.creator : i.view.creator).toLowerCase();
+/** Still taking trades/stakes (vs closed and awaiting its result). */
+const isTrading = (i: FeedItem) => closesOf(i) > nowS() && (i.kind !== "community" || i.view.status === 0);
+type Stage = "all" | "trading" | "resolving";
 const idOf = (i: FeedItem) => `${i.kind}:${i.kind === "binary" ? i.market.marketId : i.view.marketId}`;
 
 const PAGE = 24;
@@ -81,6 +88,10 @@ export function MarketFeed({
   onCreate: () => void;
 }) {
   const [pill, setPill] = useState<Pill>("all");
+  const [stage, setStage] = useState<Stage>("all");
+  const [mineOnly, setMineOnly] = useState(false);
+  const { address } = useAccount();
+  const me = address?.toLowerCase();
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(PAGE);
 
@@ -101,12 +112,17 @@ export function MarketFeed({
     return c;
   }, [all]);
 
+  const stageCounts = useMemo(() => {
+    const trading = all.filter(isTrading).length;
+    return { all: all.length, trading, resolving: all.length - trading, mine: me ? all.filter((i) => creatorOf(i) === me).length : 0 };
+  }, [all, me]);
+
   const items = useMemo(() => {
-    const open = (i: FeedItem) =>
-      i.kind === "binary" ? i.market.status === MarketStatus.Open : i.kind === "community" ? i.view.status === 0 : i.view.status === DistributionStatus.Open;
-    const closes = (i: FeedItem) => Number(i.kind === "binary" ? i.market.tradingClosesAt : i.kind === "community" ? i.view.closesAt : i.view.tradingClosesAt);
     return all
       .filter((i) => {
+        if (stage === "trading" && !isTrading(i)) return false;
+        if (stage === "resolving" && isTrading(i)) return false;
+        if (mineOnly && (!me || creatorOf(i) !== me)) return false;
         if (pill === "ranges" && i.kind !== "range") return false;
         if (pill !== "all" && pill !== "ranges" && categoryOf(i) !== pill) return false;
         if (!q) return true;
@@ -114,9 +130,9 @@ export function MarketFeed({
           i.kind === "binary" ? `${i.market.question} ${i.market.event.title}` : i.kind === "community" ? `${i.view.question} ${i.view.outcomes.join(" ")} ${i.view.category}` : i.view.question;
         return text.toLowerCase().includes(q.toLowerCase());
       })
-      // Open first, soonest to close first; then settled, newest first.
-      .sort((a, b) => Number(open(b)) - Number(open(a)) || (open(a) ? closes(a) - closes(b) : closes(b) - closes(a)));
-  }, [all, pill, q]);
+      // Trading first (closing soonest first), then awaiting a result (most recently closed first).
+      .sort((a, b) => Number(isTrading(b)) - Number(isTrading(a)) || (isTrading(a) ? closesOf(a) - closesOf(b) : closesOf(b) - closesOf(a)));
+  }, [all, pill, q, stage, mineOnly, me]);
 
   // One request for every visible card's trend line.
   const visible = items.slice(0, shown);
@@ -166,6 +182,48 @@ export function MarketFeed({
 
       <LiveTickerStrip />
 
+      {/* Lifecycle switch: trading now vs closed and awaiting a result */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex rounded-full border border-gray-200 bg-white p-0.5" role="tablist" aria-label="Market stage">
+          {(
+            [
+              ["all", "All active", stageCounts.all],
+              ["trading", "Trading now", stageCounts.trading],
+              ["resolving", "Awaiting result", stageCounts.resolving],
+            ] as [Stage, string, number][]
+          ).map(([k, label, n]) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={stage === k}
+              onClick={() => {
+                setStage(k);
+                setShown(PAGE);
+              }}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${stage === k ? "bg-violet-600 text-white" : "text-gray-600 hover:text-violet-700"}`}
+            >
+              {label}
+              <span className={`ml-1.5 font-mono text-[11px] ${stage === k ? "text-violet-200" : "text-gray-400"}`}>{n}</span>
+            </button>
+          ))}
+        </div>
+        {me && (
+          <button
+            type="button"
+            aria-pressed={mineOnly}
+            onClick={() => {
+              setMineOnly((v) => !v);
+              setShown(PAGE);
+            }}
+            className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${mineOnly ? "border-gray-900 bg-gray-900 text-white" : "border-gray-200 bg-white text-gray-600 hover:border-violet-300"}`}
+          >
+            Created by me<span className={`ml-1.5 font-mono text-[11px] ${mineOnly ? "text-gray-300" : "text-gray-400"}`}>{stageCounts.mine}</span>
+          </button>
+        )}
+        <span className="ml-auto hidden text-xs text-gray-500 sm:block">Markets stay here until they&apos;re settled; then find them in your Portfolio.</span>
+      </div>
+
       {/* Pills + search */}
       <div className="flex flex-wrap items-center gap-2">
         {PILLS.map(([key, label]) => (
@@ -207,7 +265,7 @@ export function MarketFeed({
         <p className="text-sm text-rose-700">Couldn&apos;t read markets from chain: {error.message}</p>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-violet-100 bg-white p-8 text-center text-sm text-gray-600">
-          No live markets here right now — finished markets leave this list once trading closes (find them in your Portfolio).{" "}
+          No active markets match. Settled markets leave this list (find yours in your Portfolio).{" "}
           <button onClick={onCreate} className="font-semibold text-violet-700 underline">
             Create one from any live Chainlink feed
           </button>

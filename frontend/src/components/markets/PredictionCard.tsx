@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { useAccount } from "wagmi";
 import Link from "next/link";
 import { DistributionStatus, MarketStatus } from "@novakoracle/sdk";
 import { categoryForFeed, fmtTime, fmtUsdg, tickersOf, type LiveMarket, type MarketCategory } from "@/lib/novak";
@@ -200,6 +201,17 @@ function RangeCard({ view }: { view: DistributionView }) {
 
 /** Creator-resolved community pool (sports, challenges). Black & white with the top pick highlighted. */
 function CommunityCard({ view }: { view: CommunityView }) {
+  const { address } = useAccount();
+  const yours = address?.toLowerCase() === view.creator.toLowerCase();
+  const trading = view.status === 0 && now() < view.closesAt;
+  const stage =
+    view.status === 1
+      ? `Result declared: ${view.outcomes[view.outcome]}`
+      : trading
+        ? null
+        : yours
+          ? "Declare the result"
+          : "Awaiting creator's result";
   const order = view.shares.map((p, i) => ({ p, i })).sort((a, b) => b.p - a.p);
   const lead = order[0];
   const shown = view.outcomes.length <= 3 ? view.outcomes.map((_, i) => i) : order.slice(0, 3).map((x) => x.i).sort((a, b) => a - b);
@@ -210,7 +222,10 @@ function CommunityCard({ view }: { view: CommunityView }) {
           <Users className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-gray-500">{view.category} · community</span>
+          <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+            {view.category} · community
+            {yours && <span className="rounded-full bg-violet-600 px-1.5 py-px text-[9px] text-white">yours</span>}
+          </span>
           <h3 className="text-[15px] font-semibold leading-snug text-gray-900 group-hover:text-violet-700">{view.question}</h3>
         </div>
         <div className="flex-none text-right">
@@ -230,12 +245,17 @@ function CommunityCard({ view }: { view: CommunityView }) {
         <span className="font-semibold text-gray-700">{fmtUsdg(view.totalPool)} USDG pool</span>
         <span className="flex items-center gap-1">
           <CalendarDays className="h-3.5 w-3.5" />
-          {fmtTime(view.closesAt)}
+          {trading ? fmtTime(view.closesAt) : "Staking closed"}
         </span>
         <span className="ml-auto flex items-center gap-1 text-gray-500">
           <Gavel className="h-3.5 w-3.5" /> creator resolves
         </span>
       </div>
+      {stage && (
+        <div className={`-mt-1 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${yours && view.status === 0 ? "bg-violet-600 text-white" : "bg-amber-50 text-amber-800"}`}>
+          <Gavel className="h-3.5 w-3.5" /> {stage}
+        </div>
+      )}
 
       <div className={`grid gap-2 ${shown.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
         {shown.map((i) => (

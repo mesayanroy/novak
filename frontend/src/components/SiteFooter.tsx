@@ -70,7 +70,7 @@ export function SiteFooter() {
                 <Zap className="h-3 w-3 text-ink" /> Events: <strong className="text-ink">{counts.data?.total ?? "…"}</strong>
               </span>
               <span>Decided: <strong className="text-ink">{counts.data?.decided ?? "…"}</strong></span>
-              <span>Live markets: <strong className="text-ink">{markets.data && dists.data ? markets.data.length + dists.data.length : "…"}</strong></span>
+              <span>Active markets: <strong className="text-ink">{markets.data && dists.data ? markets.data.length + dists.data.length : "…"}</strong></span>
             </div>
           )}
         </div>
