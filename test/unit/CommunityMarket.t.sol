@@ -33,7 +33,14 @@ contract CommunityMarketTest is Test {
 
     function _market() internal returns (bytes32 id) {
         vm.prank(creator);
-        id = cm.createMarket("A vs B: who wins?", _outcomes(), uint64(block.timestamp + 1 hours), uint64(block.timestamp + 1 days), 1 hours, "Official full-time score.");
+        id = cm.createMarket(
+            "A vs B: who wins?",
+            _outcomes(),
+            uint64(block.timestamp + 1 hours),
+            uint64(block.timestamp + 1 days),
+            1 hours,
+            "Official full-time score."
+        );
     }
 
     function _stake(address who, bytes32 id, uint8 o, uint256 amt) internal {
@@ -181,11 +188,22 @@ contract CommunityMarketTest is Test {
         string[] memory one = new string[](1);
         one[0] = "only";
         vm.expectRevert("CommunityMarket: 2-8 outcomes");
-        cm.createMarket("q", one, uint64(block.timestamp + 1), uint64(block.timestamp + 2), 1 hours, "");
+        cm.createMarket(
+            "q", one, uint64(block.timestamp + 1), uint64(block.timestamp + 2), 1 hours, ""
+        );
         vm.expectRevert("CommunityMarket: bad resolve deadline");
-        cm.createMarket("q", _outcomes(), uint64(block.timestamp + 10), uint64(block.timestamp + 10), 1 hours, "");
+        cm.createMarket(
+            "q",
+            _outcomes(),
+            uint64(block.timestamp + 10),
+            uint64(block.timestamp + 10),
+            1 hours,
+            ""
+        );
         vm.expectRevert("CommunityMarket: bad objection window");
-        cm.createMarket("q", _outcomes(), uint64(block.timestamp + 10), uint64(block.timestamp + 100), 60, "");
+        cm.createMarket(
+            "q", _outcomes(), uint64(block.timestamp + 10), uint64(block.timestamp + 100), 60, ""
+        );
     }
 
     function test_enumerationAndViews() public {
