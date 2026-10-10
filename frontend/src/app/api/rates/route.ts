@@ -15,8 +15,9 @@ export async function GET() {
   const [fred, nyfed] = await Promise.allSettled([
     fetch(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFEDTARU,DFEDTARL&cosd=${since}`, {
       next: { revalidate: 1800 },
+      signal: AbortSignal.timeout(8000), // a slow upstream must never stall a build or a request
     }).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`FRED HTTP ${r.status}`)))),
-    fetch("https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1.json", { next: { revalidate: 1800 } }).then(
+    fetch("https://markets.newyorkfed.org/api/rates/unsecured/effr/last/1.json", { next: { revalidate: 1800 }, signal: AbortSignal.timeout(8000) }).then(
       (r) => (r.ok ? r.json() : Promise.reject(new Error(`NY Fed HTTP ${r.status}`))),
     ),
   ]);

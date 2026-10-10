@@ -15,6 +15,7 @@ import { InsightsPanel } from "./InsightsPanel";
 import { ActivityFeed } from "./ActivityFeed";
 import { LivePriceChart } from "@/components/markets/LivePriceChart";
 import { DisputePanel } from "@/components/disputes/DisputePanel";
+import { ResolutionTimeline } from "@/components/markets/ResolutionTimeline";
 import { ArrowLeft } from "lucide-react";
 
 const DEFAULT_VOL: Record<string, number> = { SGOV: 0.01 };
@@ -90,7 +91,14 @@ export function DistributionMarketView({ marketId }: { marketId: Hex }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="flex min-w-0 flex-col gap-6">
-          <LivePriceChart feed={view.feed} ticker={view.ticker} thresholds={view.thresholds} />
+          <LivePriceChart feed={view.feed} ticker={view.ticker} thresholds={view.thresholds} resolveAt={view.at} />
+          <ResolutionTimeline
+            events={view.boundaries}
+            tradingClosesAt={view.tradingClosesAt}
+            settled={view.status === DistributionStatus.Settled}
+            refunding={view.status === DistributionStatus.Voided}
+            outcomeLabel={view.status === DistributionStatus.Settled ? view.labels[view.winningBucket] : undefined}
+          />
           <DistributionChart
             labels={view.labels}
             prices={view.prices}

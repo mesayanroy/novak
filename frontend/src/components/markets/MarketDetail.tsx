@@ -28,9 +28,6 @@ import { MarketVisualizer } from "@/components/markets/MarketVisualizer";
 
 // Below-the-fold explainer sections — split out of the initial bundle so the
 // live market detail/trading UI above the fold isn't gated on their JS.
-const OracleArchitectureGuide = dynamic(
-  () => import("@/components/markets/OracleArchitectureGuide").then((m) => m.OracleArchitectureGuide),
-);
 const DistributionMarketFAQ = dynamic(
   () => import("@/components/markets/DistributionMarketFAQ").then((m) => m.DistributionMarketFAQ),
 );
@@ -45,7 +42,6 @@ import {
   BarChart3,
   ShieldCheck,
   HelpCircle,
-  Cpu,
   Layers,
   ArrowLeft,
   DollarSign,
@@ -65,7 +61,7 @@ function toTree(e: EventNode): CompositionNode {
   };
 }
 
-type DetailTab = "visualizer" | "logic" | "oracle" | "faq";
+type DetailTab = "visualizer" | "logic" | "faq";
 
 export function MarketDetail({ marketId }: { marketId: Hex }) {
   const [activeTab, setActiveTab] = useState<DetailTab>("visualizer");
@@ -185,13 +181,6 @@ export function MarketDetail({ marketId }: { marketId: Hex }) {
           Settlement &amp; Composition Logic
         </TabButton>
         <TabButton
-          active={activeTab === "oracle"}
-          onClick={() => setActiveTab("oracle")}
-          icon={<Cpu className="h-4 w-4" />}
-        >
-          Oracle Architecture Guide
-        </TabButton>
-        <TabButton
           active={activeTab === "faq"}
           onClick={() => setActiveTab("faq")}
           icon={<HelpCircle className="h-4 w-4" />}
@@ -205,7 +194,7 @@ export function MarketDetail({ marketId }: { marketId: Hex }) {
         {activeTab === "visualizer" && (
           <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
             <div className="flex flex-col gap-8 min-w-0">
-              <LivePriceChart feed={market.event.feed} ticker={market.event.ticker} thresholds={thresholdsOf(market.event)} />
+              <LivePriceChart feed={market.event.feed} ticker={market.event.ticker} thresholds={thresholdsOf(market.event)} resolveAt={market.event.opensAt} />
               <MarketVisualizer market={market} />
               {!market.isExample &&
                 (market.event.kind === "primitive" ? (
@@ -260,12 +249,6 @@ export function MarketDetail({ marketId }: { marketId: Hex }) {
                 </p>
               </div>
             </section>
-          </div>
-        )}
-
-        {activeTab === "oracle" && (
-          <div className="flex flex-col gap-8">
-            <OracleArchitectureGuide />
           </div>
         )}
 

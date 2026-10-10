@@ -45,7 +45,7 @@ export function ReusePanel({ node }: { node: EventNode }) {
   const { address, isConnected } = useAccount();
   const client = useNovakClient();
   const { run, pending, error } = useTx();
-  const { data: events } = useEvents();
+  const { data: events } = useEvents({ limit: 300 });
   const [market, setMarket] = useState<Hex | null>(null);
 
   const undecided = node.status !== undefined && UNDECIDED.has(Number(node.status));

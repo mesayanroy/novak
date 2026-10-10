@@ -22,6 +22,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^13.2.0",
     "geist": "^1.7.2",
+    "lightweight-charts": "^5",
     "lucide-react": "^1.43.0",
     "next": "14.2.15",
     "react": "^18.3.1",

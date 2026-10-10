@@ -75,7 +75,7 @@ Deployed 2026-10-06 (chain 46630, start block 129498402; DisputeManager with com
 
 ## What's verified
 
-- **Contracts:** `forge test` → **173/173** passing (unit / integration / fuzz
+- **Contracts:** `forge test` → **186/186** passing (unit / integration / fuzz
   / adversarial), including:
   - TreasuryVault thirds, insurance and conservation fuzzing;
   - DistributionMarket LMSR solvency fuzzing, void at 1/N, and the

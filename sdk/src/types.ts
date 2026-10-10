@@ -124,6 +124,8 @@ export interface NovakAddresses {
   distributionMarket?: Address;
   /** Fee + dispute-proceeds vault (thirds: resolvers / committee / treasury). */
   treasuryVault?: Address;
+  /** Creator-resolved community prediction pools (outside the event layer). */
+  communityMarket?: Address;
 }
 
 /** Shape of deployments/<chainId>.json (script/export-deployment.mjs). */
@@ -137,4 +139,30 @@ export interface NovakDeployment extends NovakAddresses {
   stockLendingGuard: Address;
   distributionMarket: Address;
   treasuryVault: Address;
+}
+
+export enum CommunityStatus {
+  Open = 0,
+  Proposed = 1,
+  Resolved = 2,
+  Voided = 3,
+}
+
+export interface CommunityMarketInfo {
+  marketId: Hex;
+  creator: Address;
+  createdAt: bigint;
+  closesAt: bigint;
+  resolveBy: bigint;
+  objectionWindow: bigint;
+  proposedAt: bigint;
+  status: CommunityStatus;
+  nOutcomes: number;
+  outcome: number;
+  totalPool: bigint;
+  objectedStake: bigint;
+  question: string;
+  rules: string;
+  outcomes: string[];
+  pools: bigint[];
 }

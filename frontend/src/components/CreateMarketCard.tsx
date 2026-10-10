@@ -23,8 +23,9 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { shortHex } from "@/lib/utils";
 import { RangeTemplate } from "@/components/distribution/RangeTemplate";
 import { FeedSelect } from "@/components/markets/FeedSelect";
+import { CommunityTemplate } from "@/components/community/CommunityTemplate";
 
-type Template = "range" | "price" | "corporate" | "combine";
+type Template = "range" | "price" | "corporate" | "combine" | "community";
 
 const HOUR = 3600;
 const DAY = 24 * HOUR;
@@ -53,7 +54,7 @@ export function CreateMarketCard({
   const { address, isConnected } = useAccount();
   const client = useNovakClient();
   const publicClient = usePublicClient();
-  const { data: events } = useEvents();
+  const { data: events } = useEvents({ limit: 100 });
   const { run, pending, error } = useTx();
   const [template, setTemplate] = useState<Template>(initialTicker ? "range" : "price");
   const [created, setCreated] = useState<Hex | null>(null);
@@ -204,6 +205,7 @@ export function CreateMarketCard({
               ["corporate", "Corporate action"],
               ["combine", "Combine two events"],
               ["range", "Price range (distribution)"],
+              ["community", "Community challenge · sports & more"],
             ] as const
           ).map(([t, label]) => (
             <Button key={t} size="sm" variant={template === t ? "primary" : "secondary"} onClick={() => setTemplate(t)}>
@@ -262,6 +264,17 @@ export function CreateMarketCard({
         )}
 
         {template === "range" && <RangeTemplate initialTicker={initialTicker} />}
+
+        {template === "community" && (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-gray-600">
+              Your own prediction pool on anything Novak&apos;s resolvers don&apos;t cover: a football match, a final, a bet between
+              friends. You set the outcomes and the timeline and you declare the result; players can object, and if enough of
+              them do, everyone is refunded.
+            </p>
+            <CommunityTemplate />
+          </div>
+        )}
 
         {template === "combine" && (
           <div className="flex flex-col gap-3">

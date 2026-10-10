@@ -23,6 +23,7 @@ export {
   marketAbi,
   stockLendingGuardAbi,
   distributionMarketAbi,
+  communityMarketAbi,
   treasuryVaultAbi,
   mockUsdgAbi,
   novakCtfAdapterAbi,

@@ -6,8 +6,10 @@ import { useState, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { ConnectButton } from "@/components/ConnectButton";
+import { AnimatedThemeToggler } from "@/registry/magicui/animated-theme-toggler";
 import { DocsHoverMenu } from "@/components/docs/DocsHoverMenu";
 import { cn } from "@/lib/utils";
+import { useSetupProgress } from "@/lib/setup";
 
 type NavLink = { href: string; label: string; hasDropdown?: boolean };
 
@@ -34,6 +36,9 @@ export function SiteHeader() {
   const [docsHovered, setDocsHovered] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
   const pathname = usePathname();
+  // "Get started" disappears for good once a wallet has finished onboarding.
+  const { finished } = useSetupProgress();
+  const moreLinks = finished ? dataLinks.filter((l) => l.href !== "/start") : dataLinks;
   const isActive = (href: string) => (href === "/docs" ? pathname === "/docs" || (pathname.startsWith("/docs/") && pathname !== "/docs/sdk") : pathname === href || pathname.startsWith(`${href}/`));
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -92,19 +97,19 @@ export function SiteHeader() {
                 onClick={() => setDataOpen((v) => !v)}
                 className={cn(
                   "flex items-center gap-1 text-sm font-medium transition-colors hover:text-violet-700",
-                  dataLinks.some((l) => isActive(l.href)) ? "text-violet-700" : "text-gray-700",
+                  moreLinks.some((l) => isActive(l.href)) ? "text-violet-700" : "text-gray-700",
                 )}
               >
                 More <ChevronDown className={cn("h-3.5 w-3.5 text-gray-400 transition-transform", dataOpen && "rotate-180")} />
               </button>
               {dataOpen && (
-                <div className="absolute left-1/2 top-full z-50 w-52 -translate-x-1/2 rounded-xl border border-violet-100 bg-white p-1.5 shadow-[0_18px_40px_-20px_rgba(109,74,255,0.5)]">
-                  {dataLinks.map((l) => (
+                <div className="absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 rounded-2xl border border-white/60 bg-white/85 p-1.5 shadow-[0_24px_60px_-24px_rgba(76,29,149,0.45)] ring-1 ring-violet-100/70 backdrop-blur-xl backdrop-saturate-150">
+                  {moreLinks.map((l) => (
                     <Link
                       key={l.href}
                       href={l.href}
                       onClick={() => setDataOpen(false)}
-                      className={cn("link-plain block rounded-lg px-3 py-2 text-sm hover:bg-violet-50 hover:text-violet-800", isActive(l.href) ? "text-violet-700" : "text-gray-700")}
+                      className={cn("link-plain block rounded-xl px-3 py-2 text-sm font-medium hover:bg-white/80 hover:text-violet-800", isActive(l.href) ? "bg-white/70 text-violet-700" : "text-gray-700")}
                     >
                       {l.label}
                     </Link>
@@ -115,7 +120,8 @@ export function SiteHeader() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <AnimatedThemeToggler />
           <div className="hidden sm:block">
             <ConnectButton />
           </div>
@@ -131,7 +137,7 @@ export function SiteHeader() {
 
       <div className={cn("border-t border-gray-200 lg:hidden", mobileOpen ? "block" : "hidden")}>
         <nav className="mx-auto flex max-w-6xl flex-col gap-1 px-6 py-3">
-          {[...navLinks, ...dataLinks].map((link, i) => (
+          {[...navLinks, ...moreLinks].map((link, i) => (
             <Link
               key={link.href}
               href={link.href}

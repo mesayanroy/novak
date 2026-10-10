@@ -8,6 +8,7 @@ import { ArchitectureScroll } from "@/components/landing/ArchitectureScroll";
 import { LiveFactsFeed } from "@/components/landing/LiveFactsFeed";
 import { IntegrateSection } from "@/components/landing/IntegrateSection";
 import { BentoIdeaSection } from "@/components/BentoIdeaSection";
+import { GapMap } from "@/components/landing/GapMap";
 import { Iphone } from "@/registry/magicui/iphone";
 import { ArrowRight, Layers, ShieldCheck, Cpu, Terminal, Sparkles, Activity, Radio, TrendingUp } from "lucide-react";
 import { Availability } from "@novakoracle/sdk";
@@ -18,11 +19,11 @@ import { useEvents } from "@/lib/novak";
  *  chain — or a plain tagline when no deployment is configured. Never
  *  fabricated numbers. */
 function LiveBanner() {
-  const { data } = useEvents();
+  const { data } = useEvents({ limit: 40 });
   const latest = data?.find((e) => e.availability !== Availability.Pending);
   if (!deployment || !latest) {
     return (
-      <span className="text-gray-300">
+      <span className="text-gray-300 dark:text-gray-600">
         Built on Robinhood Chain — the event layer for tokenized stocks.
       </span>
     );
@@ -34,8 +35,8 @@ function LiveBanner() {
         ? latest.compositeStatus?.toUpperCase()
         : "FINALIZED";
   return (
-    <span className="text-gray-300">
-      Latest on Robinhood Chain testnet: {latest.title} → <strong className="text-paper">{verdict}</strong>
+    <span className="text-gray-300 dark:text-gray-600">
+      Latest on Robinhood Chain testnet: {latest.title} → <strong className="text-paper dark:text-ink">{verdict}</strong>
     </span>
   );
 }
@@ -63,7 +64,7 @@ export default function Home() {
   return (
     <main className="overflow-x-clip">
       {/* Live Market Ticker Banner */}
-      <div className="border-b border-gray-200 bg-gray-900 text-paper py-2 overflow-hidden">
+      <div className="border-b border-gray-200 bg-gray-900 text-paper py-2 overflow-hidden dark:bg-violet-50 dark:text-ink">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-between text-xs font-mono">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 font-bold text-emerald-400">
@@ -71,7 +72,7 @@ export default function Home() {
             </span>
             <LiveBanner />
           </div>
-          <Link href="/markets" className="hidden sm:flex items-center gap-1 text-gray-400 hover:text-paper transition-colors font-semibold">
+          <Link href="/markets" className="hidden sm:flex items-center gap-1 text-gray-400 hover:text-paper transition-colors font-semibold dark:text-gray-600 dark:hover:text-ink">
             View markets <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
@@ -225,34 +226,33 @@ export default function Home() {
         </div>
       </section>
 
-      {/* The gap on Robinhood Chain — in the chain's own words */}
-      <section className="mx-auto max-w-5xl px-6 py-16">
-        <p className="font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">The gap on Robinhood Chain</p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl text-ink">
-          Prices are covered. What happens to the stock isn&apos;t.
-        </h2>
-        <p className="mt-3 max-w-3xl text-gray-600">
-          Robinhood Chain ships Chainlink price feeds for its stock tokens. Everything else a lending market or derivative
-          needs to stay solvent through a split or a halt is left to each integrator:
-        </p>
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {GAP_QUOTES.map((q) => (
-            <figure key={q.href} className="border border-gray-300 bg-paper p-5 rounded-sm">
-              <blockquote className="text-sm text-ink leading-relaxed">&ldquo;{q.quote}&rdquo;</blockquote>
-              <figcaption className="mt-3 font-mono text-[11px] text-gray-500">
-                <a href={q.href} target="_blank" rel="noreferrer" className="underline">
-                  {q.source}
-                </a>
-              </figcaption>
-            </figure>
-          ))}
+      {/* The gap on Robinhood Chain — a dotted world map of what the price feed doesn't cover */}
+      <section className="relative overflow-hidden py-16">
+        <div className="relative mx-auto max-w-6xl px-6">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="font-mono text-xs font-semibold uppercase tracking-wide text-violet-600">The gap on Robinhood Chain</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-ink sm:text-4xl">Prices are covered. What happens to the stock isn&apos;t.</h2>
+            <p className="mt-3 text-gray-600">
+              Robinhood Chain ships Chainlink price feeds for its stock tokens. Everything else a lending market or derivative needs
+              to stay solvent through a split or a halt is left to each integrator. Hover a point to see the gap, and how Novak closes it.
+            </p>
+          </div>
+          <div className="mt-8">
+            <GapMap />
+          </div>
+          <div className="mt-10 grid gap-3 md:grid-cols-3">
+            {GAP_QUOTES.map((q) => (
+              <figure key={q.href} className="rounded-2xl border border-gray-200 bg-white p-4">
+                <blockquote className="text-[13px] leading-relaxed text-ink">&ldquo;{q.quote}&rdquo;</blockquote>
+                <figcaption className="mt-2 font-mono text-[10.5px] text-gray-500">
+                  <a href={q.href} target="_blank" rel="noreferrer" className="underline decoration-gray-300 hover:text-violet-700">
+                    {q.source}
+                  </a>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
-        <p className="mt-6 max-w-3xl text-sm text-gray-700">
-          Novak resolves those facts once — from the stock tokens&apos; own ERC-8056 logs, Chainlink rounds, and Robinhood&apos;s
-          asset registry — and every protocol reads the same finalized answer.{" "}
-          <Link href="/calendar" className="underline">See the corporate-action calendar</Link> or the{" "}
-          <Link href="/guard" className="underline">lending guard</Link>.
-        </p>
       </section>
 
       {/* Bento Grid Architecture Features */}

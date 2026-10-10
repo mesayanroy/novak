@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { parseAbiItem, type PublicClient } from "viem";
 import { usePublicClient } from "wagmi";
 import {
+  distributionMarketAbi,
   CHAINLINK_FEEDS_MAINNET,
   feedByAddress,
   DistributionStatus,
@@ -93,16 +94,40 @@ async function loadDistribution(client: NonNullable<ReturnType<typeof useNovakCl
   };
 }
 
-export function useDistributionMarkets() {
+/**
+ * Range markets. `live: true` (the markets page) keeps only markets still
+ * trading, and only those are hydrated (boundaries, prices) — finished
+ * markets cost one batched metadata read, not a full load. Without it, every
+ * market is returned (the portfolio needs finished ones to collect payouts).
+ */
+export function useDistributionMarkets(opts: { live?: boolean } = {}) {
   const client = useNovakClient();
   const pc = usePublicClient();
+  const live = Boolean(opts.live);
   return useQuery({
-    queryKey: ["novak", "distribution", "list", deployment?.distributionMarket],
+    queryKey: ["novak", "distribution", "list", deployment?.distributionMarket, live],
     enabled: Boolean(client && pc && deployment?.distributionMarket),
     refetchInterval: 20_000,
     queryFn: async () => {
-      const list = await client!.listDistributionMarkets();
-      const views = await Promise.all(list.map((m) => loadDistribution(client!, pc as PublicClient, m.marketId)));
+      const dm = novakAddresses.distributionMarket!;
+      const count = (await (pc as PublicClient).readContract({ address: dm, abi: distributionMarketAbi, functionName: "marketCount" })) as bigint;
+      const ids: Hex[] = [];
+      for (let off = 0n; off < count; off += 200n) {
+        ids.push(...((await (pc as PublicClient).readContract({ address: dm, abi: distributionMarketAbi, functionName: "getMarketIds", args: [off, 200n] })) as Hex[]));
+      }
+      let keep = ids;
+      if (live && ids.length) {
+        const metas = await (pc as PublicClient).multicall({
+          allowFailure: false,
+          contracts: ids.map((id) => ({ address: dm, abi: distributionMarketAbi, functionName: "getMarket" as const, args: [id] as const })),
+        });
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        keep = ids.filter((_, i) => {
+          const m = metas[i] as { status: number; tradingClosesAt: bigint };
+          return Number(m.status) === DistributionStatus.Open && m.tradingClosesAt > now;
+        });
+      }
+      const views = await Promise.all(keep.map((id) => loadDistribution(client!, pc as PublicClient, id)));
       return views.reverse();
     },
   });

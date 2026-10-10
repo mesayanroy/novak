@@ -46,6 +46,13 @@ Enforced by regression tests:
 `test/unit/NovakIntegrations.t.sol::test_consumer_holdsOnlyEventBusReference` /
 `test_adapter_holdsOnlyEventBusAndCtf` (the `contracts/integrations/` drop-in
 `NovakConsumer` base and the Conditional Tokens `NovakCTFAdapter`).
+**`derivatives/CommunityMarket.sol` is the deliberate exception:** user-created,
+creator-resolved prediction pools (sports, challenges) that are NOT settled by
+Novak at all — it holds only the collateral token, never the Bus, Registry or a
+resolver (`test/unit/CommunityMarket.t.sol::test_holdsOnlyCollateralReference`).
+Its safety rules (objection window: >⅓ of the pool objecting voids; creator
+deadline; nobody-backed-result refunds) live entirely in that contract. Don't
+route it through Novak events or let event-layer contracts depend on it.
 Consumers may also *push* fees into `ITreasuryVault`. The vault (protocol
 infrastructure) is the one that reads the Registry/DisputeManager to pay people.
 If you add a new consumer contract, add an equivalent guard test. Consumers
@@ -133,7 +140,7 @@ frontend/         Next.js: /, /markets, /markets/[id], /markets/dist/[id],
                   fee thirds), /build (builder console + code gen), /feeds,
                   /calendar, /guard, /docs; api/ routes; MetaMask (EIP-6963).
                   NEXT_PUBLIC_RESOLVER_URL = the resolver service (Render)
-test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 173 tests, all passing
+test/             unit/ integration/ fuzz/ adversarial/ (Foundry) — 186 tests, all passing
 script/           Deploy.s.sol (Registry -> DisputeManager -> Composer -> Bus
                   -> Settlement -> Market)
 examples/         end-to-end-flow.ts (scripted canonical flow), seed-demo.ts
@@ -144,7 +151,7 @@ docs/             architecture.md, protocol-spec.md, threat-model.md,
 
 ## Current status
 
-`forge test` → 173/173. v2 (2026-10-04): TreasuryVault + DistributionMarket +
+`forge test` → 186/186. v2 (2026-10-04): TreasuryVault + DistributionMarket +
 Fed-rate adapter + rewards duty verified live on anvil from real mainnet
 data: six range markets settled on the correct range, fee thirds were
 claimed, and the winner redeemed 1 USDG per share. Verified in the 2026-09-25 pass: full-stack deploy

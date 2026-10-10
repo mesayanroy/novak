@@ -1,7 +1,7 @@
 import { type ComponentPropsWithoutRef, type ReactNode } from "react";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 export interface BentoGridProps extends ComponentPropsWithoutRef<"div"> {
   children: ReactNode;
@@ -20,70 +20,56 @@ export interface BentoCardProps extends ComponentPropsWithoutRef<"div"> {
 
 export const BentoGrid = ({ children, className, ...props }: BentoGridProps) => {
   return (
-    <div
-      className={cn(
-        "grid w-full auto-rows-[22rem] grid-cols-3 gap-4",
-        className
-      )}
-      {...props}
-    >
+    <div className={cn("grid w-full auto-rows-[24rem] grid-cols-3 gap-4", className)} {...props}>
       {children}
     </div>
   );
 };
 
+/**
+ * Visual on top, copy below. The call to action lives in its own footer row
+ * under the description (never floated over it), so nothing overlaps at any
+ * width or on hover.
+ */
 export const BentoCard = ({
   name,
   className,
   background,
   Icon,
   description,
-  href = "#",
+  href,
   cta = "Learn more",
   ...props
 }: BentoCardProps) => (
   <div
     key={name}
     className={cn(
-      "group relative col-span-3 flex flex-col justify-between overflow-hidden rounded-md border border-gray-200 bg-paper p-1 transition-all duration-300 hover:border-gray-400 hover:shadow-md",
-      className
+      "group relative col-span-3 flex flex-col overflow-hidden rounded-2xl border border-violet-100 bg-white p-1.5 shadow-[0_10px_30px_-24px_rgba(109,74,255,0.55)] transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-[0_18px_44px_-24px_rgba(109,74,255,0.7)]",
+      className,
     )}
     {...props}
   >
-    <div className="relative h-full w-full overflow-hidden rounded-sm bg-gray-50/50">
+    <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-xl bg-gradient-to-b from-violet-50/70 to-white">
       {background}
     </div>
 
-    <div className="pointer-events-none z-10 flex flex-col gap-1.5 p-5 transition-all duration-300 group-hover:-translate-y-2">
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-paper text-ink shadow-2xs transition-transform duration-300 group-hover:scale-110">
-          <Icon className="h-5 w-5 text-ink" />
+    <div className="relative z-10 flex flex-col gap-2 px-4 pb-3 pt-4">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl border border-violet-100 bg-violet-50 text-violet-700 transition-transform duration-300 group-hover:scale-105">
+          <Icon className="h-[18px] w-[18px]" />
         </div>
-        <h3 className="text-lg font-semibold tracking-tight text-ink font-sans">
-          {name}
-        </h3>
+        <h3 className="text-base font-semibold tracking-tight text-ink sm:text-lg">{name}</h3>
       </div>
-      <p className="max-w-md text-xs text-gray-600 leading-relaxed font-sans">
-        {description}
-      </p>
-    </div>
-
-    {href && (
-      <div className="pointer-events-none absolute bottom-4 right-4 flex translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-        <Button
-          variant="secondary"
-          size="sm"
-          asChild
-          className="pointer-events-auto h-7 gap-1.5 text-xs font-mono font-medium border border-gray-300 bg-paper text-ink hover:bg-gray-100"
+      <p className="line-clamp-3 text-[13px] leading-relaxed text-gray-600">{description}</p>
+      {href && (
+        <Link
+          href={href}
+          className="link-plain mt-0.5 inline-flex w-fit items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-violet-700 hover:text-violet-900"
         >
-          <a href={href}>
-            {cta}
-            <ArrowRight className="h-3 w-3" />
-          </a>
-        </Button>
-      </div>
-    )}
-
-    <div className="pointer-events-none absolute inset-0 transition-colors duration-300 group-hover:bg-ink/[0.01]" />
+          {cta}
+          <ArrowRight className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-0.5" />
+        </Link>
+      )}
+    </div>
   </div>
 );

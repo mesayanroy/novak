@@ -22,7 +22,7 @@ const FILTERS: [Filter, string, (e: EventNode) => boolean][] = [
 ];
 
 export default function EventsPage() {
-  const { data, isLoading } = useEvents();
+  const { data, isLoading } = useEvents({ limit: 150 });
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [source, setSource] = useState("all");

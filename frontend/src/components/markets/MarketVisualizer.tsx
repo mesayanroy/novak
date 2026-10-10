@@ -8,8 +8,6 @@ import {
   ShieldCheck,
   Zap,
   ArrowRight,
-  Clock,
-  CheckCircle2,
   AlertTriangle,
   Info,
   DollarSign,
@@ -20,6 +18,7 @@ import {
 import { fmtTime, fmtUsdg, USDG_DECIMALS, type LiveMarket } from "@/lib/novak";
 import { MarketStatus } from "@novakoracle/sdk";
 import { cn } from "@/lib/utils";
+import { ResolutionTimeline } from "./ResolutionTimeline";
 
 export function MarketVisualizer({ market }: { market: LiveMarket }) {
   const [simSide, setSimSide] = useState<"YES" | "NO">("YES");
@@ -286,107 +285,14 @@ export function MarketVisualizer({ market }: { market: LiveMarket }) {
         </div>
       </div>
 
-      {/* Lifecycle Timeline & Stepper */}
-      <div className="border border-gray-300 bg-paper p-6 rounded-sm">
-        <div className="flex items-center justify-between border-b border-gray-200 pb-3">
-          <div className="flex items-center gap-2 font-mono text-sm font-semibold text-ink">
-            <Clock className="h-4 w-4 text-emerald-600" />
-            Market Lifecycle &amp; Resolution Timeline
-          </div>
-          <span className="font-mono text-[11px] text-gray-500">
-            Trading Closes: {fmtTime(market.tradingClosesAt)}
-          </span>
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-5 gap-3 relative">
-          <StepCard
-            num={1}
-            title="Trading Open"
-            desc="Deposits &amp; position closes allowed"
-            active={isTradingOpen}
-            done={!isTradingOpen}
-          />
-          <StepCard
-            num={2}
-            title="Trading Closed"
-            desc="Observation opens at close time"
-            active={isAwaitingResolution}
-            done={isSettled || isRefunding}
-          />
-          <StepCard
-            num={3}
-            title="Resolver Quorum"
-            desc="Resolvers submit outcome + evidence"
-            active={isAwaitingResolution}
-            done={isSettled || isRefunding}
-          />
-          <StepCard
-            num={4}
-            title="Dispute Window"
-            desc="Bonded 2-tier committee challenge"
-            active={isAwaitingResolution}
-            done={isSettled || isRefunding}
-          />
-          <StepCard
-            num={5}
-            title={isRefunding ? "Refunding" : "Settled"}
-            desc={isRefunding ? "Full collateral refunds open" : "Winning payouts claimable"}
-            active={isSettled || isRefunding}
-            done={isSettled || isRefunding}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StepCard({
-  num,
-  title,
-  desc,
-  active,
-  done,
-}: {
-  num: number;
-  title: string;
-  desc: string;
-  active: boolean;
-  done: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "border p-3 rounded-sm flex flex-col justify-between transition-all",
-        active
-          ? "border-emerald-600 bg-emerald-50/70 shadow-sm"
-          : done
-          ? "border-gray-300 bg-gray-50 text-gray-700"
-          : "border-gray-200 bg-paper opacity-60"
-      )}
-    >
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <span
-            className={cn(
-              "font-mono text-[10px] font-bold px-1.5 py-0.5 rounded",
-              active
-                ? "bg-emerald-600 text-paper"
-                : done
-                ? "bg-gray-800 text-paper"
-                : "bg-gray-200 text-gray-600"
-            )}
-          >
-            0{num}
-          </span>
-          {done ? (
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-          ) : active ? (
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-          ) : null}
-        </div>
-        <h4 className="font-mono text-xs font-semibold text-ink">{title}</h4>
-        <p className="mt-1 text-[11px] text-gray-600 leading-tight">{desc}</p>
-      </div>
+      {/* Lifecycle timeline, from chain state */}
+      <ResolutionTimeline
+        events={[market.event]}
+        tradingClosesAt={market.tradingClosesAt}
+        settled={market.status === MarketStatus.Settled}
+        refunding={market.status === MarketStatus.Refunding}
+        outcomeLabel={market.status === MarketStatus.Settled ? (market.outcome ? "YES" : "NO") : undefined}
+      />
     </div>
   );
 }

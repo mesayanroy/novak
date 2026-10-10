@@ -11,6 +11,7 @@ import { TreasuryVault } from "../contracts/TreasuryVault.sol";
 import { MockUSDG } from "../contracts/mocks/MockUSDG.sol";
 import { Market } from "../derivatives/Market.sol";
 import { DistributionMarket } from "../derivatives/DistributionMarket.sol";
+import { CommunityMarket } from "../derivatives/CommunityMarket.sol";
 import { Settlement } from "../derivatives/Settlement.sol";
 import { PositionManager } from "../derivatives/PositionManager.sol";
 import { StockLendingGuard } from "../consumers/StockLendingGuard.sol";
@@ -92,6 +93,8 @@ contract Deploy is Script {
             address(c.settlement), cfg.collateral, address(c.vault), cfg.tradeFeeBps
         );
         StockLendingGuard guard = new StockLendingGuard(address(c.bus), cfg.riskAdmin);
+        // Creator-resolved community markets: outside the event layer, needs only the collateral.
+        CommunityMarket community = new CommunityMarket(cfg.collateral);
 
         for (uint256 i = 0; i < cfg.resolvers.length; i++) {
             c.registry.setResolverAuthorization(cfg.resolvers[i], true);
@@ -109,6 +112,7 @@ contract Deploy is Script {
         console.log("TreasuryVault:       ", address(c.vault));
         console.log("SubscriptionManager: ", address(subscriptions));
         console.log("Settlement:          ", address(c.settlement));
+        console.log("CommunityMarket:     ", address(community));
         console.log("PositionManager:     ", address(positionManager));
         console.log("Market:              ", address(market));
         console.log("DistributionMarket:  ", address(dist));

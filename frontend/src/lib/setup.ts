@@ -22,6 +22,9 @@ export interface SetupState {
   ethBalance?: bigint;
   usdgBalance?: bigint;
   ready: boolean;
+  /** All six steps were completed at some point by this wallet (remembered), so
+   *  onboarding UI ("Get started", the checklist) is gone for good. */
+  finished: boolean;
 }
 
 const ORDER: StepId[] = ["wallet", "connect", "network", "gas", "usdg", "trade"];
@@ -58,11 +61,24 @@ export function useSetupProgress(): SetupState {
     trade: Boolean(portfolio?.positions.length),
   };
   const done = ORDER.filter((s) => steps[s]).length;
+  const complete = done === ORDER.length;
+  const key = address ? `novak.setup.finished.${address.toLowerCase()}` : undefined;
+  const [remembered, setRemembered] = useState(false);
+  useEffect(() => {
+    if (!key) return setRemembered(false);
+    try {
+      if (complete) localStorage.setItem(key, "1");
+      setRemembered(localStorage.getItem(key) === "1");
+    } catch {
+      setRemembered(complete);
+    }
+  }, [key, complete]);
   return {
     steps,
     done,
     total: ORDER.length,
-    complete: done === ORDER.length,
+    complete,
+    finished: complete || remembered,
     next: ORDER.find((s) => !steps[s]),
     ethBalance: eth?.value,
     usdgBalance: usdg as bigint | undefined,

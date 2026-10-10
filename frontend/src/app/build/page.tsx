@@ -142,7 +142,7 @@ export default function BuildPage() {
   const { data: feeds } = useLiveFeeds();
   const [created, setCreated] = useState<{ id: Hex; market?: Hex } | null>(null);
   const [dupOk, setDupOk] = useState(false);
-  const { data: events } = useEvents();
+  const { data: events } = useEvents({ limit: 300 });
 
   // common
   const [disputeMin, setDisputeMin] = useState(30);

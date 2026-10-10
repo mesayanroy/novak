@@ -11,6 +11,7 @@ export const docsNavGroups: { label: string; items: { href: string; label: strin
       { href: "/docs", label: "Introduction" },
       { href: "/docs/robinhood", label: "Robinhood Chain" },
       { href: "/docs/architecture", label: "Architecture" },
+      { href: "/docs/oracle-architecture", label: "Oracle architecture", isNew: true },
       { href: "/docs/contracts", label: "Deployed contracts", isNew: true },
     ],
   },

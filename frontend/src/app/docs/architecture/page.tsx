@@ -1,6 +1,7 @@
 import { Layers } from "lucide-react";
 import { LayerDiagram } from "@/components/architecture/LayerDiagram";
 import { C, Callout, DataTable, DocHeader, H2, H3, P, Steps } from "@/components/docs/DocPrimitives";
+import { OracleComparison } from "@/components/docs/OracleComparison";
 
 export const metadata = { title: "Architecture — Novak Docs" };
 
@@ -70,6 +71,15 @@ export default function ArchitecturePage() {
       <P>Click a layer to see its job and the functions it exposes. A layer only talks to the one directly beneath it.</P>
       <div className="mt-6">
         <LayerDiagram detailed />
+      </div>
+
+      <H2 id="side-by-side">Side by side: an event oracle, not another price feed</H2>
+      <P>
+        What each oracle design gives a prediction market. Chainlink is one of Novak&apos;s data sources, not an alternative
+        to it. For how an answer is decided and defended, see <a href="/docs/oracle-architecture">Oracle architecture</a>.
+      </P>
+      <div className="mt-6">
+        <OracleComparison />
       </div>
 
       <H2>Contracts and their roles</H2>

@@ -1,18 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { NovakLogo } from "@/components/NovakLogo";
-import { Availability, explorerUrl } from "@novakoracle/sdk";
-import { NOVAK_CHAIN_ID, deployment, novakAddresses } from "@/lib/addresses";
-import { useEvents, useMarkets } from "@/lib/novak";
-import { shortHex } from "@/lib/utils";
+import { NOVAK_CHAIN_ID, deployment } from "@/lib/addresses";
+import { useEventCounts, useMarkets } from "@/lib/novak";
+import { useDistributionMarkets } from "@/lib/distribution";
 import {
   Activity,
   Zap,
   CheckCircle2,
-  Copy,
-  Check,
   ArrowRight,
   ShieldCheck,
   BookOpen,
@@ -51,32 +47,11 @@ const footerColumns = [
   },
 ];
 
-const contractRows: Array<{ label: string; address: string }> = [
-  { label: "EventRegistry", address: novakAddresses.eventRegistry },
-  { label: "DisputeManager", address: novakAddresses.disputeManager ?? "0x" },
-  { label: "TreasuryVault", address: novakAddresses.treasuryVault ?? "0x" },
-  { label: "DistributionMarket", address: novakAddresses.distributionMarket ?? "0x" },
-  { label: "EventComposer", address: novakAddresses.eventComposer },
-  { label: "EventBus", address: novakAddresses.eventBus },
-  { label: "Market", address: novakAddresses.market },
-  { label: "StockLendingGuard", address: novakAddresses.stockLendingGuard },
-];
-
 export function SiteFooter() {
-  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
-  const events = useEvents();
-  const markets = useMarkets();
-  const explorer = explorerUrl(NOVAK_CHAIN_ID);
+  const counts = useEventCounts();
+  const markets = useMarkets({ live: true });
+  const dists = useDistributionMarkets({ live: true });
   const networkName = NOVAK_CHAIN_ID === 46630 ? "Robinhood Chain testnet" : NOVAK_CHAIN_ID === 31337 ? "Local anvil" : `Chain ${NOVAK_CHAIN_ID}`;
-  const decided = (events.data ?? []).filter((e) => e.availability !== Availability.Pending).length;
-
-  const hasAnyAddress = contractRows.some((row) => row.address !== "0x");
-
-  const handleCopy = (address: string) => {
-    navigator.clipboard.writeText(address);
-    setCopiedAddress(address);
-    setTimeout(() => setCopiedAddress(null), 2000);
-  };
 
 
   return (
@@ -92,10 +67,10 @@ export function SiteFooter() {
           {deployment && (
             <div className="flex items-center gap-5 text-gray-500">
               <span className="flex items-center gap-1">
-                <Zap className="h-3 w-3 text-ink" /> Events: <strong className="text-ink">{events.data?.length ?? "…"}</strong>
+                <Zap className="h-3 w-3 text-ink" /> Events: <strong className="text-ink">{counts.data?.total ?? "…"}</strong>
               </span>
-              <span>Decided: <strong className="text-ink">{events.data ? decided : "…"}</strong></span>
-              <span>Markets: <strong className="text-ink">{markets.data?.length ?? "…"}</strong></span>
+              <span>Decided: <strong className="text-ink">{counts.data?.decided ?? "…"}</strong></span>
+              <span>Live markets: <strong className="text-ink">{markets.data && dists.data ? markets.data.length + dists.data.length : "…"}</strong></span>
             </div>
           )}
         </div>
@@ -147,63 +122,6 @@ export function SiteFooter() {
               </ul>
             </div>
           ))}
-        </div>
-
-        {/* Contract Address Section */}
-        <div className="mt-12 pt-8 border-t border-gray-200">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold">
-                Core Protocol Contract Deployments
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {networkName} (chain ID {NOVAK_CHAIN_ID}){explorer ? " · verified on Blockscout" : ""}
-              </p>
-            </div>
-            <Link href="/docs/sdk" className="link-plain font-mono text-xs text-ink underline font-semibold">
-              View SDK Docs →
-            </Link>
-          </div>
-
-          {hasAnyAddress && (
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 font-mono text-xs">
-              {contractRows
-                .filter((row) => row.address !== "0x")
-                .map((row) => (
-                  <div
-                    key={row.label}
-                    className="border border-gray-200 bg-gray-50 p-2.5 rounded-sm flex flex-col justify-between"
-                  >
-                    {explorer ? (
-                      <a
-                        href={`${explorer}/address/${row.address}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] uppercase text-gray-500 font-semibold hover:text-ink"
-                      >
-                        {row.label} ↗
-                      </a>
-                    ) : (
-                      <span className="text-[10px] uppercase text-gray-500 font-semibold">{row.label}</span>
-                    )}
-                    <div className="mt-1 flex items-center justify-between text-ink font-bold">
-                      <span>{shortHex(row.address, 6, 4)}</span>
-                      <button
-                        onClick={() => handleCopy(row.address)}
-                        className="text-gray-400 hover:text-ink transition-colors"
-                        title="Copy address"
-                      >
-                        {copiedAddress === row.address ? (
-                          <Check className="h-3.5 w-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
         </div>
 
         {/* Bottom Legal & Copyright */}

@@ -34,7 +34,8 @@ import { activeChain } from "@/lib/wagmi";
 import { AssetStack } from "@/components/markets/AssetIcon";
 import { ConnectButton } from "@/components/ConnectButton";
 import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
-import { Donut, SERIES, Sparkline, toSlices, ValueChart } from "@/components/portfolio/charts";
+import { Donut, SERIES, Sparkline, toSlices } from "@/components/portfolio/charts";
+import { ValueChart } from "@/components/portfolio/ValueChart";
 import { cn } from "@/lib/utils";
 
 const f6 = (v: bigint) => Number(v) / 1e6;
@@ -63,8 +64,8 @@ function statusOf(p: Position): { label: string; tone: "live" | "wait" | "ready"
 
 const SECTIONS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "holdings", label: "Holdings", icon: Table2 },
   { id: "allocation", label: "Allocation", icon: PieChart },
+  { id: "holdings", label: "Holdings", icon: Table2 },
   { id: "collect", label: "Collect", icon: Coins },
   { id: "activity", label: "Activity", icon: ActivityIcon },
   { id: "protocol", label: "On Novak", icon: Scale },
@@ -248,7 +249,7 @@ export default function PortfolioPage() {
         <aside className="hidden lg:block">
           <div className="sticky top-24 space-y-4">
             <nav className="rounded-2xl border border-violet-100 bg-white p-2 shadow-[0_10px_30px_-24px_rgba(109,74,255,0.5)]" aria-label="Portfolio sections">
-              {SECTIONS.map(({ id, label, icon: Icon }) => (
+              {SECTIONS.filter((x) => x.id !== "setup" || (!readOnly && !setup.finished)).map(({ id, label, icon: Icon }) => (
                 <a
                   key={id}
                   href={`#${id}`}
@@ -595,7 +596,7 @@ export default function PortfolioPage() {
             </Panel>
           </div>
 
-          {!readOnly && (
+          {!readOnly && !setup.finished && (
             <div id="setup" className="scroll-mt-24">
               <SetupChecklist variant="page" />
             </div>

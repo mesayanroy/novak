@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, http, parseAbi, type Address } from "viem";
-import { robinhood } from "viem/chains";
+import { parseAbi, type Address } from "viem";
+import { mainnetClient } from "@/lib/server/mainnet";
 
 /**
  * Corporate-action calendar data for every Robinhood Stock Token:
@@ -50,10 +50,7 @@ export async function GET() {
   if (!res.ok) return NextResponse.json({ error: `rhj/assets HTTP ${res.status}` }, { status: 502 });
   const assets = ((await res.json()) as { assets: RhAsset[] }).assets.filter((a) => a.deployments?.[0]?.contractAddress);
 
-  const client = createPublicClient({
-    chain: robinhood,
-    transport: http(process.env.RESOLVER_SOURCE_RPC_URL ?? robinhood.rpcUrls.default.http[0]),
-  });
+  const client = mainnetClient();
   const fns = ["uiMultiplier", "newUIMultiplier", "effectiveAt", "oraclePaused"] as const;
   const results = await client.multicall({
     allowFailure: true,

@@ -98,7 +98,7 @@ function WithdrawStrip() {
 }
 
 export default function DisputesPage() {
-  const { data: events, isLoading } = useEvents();
+  const { data: events, isLoading } = useEvents({ limit: 200 });
   const dm = deployment?.disputeManager;
   const { data: bonds } = useReadContracts({
     allowFailure: false,

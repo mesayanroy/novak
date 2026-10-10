@@ -1,27 +1,33 @@
 "use client";
 
+import { createContext, useContext } from "react";
 import Link from "next/link";
 import { DistributionStatus, MarketStatus } from "@novakoracle/sdk";
 import { categoryForFeed, fmtTime, fmtUsdg, tickersOf, type LiveMarket, type MarketCategory } from "@/lib/novak";
 import type { DistributionView } from "@/lib/distribution";
-import { fmtPrice, useFeedRounds, useFeedRow } from "@/lib/feeds";
+import type { CommunityView } from "@/lib/community";
+import { fmtPrice, useFeedRow } from "@/lib/feeds";
 import { ExampleDataBadge } from "@/components/ExampleDataBadge";
 import { AssetIcon, AssetStack } from "./AssetIcon";
 import { Sparkline } from "./Sparkline";
-import { CalendarDays, ShieldCheck } from "lucide-react";
+import { CalendarDays, Gavel, ShieldCheck, Users } from "lucide-react";
 
 export type FeedItem =
   | { kind: "binary"; market: LiveMarket }
-  | { kind: "range"; view: DistributionView; category?: MarketCategory };
+  | { kind: "range"; view: DistributionView; category?: MarketCategory }
+  | { kind: "community"; view: CommunityView };
 
 const cents = (p: number) => `${Math.round(p * 100)}¢`;
 const now = () => BigInt(Math.floor(Date.now() / 1000));
 
+/** Recent rounds per feed (lowercase address), fetched once for every card on the page. */
+export const SparklineContext = createContext<Record<string, { price: number; updatedAt: number }[]> | undefined>(undefined);
+
 /** Live Chainlink price chip + sparkline for the market's underlying feed. */
 function LivePrice({ feed, ticker }: { feed?: `0x${string}`; ticker?: string }) {
   const row = useFeedRow(feed);
-  const { data } = useFeedRounds(feed, 30);
-  const series = data?.rounds.map((r) => r.price) ?? [];
+  const all = useContext(SparklineContext);
+  const series = (feed && all?.[feed.toLowerCase()]?.map((r) => r.price)) || [];
   if (!feed) return null;
   const first = series[0];
   const last = row?.price ?? series[series.length - 1];
@@ -58,6 +64,7 @@ function Shell({ href, children, example }: { href: string; children: React.Reac
 
 export function PredictionCard({ item }: { item: FeedItem }) {
   if (item.kind === "binary") return <BinaryCard market={item.market} />;
+  if (item.kind === "community") return <CommunityCard view={item.view} />;
   return <RangeCard view={item.view} />;
 }
 
@@ -120,6 +127,9 @@ function RangeCard({ view }: { view: DistributionView }) {
   const lead = order[0];
   const top = order.slice(0, 3).sort((a, b) => a.i - b.i);
   const volume = view.outstanding.reduce((s, q) => s + q, 0n);
+  // Collateral traders have put in: the pool minus the creator's LMSR subsidy b·ln N.
+  const subsidy = BigInt(Math.round(Number(view.b) * Math.log(view.nBuckets)));
+  const traded = view.reserve > subsidy ? view.reserve - subsidy : 0n;
   const closed = !settled && now() >= view.tradingClosesAt;
   const category: MarketCategory = view.feed ? categoryForFeed(view.feed) : "stocks";
 
@@ -163,7 +173,9 @@ function RangeCard({ view }: { view: DistributionView }) {
       </div>
 
       <div className="flex items-center gap-3 text-xs text-gray-500">
-        <span className="font-semibold text-gray-700">{fmtUsdg(volume)} shares out</span>
+        <span className="font-semibold text-gray-700" title={`${fmtUsdg(volume)} shares outstanding · pool ${fmtUsdg(view.reserve)} USDG`}>
+          {fmtUsdg(traded)} USDG traded
+        </span>
         <span className="flex items-center gap-1">
           <CalendarDays className="h-3.5 w-3.5" />
           {settled ? "Settled" : closed ? "Resolving" : fmtTime(view.tradingClosesAt)}
@@ -179,6 +191,57 @@ function RangeCard({ view }: { view: DistributionView }) {
           >
             <span className="block truncate font-normal opacity-90">{view.labels[i]}</span>
             {cents(p)}
+          </span>
+        ))}
+      </div>
+    </Shell>
+  );
+}
+
+/** Creator-resolved community pool (sports, challenges). Black & white with the top pick highlighted. */
+function CommunityCard({ view }: { view: CommunityView }) {
+  const order = view.shares.map((p, i) => ({ p, i })).sort((a, b) => b.p - a.p);
+  const lead = order[0];
+  const shown = view.outcomes.length <= 3 ? view.outcomes.map((_, i) => i) : order.slice(0, 3).map((x) => x.i).sort((a, b) => a - b);
+  return (
+    <Shell href={`/markets/c/${view.marketId}`}>
+      <div className="flex items-start gap-3">
+        <span className="flex h-12 w-12 flex-none items-center justify-center rounded-[14px] bg-gray-900 text-white shadow-sm">
+          <Users className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-gray-500">{view.category} · community</span>
+          <h3 className="text-[15px] font-semibold leading-snug text-gray-900 group-hover:text-violet-700">{view.question}</h3>
+        </div>
+        <div className="flex-none text-right">
+          <p className="text-2xl font-bold leading-none text-ink">{Math.round(lead.p * 100)}%</p>
+          <p className="mt-0.5 max-w-[90px] truncate text-[11px] text-gray-500">{view.outcomes[lead.i]}</p>
+        </div>
+      </div>
+
+      {/* pool split */}
+      <div className="flex h-2.5 overflow-hidden rounded-full bg-gray-100" aria-hidden>
+        {view.shares.map((p, i) => (
+          <span key={i} className={i === lead.i ? "bg-gray-900" : i % 2 ? "bg-violet-300" : "bg-violet-500"} style={{ width: `${p * 100}%` }} />
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3 text-xs text-gray-500">
+        <span className="font-semibold text-gray-700">{fmtUsdg(view.totalPool)} USDG pool</span>
+        <span className="flex items-center gap-1">
+          <CalendarDays className="h-3.5 w-3.5" />
+          {fmtTime(view.closesAt)}
+        </span>
+        <span className="ml-auto flex items-center gap-1 text-gray-500">
+          <Gavel className="h-3.5 w-3.5" /> creator resolves
+        </span>
+      </div>
+
+      <div className={`grid gap-2 ${shown.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+        {shown.map((i) => (
+          <span key={i} className={`rounded-xl px-2 py-2 text-center text-xs font-semibold ${i === lead.i ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
+            <span className="block truncate font-normal opacity-90">{view.outcomes[i]}</span>
+            {cents(view.shares[i])}
           </span>
         ))}
       </div>

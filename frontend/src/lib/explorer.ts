@@ -21,6 +21,7 @@ import {
   type EventSpecInput,
   type Hex,
 } from "@novakoracle/sdk";
+import { fetchLogs } from "./logs";
 import { deployment, novakAddresses } from "./addresses";
 import { fmtTime, type LiveMarket } from "./novak";
 import type { DistributionView } from "./distribution";
@@ -170,28 +171,16 @@ export interface TimelineItem {
 }
 
 const ABI = [...eventRegistryAbi, ...disputeManagerAbi, ...eventComposerAbi].filter((x) => x.type === "event");
-const CHUNK = 450_000n;
-
 async function logsFor(pc: PublicClient, eventId: Hex): Promise<Log[]> {
   const d = deployment!;
-  const latest = await pc.getBlockNumber();
-  const out: Log[] = [];
-  for (let from = BigInt(d.startBlock); from <= latest; from += CHUNK) {
-    const to = from + CHUNK - 1n > latest ? latest : from + CHUNK - 1n;
-    const logs = (await pc.request({
-      method: "eth_getLogs",
-      params: [
-        {
-          address: [d.eventRegistry, d.disputeManager, d.eventComposer],
-          topics: [null, eventId],
-          fromBlock: `0x${from.toString(16)}`,
-          toBlock: `0x${to.toString(16)}`,
-        },
-      ],
-    } as never)) as Log[];
-    out.push(...logs);
-  }
-  return out;
+  const toBlock = await pc.getBlockNumber();
+  // One contract per query, eventId as the single topic-1 value (provider-friendly; see lib/logs.ts).
+  const all = await Promise.all(
+    [d.eventRegistry, d.disputeManager, d.eventComposer].map((address) =>
+      fetchLogs(pc, { address, topics: [null, eventId], fromBlock: BigInt(d.startBlock), toBlock }),
+    ),
+  );
+  return all.flat();
 }
 
 export function useEventTimeline(eventId: Hex | undefined) {

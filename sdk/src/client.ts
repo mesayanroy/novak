@@ -1,6 +1,7 @@
 import { parseAbiItem, toEventSelector, type Account, type PublicClient, type WalletClient } from "viem";
 import {
   distributionMarketAbi,
+  communityMarketAbi,
   eventBusAbi,
   eventComposerAbi,
   eventRegistryAbi,
@@ -18,6 +19,8 @@ import type {
   DistributionMarketInfo,
   DistributionStatus,
   CompositeSpecInput,
+  CommunityMarketInfo,
+  CommunityStatus,
   EventSpecInput,
   Hex,
   MarketDef,
@@ -780,6 +783,108 @@ export class NovakClient {
     return Array.isArray(eventIdOrBoundaries)
       ? this.publicClient.readContract({ address: adapter, abi: novakCtfAdapterAbi, functionName: "rangeQuestionId", args: [eventIdOrBoundaries] })
       : this.publicClient.readContract({ address: adapter, abi: novakCtfAdapterAbi, functionName: "binaryQuestionId", args: [eventIdOrBoundaries] });
+  }
+
+  // --- Community markets (creator-resolved prediction pools) ---
+
+  private get community(): Address {
+    if (!this.addresses.communityMarket) throw new Error("NovakClient: no communityMarket in this deployment");
+    return this.addresses.communityMarket;
+  }
+
+  private writeCommunity(functionName: string, args: readonly unknown[], account: Account | Address): Promise<Hex> {
+    return this.requireWallet().writeContract({
+      account,
+      chain: this.walletClient?.chain,
+      address: this.community,
+      abi: communityMarketAbi,
+      functionName,
+      args,
+    } as never);
+  }
+
+  /** Open a pool on anything: 2–8 outcomes, staking until `closesAt`, the creator resolves by `resolveBy`. */
+  async createCommunityMarket(
+    p: { question: string; outcomes: string[]; closesAt: bigint; resolveBy: bigint; objectionWindowSeconds: bigint; rules: string },
+    account: Account | Address,
+  ): Promise<Hex> {
+    return this.writeCommunity("createMarket", [p.question, p.outcomes, p.closesAt, p.resolveBy, p.objectionWindowSeconds, p.rules], account);
+  }
+
+  async getCreatedCommunityMarketId(txHash: Hex): Promise<Hex> {
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
+    const topic = toEventSelector("MarketCreated(bytes32,address,string,string[],uint64,uint64,uint64)");
+    const log = receipt.logs.find((l) => l.address.toLowerCase() === this.community.toLowerCase() && l.topics[0] === topic);
+    if (!log?.topics[1]) throw new Error("NovakClient: MarketCreated not found");
+    return log.topics[1] as Hex;
+  }
+
+  /** Stake USDG on an outcome (approve the collateral for the community market first). */
+  async communityStake(marketId: Hex, outcome: number, amount: bigint, account: Account | Address): Promise<Hex> {
+    return this.writeCommunity("stake", [marketId, outcome, amount], account);
+  }
+  /** Creator only: declare the result after staking closes. Starts the objection window. */
+  async communityPropose(marketId: Hex, outcome: number, account: Account | Address): Promise<Hex> {
+    return this.writeCommunity("proposeOutcome", [marketId, outcome], account);
+  }
+  /** A player objects to the declared result; > ⅓ of the pool objecting voids the market. */
+  async communityObject(marketId: Hex, account: Account | Address): Promise<Hex> {
+    return this.writeCommunity("object", [marketId], account);
+  }
+  async communityFinalize(marketId: Hex, account: Account | Address): Promise<Hex> {
+    return this.writeCommunity("finalize", [marketId], account);
+  }
+  async communityVoidUnresolved(marketId: Hex, account: Account | Address): Promise<Hex> {
+    return this.writeCommunity("voidUnresolved", [marketId], account);
+  }
+  async communityCancel(marketId: Hex, account: Account | Address): Promise<Hex> {
+    return this.writeCommunity("cancel", [marketId], account);
+  }
+  async communityClaim(marketId: Hex, account: Account | Address): Promise<Hex> {
+    return this.writeCommunity("claim", [marketId], account);
+  }
+
+  async getCommunityMarket(marketId: Hex): Promise<CommunityMarketInfo> {
+    const c = { address: this.community, abi: communityMarketAbi } as const;
+    const [m, outcomes, pools] = await Promise.all([
+      this.publicClient.readContract({ ...c, functionName: "getMarket", args: [marketId] }),
+      this.publicClient.readContract({ ...c, functionName: "getOutcomes", args: [marketId] }),
+      this.publicClient.readContract({ ...c, functionName: "getPools", args: [marketId] }),
+    ]);
+    return {
+      marketId,
+      creator: m.creator,
+      createdAt: m.createdAt,
+      closesAt: m.closesAt,
+      resolveBy: m.resolveBy,
+      objectionWindow: m.objectionWindow,
+      proposedAt: m.proposedAt,
+      status: m.status as CommunityStatus,
+      nOutcomes: m.nOutcomes,
+      outcome: m.outcome,
+      totalPool: m.totalPool,
+      objectedStake: m.objectedStake,
+      question: m.question,
+      rules: m.rules,
+      outcomes: [...(outcomes as readonly string[])],
+      pools: [...(pools as readonly bigint[])],
+    };
+  }
+
+  async listCommunityMarketIds(): Promise<Hex[]> {
+    const c = { address: this.community, abi: communityMarketAbi } as const;
+    const count = await this.publicClient.readContract({ ...c, functionName: "marketCount" });
+    const ids: Hex[] = [];
+    for (let off = 0n; off < count; off += 200n) ids.push(...((await this.publicClient.readContract({ ...c, functionName: "getMarketIds", args: [off, 200n] })) as Hex[]));
+    return ids;
+  }
+
+  async communityStakesOf(marketId: Hex, player: Address): Promise<bigint[]> {
+    return [...((await this.publicClient.readContract({ address: this.community, abi: communityMarketAbi, functionName: "stakesOf", args: [marketId, player] })) as readonly bigint[])];
+  }
+
+  async communityPayoutOf(marketId: Hex, player: Address): Promise<bigint> {
+    return this.publicClient.readContract({ address: this.community, abi: communityMarketAbi, functionName: "payoutOf", args: [marketId, player] });
   }
 
   private requireWallet(): WalletClient {

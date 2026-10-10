@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AnimatePresence,
   motion,
@@ -91,13 +91,13 @@ const LAYERS: Layer[] = [
 /* Right-hand visuals                                                  */
 /* ------------------------------------------------------------------ */
 
-type SourceMarker = Marker & { label?: string; logo?: string; side?: "right" | "left" | "below" | "above" };
+type SourceMarker = Marker & { n?: number };
 
-/** Where Novak's facts come from (labelled) and where 24/7 holders trade them (pulsing). */
+/** Where Novak's facts come from (numbered) and where 24/7 holders trade them (pulsing). */
 const MARKERS: SourceMarker[] = [
-  { lat: 40.7128, lng: -74.006, size: 1.6, label: "Stock feeds", logo: "/logos/nvda.webp", side: "right" },
-  { lat: 38.627, lng: -90.1994, size: 1.2, label: "Fed rates", side: "below" },
-  { lat: 37.4529, lng: -122.1817, size: 1.4, label: "Robinhood API", side: "above" },
+  { lat: 40.7128, lng: -74.006, size: 0.9, n: 1 },
+  { lat: 38.627, lng: -90.1994, size: 0.9, n: 2 },
+  { lat: 37.4529, lng: -122.1817, size: 0.9, n: 3 },
   { lat: 51.5072, lng: -0.1276, size: 0.9, pulse: true },
   { lat: 37.5665, lng: 126.978, size: 0.9, pulse: true },
   { lat: 1.3521, lng: 103.8198, size: 0.9, pulse: true },
@@ -105,51 +105,51 @@ const MARKERS: SourceMarker[] = [
   { lat: 25.2048, lng: 55.2708, size: 0.9, pulse: true },
 ];
 
+const SOURCES_LEGEND = [
+  { n: 1, label: "Stock feeds", sub: "Chainlink" },
+  { n: 2, label: "Fed rates", sub: "FRED" },
+  { n: 3, label: "Robinhood", sub: "Asset API" },
+];
+
 export function SourcesMap({ className }: { className?: string }) {
-  const id = useId().replace(/:/g, "");
   return (
-    <div className={cn("relative overflow-hidden rounded-3xl border border-violet-100 bg-white/90 p-4 shadow-[0_20px_60px_-30px_rgba(109,74,255,0.55)] backdrop-blur", className)}>
+    <div className={cn("relative overflow-hidden rounded-2xl border border-violet-200 bg-white p-4 shadow-[0_18px_50px_-28px_rgba(109,74,255,0.6)]", className)}>
       <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-violet-600">01 · Sources → resolvers</p>
-        <span className="flex items-center gap-1.5 font-mono text-[10px] text-gray-500">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> mainnet, read-only
+        <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-violet-700">01 · Sources → resolvers</p>
+        <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-100">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> mainnet · read-only
         </span>
       </div>
-      <div className="relative mt-2 aspect-[2/1] w-full">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,white_95%)]" />
+      <div className="relative mt-3 aspect-[2/1] w-full rounded-xl bg-violet-50/40 ring-1 ring-violet-100">
         <DottedMap<SourceMarker>
           markers={MARKERS}
-          dotColor="#c9bdf2"
+          dotColor="#b9a8f0"
           markerColor="#7c3aed"
-          dotRadius={0.3}
-          renderMarkerOverlay={({ marker, x, y, r, index }) => {
-            if (!marker.label) return null;
-            const fs = 3;
-            const pillH = 5;
-            const pillW = marker.label.length * fs * 0.56 + (marker.logo ? 6.2 : 3);
-            const px = marker.side === "left" ? x - r - 1.2 - pillW : marker.side === "below" || marker.side === "above" ? x - pillW / 2 : x + r + 1.2;
-            const py = marker.side === "below" ? y + r + 1.4 : marker.side === "above" ? y - r - 1.4 - pillH : y - pillH / 2;
-            const clip = `${id}-clip-${index}`;
-            return (
+          dotRadius={0.34}
+          renderMarkerOverlay={({ marker, x, y }) =>
+            marker.n ? (
               <g style={{ pointerEvents: "none" }}>
-                <rect x={px} y={py} width={pillW} height={pillH} rx={pillH / 2} fill="rgba(76,29,149,0.88)" />
-                {marker.logo && (
-                  <>
-                    <clipPath id={clip}>
-                      <circle cx={px + pillH / 2} cy={py + pillH / 2} r={pillH / 2 - 0.45} />
-                    </clipPath>
-                    <image href={marker.logo} x={px + 0.45} y={py + 0.45} width={pillH - 0.9} height={pillH - 0.9} clipPath={`url(#${clip})`} preserveAspectRatio="xMidYMid slice" />
-                  </>
-                )}
-                <text x={px + (marker.logo ? pillH + 0.4 : 1.5)} y={py + pillH / 2 + fs * 0.35} fontSize={fs} fill="white" fontFamily="ui-sans-serif, system-ui">
-                  {marker.label}
+                <circle cx={x} cy={y} r={2.5} fill="#6d28d9" stroke="white" strokeWidth={0.6} />
+                <text x={x} y={y + 0.95} textAnchor="middle" fontSize={2.7} fontWeight={700} fill="white" fontFamily="ui-monospace, monospace">
+                  {marker.n}
                 </text>
               </g>
-            );
-          }}
+            ) : null
+          }
         />
       </div>
-      <p className="mt-1 text-xs text-gray-500">
+      <ul className="mt-3 grid grid-cols-3 gap-2">
+        {SOURCES_LEGEND.map((l) => (
+          <li key={l.n} className="flex min-w-0 items-start gap-2 rounded-xl border border-violet-100 bg-white px-2.5 py-2">
+            <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-violet-700 font-mono text-[10px] font-bold text-white">{l.n}</span>
+            <span className="min-w-0">
+              <span className="block text-[12px] font-semibold leading-tight text-ink">{l.label}</span>
+              <span className="block font-mono text-[10px] leading-tight text-gray-500">{l.sub}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2.5 text-[12px] leading-snug text-gray-600">
         Facts originate in US markets and the Fed; tokenized stocks are held and traded <span className="font-semibold text-violet-700">24/7, worldwide</span>.
       </p>
     </div>
@@ -160,9 +160,9 @@ export function AssetOrbit({ className, compact = false }: { className?: string;
   const outer = compact ? 108 : 132;
   const inner = compact ? 62 : 76;
   return (
-    <div className={cn("relative overflow-hidden rounded-3xl border border-violet-100 bg-white/90 p-4 shadow-[0_20px_60px_-30px_rgba(109,74,255,0.55)] backdrop-blur", className)}>
+    <div className={cn("relative overflow-hidden rounded-2xl border border-violet-200 bg-white p-4 shadow-[0_18px_50px_-28px_rgba(109,74,255,0.6)]", className)}>
       <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-wider text-violet-600">02 · One fact, every market</p>
+        <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-violet-700">02 · One fact, every market</p>
         <span className="font-mono text-[10px] text-gray-500">EventBus.readOutcome</span>
       </div>
       <div className="relative mx-auto flex items-center justify-center" style={{ height: outer * 2 + 56 }}>
@@ -225,12 +225,13 @@ const leftArc = (w: number, h: number) => {
   const focusX = Math.min(150, w * 0.12);
   return { R, cx: focusX - R, cy: h / 2, focusX };
 };
-/** Right arc: circle centred off-screen right; its left-most point is the focus. */
+/** Right arc: mirror of the left. Circle centred off-screen right; its left-most
+ *  point is the focus; the frame sits just right of its node, like the left card. */
 const rightArc = (w: number, h: number) => {
-  const panelW = Math.min(470, w * 0.4);
-  const R = Math.min(h * 0.62, 520);
-  const focusX = w - panelW / 2 - 8;
-  return { R, cx: focusX + R, cy: h / 2, panelW };
+  const panelW = Math.min(430, w * 0.37);
+  const R = Math.min(h * 0.46, 380);
+  const focusX = w - panelW - 52;
+  return { R, cx: focusX + R, cy: h / 2, panelW, focusX };
 };
 
 function ArcNode({ i, p, w, h, active, onPick }: { i: number; p: MotionValue<number>; w: MotionValue<number>; h: MotionValue<number>; active: boolean; onPick: () => void }) {
@@ -246,6 +247,14 @@ function ArcNode({ i, p, w, h, active, onPick }: { i: number; p: MotionValue<num
   });
   const opacity = useTransform(theta, (t) => r2(Math.max(0.12, 1 - Math.abs(t) / (STEP_DEG * 2.7))));
   const scale = useTransform(theta, (t) => r2(1 + Math.max(0, 1 - Math.abs(t) / STEP_DEG) * 0.25));
+  // Labels show only for the immediate neighbours: hidden near the focus (where
+  // the detail card sits) and beyond one step (where faded nodes bunch up).
+  const labelOpacity = useTransform(theta, (t) => {
+    const a = Math.abs(t) / STEP_DEG;
+    const rise = Math.min(1, Math.max(0, (a - 0.5) / 0.35));
+    const fall = Math.min(1, Math.max(0, 1 - (a - 1.1) / 0.6));
+    return r2(rise * fall);
+  });
   return (
     <motion.button
       type="button"
@@ -262,7 +271,11 @@ function ArcNode({ i, p, w, h, active, onPick }: { i: number; p: MotionValue<num
       >
         {i + 1}
       </span>
-      {!active && <span className="whitespace-nowrap text-sm font-medium text-gray-500">{LAYERS[i].title}</span>}
+      {!active && (
+        <motion.span style={{ opacity: labelOpacity }} className="whitespace-nowrap text-sm font-medium text-gray-500">
+          {LAYERS[i].title}
+        </motion.span>
+      )}
     </motion.button>
   );
 }
@@ -270,7 +283,7 @@ function ArcNode({ i, p, w, h, active, onPick }: { i: number; p: MotionValue<num
 function ArcPanel({ i, p, w, h, width, children }: { i: number; p: MotionValue<number>; w: MotionValue<number>; h: MotionValue<number>; width: number; children: ReactNode }) {
   // Scrolling down moves both frames UP the arc (matching the left side): the
   // map leaves over the top while the orbit rises from below.
-  const drift = useTransform(p, [0, 0.42, 0.58, 1], [-10, 0, PANEL_SPAN, PANEL_SPAN + 10]);
+  const drift = useTransform(p, [0, 0.42, 0.58, 1], [-6, 0, PANEL_SPAN, PANEL_SPAN + 6]);
   const phi = useTransform(drift, (d) => 180 - i * PANEL_SPAN + d);
   const x = useTransform([phi, w, h] as MotionValue<number>[], ([f, ww, hh]: number[]) => {
     const a = rightArc(ww, hh);
@@ -280,12 +293,24 @@ function ArcPanel({ i, p, w, h, width, children }: { i: number; p: MotionValue<n
     const a = rightArc(ww, hh);
     return r2(a.cy + a.R * Math.sin((f * Math.PI) / 180));
   });
-  const opacity = useTransform(phi, (f) => r2(Math.max(0, 1 - Math.abs(f - 180) / 52)));
-  const rotate = useTransform(phi, (f) => r2((f - 180) * 0.14));
+  const opacity = useTransform(phi, (f) => r2(Math.max(0, 1 - Math.abs(f - 180) / 46)));
+  const nodeScale = useTransform(phi, (f) => r2(1 + Math.max(0, 1 - Math.abs(f - 180) / 20) * 0.25));
+  const [focused, setFocused] = useState(i === 0);
+  useMotionValueEvent(phi, "change", (f) => setFocused(Math.abs(f - 180) < 30));
   return (
-    // outer: rides the arc (framer owns its transform); inner: centred on that point
-    <motion.div style={{ x, y, opacity, rotate }} className="absolute left-0 top-0 h-0 w-0">
-      <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2" style={{ width }}>
+    // outer: rides the arc (framer owns its transform); node on the arc, frame beside it
+    <motion.div style={{ x, y, opacity }} className="absolute left-0 top-0 h-0 w-0">
+      <motion.span
+        style={{ scale: nodeScale }}
+        className={cn(
+          "absolute -left-5 -top-5 flex h-10 w-10 items-center justify-center rounded-full border-[3px] border-white font-mono text-[11px] font-bold shadow-lg transition-colors",
+          focused ? "bg-violet-600 text-white shadow-violet-500/40" : "bg-white text-violet-600 ring-1 ring-violet-200",
+        )}
+      >
+        {String(i + 1).padStart(2, "0")}
+      </motion.span>
+      <span className="absolute left-6 top-0 h-px w-5 bg-violet-300" />
+      <div className="absolute left-12 top-0 -translate-y-1/2" style={{ width }}>
         {children}
       </div>
     </motion.div>
@@ -311,7 +336,7 @@ function DesktopScroll() {
   const L = leftArc(size.w, size.h);
   const Rr = rightArc(size.w, size.h);
   const cardLeft = L.focusX + 48;
-  const cardWidth = Math.max(300, Math.min(440, size.w - Rr.panelW - cardLeft - 56));
+  const cardWidth = Math.max(300, Math.min(420, Rr.focusX - 64 - cardLeft));
 
   const jump = (i: number) => {
     const el = sectionRef.current;
@@ -336,7 +361,8 @@ function DesktopScroll() {
             </defs>
             <circle cx={L.cx} cy={L.cy} r={L.R} fill="none" stroke="url(#arcfade)" strokeWidth={2} strokeDasharray="2 7" strokeLinecap="round" />
             <circle cx={L.cx} cy={L.cy} r={L.R - 26} fill="none" stroke="#ede9fe" strokeWidth={1} />
-            <circle cx={Rr.cx} cy={Rr.cy} r={Rr.R} fill="none" stroke="url(#arcfade)" strokeWidth={1.5} strokeDasharray="2 8" strokeLinecap="round" opacity={0.7} />
+            <circle cx={Rr.cx} cy={Rr.cy} r={Rr.R} fill="none" stroke="url(#arcfade)" strokeWidth={2} strokeDasharray="2 7" strokeLinecap="round" />
+            <circle cx={Rr.cx} cy={Rr.cy} r={Rr.R - 26} fill="none" stroke="#ede9fe" strokeWidth={1} />
             <line x1={L.focusX + 24} x2={cardLeft - 8} y1={L.cy} y2={L.cy} stroke="#c4b5fd" strokeWidth={1.5} strokeDasharray="3 4" />
           </svg>
 
@@ -369,14 +395,6 @@ function DesktopScroll() {
                 <p className="mt-3 text-[15px] leading-relaxed text-gray-700">{LAYERS[active].body}</p>
               </motion.div>
             </AnimatePresence>
-            <div className="mt-4 flex items-center gap-2 font-mono text-[11px] text-gray-500">
-              <span className="text-violet-700">{String(active + 1).padStart(2, "0")}</span>
-              <span className="h-px w-16 bg-violet-100">
-                <motion.span className="block h-px origin-left bg-violet-500" style={{ scaleX: p }} />
-              </span>
-              <span>{String(N).padStart(2, "0")}</span>
-              <span className="ml-2">scroll ↓</span>
-            </div>
           </div>
 
           {/* right: the two frames riding the mirrored arc */}

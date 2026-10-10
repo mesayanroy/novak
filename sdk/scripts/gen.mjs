@@ -24,6 +24,7 @@ const contracts = [
   ["Market", "marketAbi"],
   ["StockLendingGuard", "stockLendingGuardAbi"],
   ["DistributionMarket", "distributionMarketAbi"],
+  ["CommunityMarket", "communityMarketAbi"],
   ["TreasuryVault", "treasuryVaultAbi"],
   ["MockUSDG", "mockUsdgAbi"],
   ["NovakCTFAdapter", "novakCtfAdapterAbi"],

@@ -7,12 +7,12 @@ import { DistributionStatus, MarketStatus } from "@novakoracle/sdk";
 import { Marquee } from "@/components/ui/marquee";
 import { categoryForFeed, type LiveMarket, type MarketCategory } from "@/lib/novak";
 import type { DistributionView } from "@/lib/distribution";
-import { fmtPrice, useLiveFeeds } from "@/lib/feeds";
-import { PredictionCard, type FeedItem } from "./PredictionCard";
-import { SetupChecklist } from "@/components/onboarding/SetupChecklist";
+import type { CommunityView } from "@/lib/community";
+import { fmtPrice, useLiveFeeds, useSparklines } from "@/lib/feeds";
+import { PredictionCard, SparklineContext, type FeedItem } from "./PredictionCard";
 import { ArrowRight, Search } from "lucide-react";
 
-type Pill = "all" | "stocks" | "bonds" | "crypto" | "macro" | "ranges" | "corporate";
+type Pill = "all" | "stocks" | "bonds" | "crypto" | "macro" | "ranges" | "corporate" | "community";
 const PILLS: Array<[Pill, string]> = [
   ["all", "All"],
   ["stocks", "Stocks"],
@@ -21,10 +21,18 @@ const PILLS: Array<[Pill, string]> = [
   ["macro", "Macro"],
   ["ranges", "Ranges"],
   ["corporate", "Corporate actions"],
+  ["community", "Community"],
 ];
 
-const categoryOf = (item: FeedItem): MarketCategory =>
-  item.kind === "binary" ? (item.market.event.category ?? "other") : item.view.feed ? categoryForFeed(item.view.feed) : "stocks";
+const categoryOf = (item: FeedItem): MarketCategory | "community" =>
+  item.kind === "community"
+    ? "community"
+    : item.kind === "binary"
+      ? (item.market.event.category ?? "other")
+      : item.view.feed
+        ? categoryForFeed(item.view.feed)
+        : "stocks";
+const idOf = (i: FeedItem) => `${i.kind}:${i.kind === "binary" ? i.market.marketId : i.view.marketId}`;
 
 const PAGE = 24;
 
@@ -60,12 +68,14 @@ function LiveTickerStrip() {
 export function MarketFeed({
   markets,
   dists,
+  community = [],
   loading,
   error,
   onCreate,
 }: {
   markets: LiveMarket[];
   dists: DistributionView[];
+  community?: CommunityView[];
   loading: boolean;
   error?: Error | null;
   onCreate: () => void;
@@ -75,8 +85,12 @@ export function MarketFeed({
   const [shown, setShown] = useState(PAGE);
 
   const all = useMemo<FeedItem[]>(
-    () => [...dists.map((view) => ({ kind: "range" as const, view })), ...markets.map((market) => ({ kind: "binary" as const, market }))],
-    [markets, dists],
+    () => [
+      ...community.map((view) => ({ kind: "community" as const, view })),
+      ...dists.map((view) => ({ kind: "range" as const, view })),
+      ...markets.map((market) => ({ kind: "binary" as const, market })),
+    ],
+    [markets, dists, community],
   );
   const counts = useMemo(() => {
     const c: Partial<Record<Pill, number>> = { all: all.length, ranges: all.filter((i) => i.kind === "range").length };
@@ -89,19 +103,28 @@ export function MarketFeed({
 
   const items = useMemo(() => {
     const open = (i: FeedItem) =>
-      i.kind === "binary" ? i.market.status === MarketStatus.Open : i.view.status === DistributionStatus.Open;
-    const closes = (i: FeedItem) => Number(i.kind === "binary" ? i.market.tradingClosesAt : i.view.tradingClosesAt);
+      i.kind === "binary" ? i.market.status === MarketStatus.Open : i.kind === "community" ? i.view.status === 0 : i.view.status === DistributionStatus.Open;
+    const closes = (i: FeedItem) => Number(i.kind === "binary" ? i.market.tradingClosesAt : i.kind === "community" ? i.view.closesAt : i.view.tradingClosesAt);
     return all
       .filter((i) => {
         if (pill === "ranges" && i.kind !== "range") return false;
         if (pill !== "all" && pill !== "ranges" && categoryOf(i) !== pill) return false;
         if (!q) return true;
-        const text = i.kind === "binary" ? `${i.market.question} ${i.market.event.title}` : i.view.question;
+        const text =
+          i.kind === "binary" ? `${i.market.question} ${i.market.event.title}` : i.kind === "community" ? `${i.view.question} ${i.view.outcomes.join(" ")} ${i.view.category}` : i.view.question;
         return text.toLowerCase().includes(q.toLowerCase());
       })
       // Open first, soonest to close first; then settled, newest first.
       .sort((a, b) => Number(open(b)) - Number(open(a)) || (open(a) ? closes(a) - closes(b) : closes(b) - closes(a)));
   }, [all, pill, q]);
+
+  // One request for every visible card's trend line.
+  const visible = items.slice(0, shown);
+  const feeds = visible.flatMap((i) => {
+    const f = i.kind === "binary" ? i.market.event.feed : i.kind === "range" ? i.view.feed : undefined;
+    return f ? [f] : [];
+  });
+  const { data: sparks } = useSparklines(feeds);
 
   return (
     <div className="flex flex-col gap-5">
@@ -140,8 +163,6 @@ export function MarketFeed({
           </div>
         </div>
       </div>
-
-      <SetupChecklist variant="compact" />
 
       <LiveTickerStrip />
 
@@ -186,7 +207,7 @@ export function MarketFeed({
         <p className="text-sm text-rose-700">Couldn&apos;t read markets from chain: {error.message}</p>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-violet-100 bg-white p-8 text-center text-sm text-gray-600">
-          No markets here yet.{" "}
+          No live markets here right now — finished markets leave this list once trading closes (find them in your Portfolio).{" "}
           <button onClick={onCreate} className="font-semibold text-violet-700 underline">
             Create one from any live Chainlink feed
           </button>
@@ -194,11 +215,13 @@ export function MarketFeed({
         </div>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {items.slice(0, shown).map((i) => (
-              <PredictionCard key={i.kind === "binary" ? i.market.marketId : i.view.marketId} item={i} />
-            ))}
-          </div>
+          <SparklineContext.Provider value={sparks}>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {visible.map((i) => (
+                <PredictionCard key={idOf(i)} item={i} />
+              ))}
+            </div>
+          </SparklineContext.Provider>
           {items.length > shown && (
             <button
               type="button"

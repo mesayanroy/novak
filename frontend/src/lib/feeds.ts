@@ -13,7 +13,7 @@ import type { FeedRow } from "@/app/api/feeds/route";
 export function useLiveFeeds() {
   return useQuery({
     queryKey: ["feeds"],
-    refetchInterval: 60_000,
+    refetchInterval: 20_000,
     queryFn: async () => {
       const r = await fetch("/api/feeds");
       if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`);
@@ -38,6 +38,36 @@ export function useFeedRounds(feed?: Hex, rounds = 30) {
       const r = await fetch(`/api/feeds/history?feed=${feed}&rounds=${rounds}`);
       if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`);
       return (await r.json()) as { rounds: { price: number; updatedAt: number }[]; annualVol: number | null };
+    },
+  });
+}
+
+/** The feed's latest round, polled every 10 s (the server caches it for 10 s too). */
+export function useFeedLatest(feed?: Hex) {
+  return useQuery({
+    queryKey: ["feed-latest", feed],
+    enabled: Boolean(feed),
+    refetchInterval: 10_000,
+    queryFn: async () => {
+      const r = await fetch(`/api/feeds/latest?feed=${feed}`);
+      if (!r.ok) throw new Error((await r.json()).error ?? `HTTP ${r.status}`);
+      return (await r.json()) as { roundId: string; price: number; updatedAt: number; decimals: number; fetchedAt: number };
+    },
+  });
+}
+
+/** Recent rounds for many feeds in ONE request (market cards). */
+export function useSparklines(feeds: string[], rounds = 30) {
+  const key = [...new Set(feeds.map((f) => f.toLowerCase()))].sort();
+  return useQuery({
+    queryKey: ["feed-sparklines", key.join(","), rounds],
+    enabled: key.length > 0,
+    refetchInterval: 120_000,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const r = await fetch(`/api/feeds/sparklines?feeds=${key.join(",")}&rounds=${rounds}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return ((await r.json()) as { rounds: Record<string, { price: number; updatedAt: number }[]> }).rounds;
     },
   });
 }

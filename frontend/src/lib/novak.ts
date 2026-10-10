@@ -384,16 +384,22 @@ export const MOCK_MARKETS: LiveMarket[] = MOCK_MARKETS_RAW.map((m) => ({ ...m, i
 
 export const showingExamples = !deployment;
 
-export function useMarkets() {
+/** Yes/no markets, newest first. `live: true` keeps (and hydrates) only markets still trading. */
+export function useMarkets(opts: { live?: boolean } = {}) {
   const client = useNovakClient();
   const pc = usePublicClient();
+  const live = Boolean(opts.live);
   return useQuery({
-    queryKey: ["novak", "markets", deployment?.market],
+    queryKey: ["novak", "markets", deployment?.market, live],
     enabled: showingExamples || Boolean(client && pc),
     refetchInterval: showingExamples ? false : 20_000,
     queryFn: async (): Promise<LiveMarket[]> => {
       if (showingExamples) return MOCK_MARKETS;
-      const markets = await client!.listMarkets();
+      let markets = await client!.listMarkets();
+      if (live) {
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        markets = markets.filter((m) => m.status === MarketStatus.Open && m.tradingClosesAt > now);
+      }
       const withEvents = await Promise.all(
         markets.map(async (m) => ({ ...m, event: await loadEventNode(pc as PublicClient, m.eventId) })),
       );
@@ -421,19 +427,46 @@ export function useMarket(marketId: Hex | undefined) {
   });
 }
 
-/** Every primitive event and composite, newest first. */
-export function useEvents() {
+/**
+ * The newest `limit` primitive events, newest first, fully described. Event
+ * IDs come from one log scan; only the newest are hydrated, so pages stay fast
+ * however many events the protocol accumulates.
+ */
+export function useEvents(opts: { limit?: number } = {}) {
   const client = useNovakClient();
   const pc = usePublicClient();
+  const limit = opts.limit ?? 60;
   return useQuery({
-    queryKey: ["novak", "events", deployment?.eventRegistry],
+    queryKey: ["novak", "events", deployment?.eventRegistry, limit],
     enabled: showingExamples || Boolean(client && pc),
-    refetchInterval: showingExamples ? false : 15_000,
+    refetchInterval: showingExamples ? false : 20_000,
     queryFn: async (): Promise<EventNode[]> => {
       if (showingExamples) return MOCK_MARKETS.map((m) => m.event);
       const created = await client!.listEvents(BigInt(deployment!.startBlock));
-      const nodes = await Promise.all(created.map((e) => loadEventNode(pc as PublicClient, e.eventId)));
-      return nodes.reverse();
+      const newest = created.slice(-limit).reverse();
+      return Promise.all(newest.map((e) => loadEventNode(pc as PublicClient, e.eventId)));
+    },
+  });
+}
+
+/** Totals for status bars: how many events exist and how many are decided (one log scan + one batched read). */
+export function useEventCounts() {
+  const client = useNovakClient();
+  const pc = usePublicClient();
+  return useQuery({
+    queryKey: ["novak", "eventCounts", deployment?.eventRegistry],
+    enabled: !showingExamples && Boolean(client && pc && deployment),
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const created = await client!.listEvents(BigInt(deployment!.startBlock));
+      const av = created.length
+        ? await (pc as PublicClient).multicall({
+            allowFailure: true,
+            contracts: created.map((e) => ({ address: novakAddresses.eventBus, abi: eventBusAbi, functionName: "getAvailability" as const, args: [e.eventId] as const })),
+          })
+        : [];
+      const decided = av.filter((r) => r.status === "success" && Number(r.result) !== Availability.Pending).length;
+      return { total: created.length, decided };
     },
   });
 }

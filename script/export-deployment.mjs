@@ -38,7 +38,10 @@ const keys = {
   DistributionMarket: "distributionMarket",
   TreasuryVault: "treasuryVault",
   StockLendingGuard: "stockLendingGuard",
+  CommunityMarket: "communityMarket",
 };
+// Added after the first deploy (optional): may come from an add-on script below.
+const optional = new Set(["communityMarket"]);
 
 const addresses = {};
 for (const tx of run.transactions) {
@@ -50,7 +53,22 @@ if (!addresses.collateral) {
   addresses.collateral = process.env.COLLATERAL_TOKEN_ADDRESS;
 }
 
-const missing = Object.values(keys).filter((k) => !addresses[k]);
+// Add-on deploys (e.g. script/DeployCommunity.s.sol) for contracts the main
+// broadcast predates. Only used if that broadcast is newer than the main one.
+for (const addon of ["DeployCommunity.s.sol"]) {
+  try {
+    const r = JSON.parse(readFileSync(join(root, "broadcast", addon, chainId, "run-latest.json"), "utf8"));
+    if (r.timestamp >= run.timestamp) {
+      for (const tx of r.transactions) {
+        if (tx.transactionType === "CREATE" && keys[tx.contractName]) addresses[keys[tx.contractName]] = tx.contractAddress;
+      }
+    }
+  } catch {
+    /* no add-on broadcast */
+  }
+}
+
+const missing = Object.values(keys).filter((k) => !addresses[k] && !optional.has(k));
 if (missing.length) {
   console.error(`missing addresses in broadcast: ${missing.join(", ")}`);
   process.exit(1);

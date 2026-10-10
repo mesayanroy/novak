@@ -14,5 +14,6 @@
   "positionManager": "0xed6bb54f0aa711859f2ecd108f59f97d667aadf2",
   "market": "0xd6efcb2e3e0f3ddf7951878847bc5422dc9a7d75",
   "distributionMarket": "0xc3af31add18d0d427a702516e92657c838c6b498",
-  "stockLendingGuard": "0x530bd96cc480476506cdf97289a66b6587a928fb"
+  "stockLendingGuard": "0x530bd96cc480476506cdf97289a66b6587a928fb",
+  "communityMarket": "0xb7bb0cf4c152679ac9aece7a8aba2fe0e41fa10c"
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, http, parseAbi, type Address } from "viem";
-import { robinhood } from "viem/chains";
+import { parseAbi, type Address } from "viem";
+import { mainnetClient } from "@/lib/server/mainnet";
 
 /**
  * Every Chainlink "Robinhood <TICKER> / USD" feed on Robinhood Chain MAINNET
@@ -8,7 +8,7 @@ import { robinhood } from "viem/chains";
  * in ONE multicall. The feed list comes from Chainlink's own public directory,
  * so new feeds appear automatically. Cached 60s.
  */
-export const revalidate = 60;
+export const revalidate = 20;
 
 const DIRECTORY = "https://reference-data-directory.vercel.app/feeds-robinhood-mainnet.json";
 const feedAbi = parseAbi([
@@ -43,10 +43,7 @@ export async function GET() {
     (f) => f.proxyAddress && !/exchange rate/i.test(f.name),
   );
 
-  const client = createPublicClient({
-    chain: robinhood,
-    transport: http(process.env.RESOLVER_SOURCE_RPC_URL ?? robinhood.rpcUrls.default.http[0]),
-  });
+  const client = mainnetClient();
   const results = await client.multicall({
     allowFailure: true,
     contracts: feeds.map((f) => ({ address: f.proxyAddress, abi: feedAbi, functionName: "latestRoundData" as const })),

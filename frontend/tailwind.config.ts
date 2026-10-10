@@ -1,5 +1,8 @@
 import type { Config } from "tailwindcss";
 
+const v = (name: string) => `rgb(var(--c-${name}) / <alpha-value>)`;
+const scale = (name: string) => Object.fromEntries(["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"].map((s) => [s, v(`${name}-${s}`)]));
+
 // Strict black/white/gray design system — see docs/FRONTEND_SPEC.md for the
 // full rationale. No accent hue anywhere; every color below is either pure
 // black/white or a step on one neutral (very slightly warm) gray ramp.
@@ -8,21 +11,21 @@ const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
+      // Themed palette: every colour reads a CSS variable (src/app/globals.css),
+      // so html.dark re-themes the whole site. Light values are unchanged.
       colors: {
-        ink: "#0A0908",
-        paper: "#FDFDFC",
-        gray: {
-          50: "#F7F6F5",
-          100: "#EEEDEB",
-          200: "#E2E0DD",
-          300: "#C9C6C1",
-          400: "#A19D97",
-          500: "#78746E",
-          600: "#57534E",
-          700: "#3D3A36",
-          800: "#262421",
-          900: "#171512",
-        },
+        white: v("white"),
+        black: v("black"),
+        ink: v("ink"),
+        paper: v("paper"),
+        gray: scale("gray"),
+        violet: scale("violet"),
+        purple: scale("purple"),
+        indigo: scale("indigo"),
+        emerald: scale("emerald"),
+        rose: scale("rose"),
+        amber: scale("amber"),
+        sky: scale("sky"),
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],

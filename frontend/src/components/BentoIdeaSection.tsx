@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   FileText,
   Bell,
@@ -13,12 +14,13 @@ import {
   ArrowUpRight,
   Database,
   Lock,
+  Gavel,
+  Users,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { BentoCard, BentoGrid } from "@/components/ui/bento-grid";
 import { Marquee } from "@/components/ui/marquee";
-import { AnimatedList } from "@/components/ui/animated-list";
 import { AnimatedBeam } from "@/components/ui/animated-beam";
 import { Calendar } from "@/components/ui/calendar";
 
@@ -94,64 +96,68 @@ function CanonicalEventsMarquee() {
   );
 }
 
-// --- Demo 2: Dispute Telemetry Animated List ---
+// --- Demo 2: Dispute telemetry, as a live notification stream ---
+// The real order of a contested event, looping: each step arrives on top like a
+// phone notification, older ones slide down and fade out.
 const telemetryNotifications = [
-  {
-    icon: ShieldCheck,
-    title: "Tier-1 Committee Quorum Reached",
-    description: "66% consensus achieved on Event EVT_0x7f3a",
-    time: "step 4",
-    badge: "PASSED",
-  },
-  {
-    icon: Lock,
-    title: "Challenger Bond Posted",
-    description: "Dispute bond posted — a Tier-1 committee is drawn",
-    time: "step 3",
-    badge: "BONDED",
-  },
-  {
-    icon: Cpu,
-    title: "Safety Floor Enforced",
-    description: "Never converged → VOIDED; dependent markets switch to refunds",
-    time: "step 5",
-    badge: "HARD FLOOR",
-  },
-  {
-    icon: CheckCircle2,
-    title: "Canonical Fact Stored",
-    description: "Readable by every market and lending guard via EventBus",
-    time: "step 6",
-    badge: "FINALIZED",
-  },
+  { icon: Gavel, tone: "bg-violet-600", title: "Outcome proposed", description: "2/2 resolvers agree · NVDA ≥ $230 at T → YES", badge: "QUORUM" },
+  { icon: Lock, tone: "bg-amber-500", title: "Challenger bond posted", description: "0.0005 ETH bond — a Tier-1 committee is drawn", badge: "BONDED" },
+  { icon: Users, tone: "bg-sky-600", title: "Committee drawn by commit-reveal", description: "7 bonded resolvers · seed = XOR of revealed salts", badge: "TIER 1" },
+  { icon: ShieldCheck, tone: "bg-emerald-600", title: "Tier-1 quorum reached", description: "5 of 7 voted YES — 66% of the committee", badge: "PASSED" },
+  { icon: CheckCircle2, tone: "bg-gray-900", title: "Canonical fact stored", description: "Readable by every market and lending guard via EventBus", badge: "FINALIZED" },
+  { icon: Cpu, tone: "bg-rose-600", title: "Safety floor enforced", description: "Another event never converged → VOIDED; markets refund", badge: "HARD FLOOR" },
 ];
 
 function DisputeTelemetryList({ className }: { className?: string }) {
+  const reduce = useReducedMotion();
+  const [tick, setTick] = useState(2);
+  useEffect(() => {
+    if (reduce) return;
+    const t = setInterval(() => setTick((n) => n + 1), 2200);
+    return () => clearInterval(t);
+  }, [reduce]);
+  const N = telemetryNotifications.length;
+  // newest first; keep the last three on screen
+  const shown = [0, 1, 2].map((k) => ({ id: tick - k, item: telemetryNotifications[(((tick - k) % N) + N) % N] }));
+
   return (
-    <div className={cn("absolute top-3 right-3 w-[88%] sm:w-[340px]", className)}>
-      <AnimatedList delay={2000}>
-        {telemetryNotifications.map((item, idx) => (
-          <div
-            key={idx}
-            className="flex items-center justify-between rounded-md border border-gray-300 bg-paper p-2.5 shadow-2xs font-mono text-xs"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded border border-gray-200 bg-gray-50 text-ink">
-                <item.icon className="h-3.5 w-3.5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5 font-sans font-semibold text-ink text-xs">
-                  <span>{item.title}</span>
-                </div>
-                <div className="text-[10px] text-gray-500 font-mono">{item.description}</div>
-              </div>
-            </div>
-            <span className="text-[9px] font-bold text-ink border border-gray-200 bg-gray-100 px-1.5 py-0.5 rounded">
-              {item.badge}
-            </span>
-          </div>
-        ))}
-      </AnimatedList>
+    <div
+      className={cn(
+        "absolute right-3 top-3 w-[92%] sm:w-[360px] [mask-image:linear-gradient(to_bottom,#000_62%,transparent_100%)]",
+        className,
+      )}
+    >
+      <ul className="flex flex-col gap-2">
+        <AnimatePresence initial={false} mode="popLayout">
+          {shown.map(({ id, item }, i) => (
+            <motion.li
+              key={id}
+              layout
+              initial={{ opacity: 0, y: -28, scale: 0.94 }}
+              animate={{ opacity: i === 2 ? 0.55 : 1, y: 0, scale: i === 0 ? 1 : 0.98 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.16 } }}
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/90 p-2.5 shadow-[0_10px_30px_-18px_rgba(76,29,149,0.55)] ring-1 ring-violet-100/80 backdrop-blur"
+            >
+              <span className={cn("flex h-9 w-9 flex-none items-center justify-center rounded-xl text-white shadow-sm", item.tone)}>
+                <item.icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[13px] font-semibold text-ink">{item.title}</span>
+                  <span className="flex-none font-mono text-[10px] text-gray-400">{i === 0 ? "now" : `${i * 2}s ago`}</span>
+                </span>
+                <span className="mt-0.5 flex items-center justify-between gap-2">
+                  <span className="truncate font-mono text-[10.5px] text-gray-500">{item.description}</span>
+                  <span className="flex-none rounded-md bg-violet-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-violet-700 ring-1 ring-violet-100">
+                    {item.badge}
+                  </span>
+                </span>
+              </span>
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
     </div>
   );
 }
@@ -256,7 +262,7 @@ const features = [
     Icon: FileText,
     name: "Canonical Standing Facts",
     description:
-      "Events are finalized and stored once in Novak's EventBus — providing a permanent on-chain reference for endless downstream applications.",
+      "Finalized once in the EventBus, then read by every downstream app as a permanent on-chain reference.",
     href: "/docs/architecture",
     cta: "Explore event store",
     className: "col-span-3 lg:col-span-1",
@@ -286,7 +292,7 @@ const features = [
     Icon: CalendarIcon,
     name: "Temporal Horizon Window",
     description:
-      "Precision time-bound event evaluations locked to epoch windows and verification horizons.",
+      "Every event is evaluated at a fixed time T, inside a set observation and dispute window.",
     href: "/docs/lifecycle",
     cta: "View lifecycle",
     className: "col-span-3 lg:col-span-1",
@@ -306,7 +312,7 @@ export function BentoIdeaSection() {
           <div>
             <p className="font-mono text-xs uppercase tracking-wide text-gray-500 font-semibold flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-ink animate-pulse-subtle" />
-              The Idea • Bento Architecture
+              The Idea
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl text-ink">
               A composable event primitive for Robinhood Chain

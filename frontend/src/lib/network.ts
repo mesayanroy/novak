@@ -5,6 +5,7 @@ import { usePublicClient } from "wagmi";
 import { decodeEventLog, toEventSelector, type Address, type Log, type PublicClient } from "viem";
 import { disputeManagerAbi, eventRegistryAbi, treasuryVaultAbi, type Hex } from "@novakoracle/sdk";
 import { deployment } from "./addresses";
+import { fetchLogsForEvents } from "./logs";
 
 export interface ResolverStats {
   address: Address;
@@ -30,22 +31,8 @@ export interface NetworkStats {
 
 const ev = (abi: readonly unknown[], name: string) =>
   (abi as { type: string; name: string }[]).find((x) => x.type === "event" && x.name === name)!;
-const CHUNK = 450_000n;
-
 async function scan(pc: PublicClient, address: Address, topics: Hex[]): Promise<Log[]> {
-  const d = deployment!;
-  const latest = await pc.getBlockNumber();
-  const out: Log[] = [];
-  for (let from = BigInt(d.startBlock); from <= latest; from += CHUNK) {
-    const to = from + CHUNK - 1n > latest ? latest : from + CHUNK - 1n;
-    out.push(
-      ...((await pc.request({
-        method: "eth_getLogs",
-        params: [{ address, topics: [topics], fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}` }],
-      } as never)) as Log[]),
-    );
-  }
-  return out;
+  return fetchLogsForEvents(pc, address, topics, BigInt(deployment!.startBlock));
 }
 
 async function loadNetwork(pc: PublicClient): Promise<NetworkStats> {

@@ -2,6 +2,223 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------
+   Theme palette (light = the site's original colours). Tailwind reads
+   these variables (tailwind.config.ts), so `.dark` on <html> re-themes
+   every page at once. Toggle: components/ui/animated-theme-toggler.tsx
+   ------------------------------------------------------------------ */
+:root {
+  --c-white: 255 255 255;
+  --c-black: 0 0 0;
+  --c-ink: 10 9 8;
+  --c-paper: 253 253 252;
+  --c-gray-50: 247 246 245;
+  --c-gray-100: 238 237 235;
+  --c-gray-200: 226 224 221;
+  --c-gray-300: 201 198 193;
+  --c-gray-400: 161 157 151;
+  --c-gray-500: 120 116 110;
+  --c-gray-600: 87 83 78;
+  --c-gray-700: 61 58 54;
+  --c-gray-800: 38 36 33;
+  --c-gray-900: 23 21 18;
+  --c-gray-950: 12 10 9;
+  --c-violet-50: 245 243 255;
+  --c-violet-100: 237 233 254;
+  --c-violet-200: 221 214 254;
+  --c-violet-300: 196 181 253;
+  --c-violet-400: 167 139 250;
+  --c-violet-500: 139 92 246;
+  --c-violet-600: 124 58 237;
+  --c-violet-700: 109 40 217;
+  --c-violet-800: 91 33 182;
+  --c-violet-900: 76 29 149;
+  --c-violet-950: 46 16 101;
+  --c-purple-50: 250 245 255;
+  --c-purple-100: 243 232 255;
+  --c-purple-200: 233 213 255;
+  --c-purple-300: 216 180 254;
+  --c-purple-400: 192 132 252;
+  --c-purple-500: 168 85 247;
+  --c-purple-600: 147 51 234;
+  --c-purple-700: 126 34 206;
+  --c-purple-800: 107 33 168;
+  --c-purple-900: 88 28 135;
+  --c-purple-950: 59 7 100;
+  --c-indigo-50: 238 242 255;
+  --c-indigo-100: 224 231 255;
+  --c-indigo-200: 199 210 254;
+  --c-indigo-300: 165 180 252;
+  --c-indigo-400: 129 140 248;
+  --c-indigo-500: 99 102 241;
+  --c-indigo-600: 79 70 229;
+  --c-indigo-700: 67 56 202;
+  --c-indigo-800: 55 48 163;
+  --c-indigo-900: 49 46 129;
+  --c-indigo-950: 30 27 75;
+  --c-emerald-50: 236 253 245;
+  --c-emerald-100: 209 250 229;
+  --c-emerald-200: 167 243 208;
+  --c-emerald-300: 110 231 183;
+  --c-emerald-400: 52 211 153;
+  --c-emerald-500: 16 185 129;
+  --c-emerald-600: 5 150 105;
+  --c-emerald-700: 4 120 87;
+  --c-emerald-800: 6 95 70;
+  --c-emerald-900: 6 78 59;
+  --c-emerald-950: 2 44 34;
+  --c-rose-50: 255 241 242;
+  --c-rose-100: 255 228 230;
+  --c-rose-200: 254 205 211;
+  --c-rose-300: 253 164 175;
+  --c-rose-400: 251 113 133;
+  --c-rose-500: 244 63 94;
+  --c-rose-600: 225 29 72;
+  --c-rose-700: 190 18 60;
+  --c-rose-800: 159 18 57;
+  --c-rose-900: 136 19 55;
+  --c-rose-950: 76 5 25;
+  --c-amber-50: 255 251 235;
+  --c-amber-100: 254 243 199;
+  --c-amber-200: 253 230 138;
+  --c-amber-300: 252 211 77;
+  --c-amber-400: 251 191 36;
+  --c-amber-500: 245 158 11;
+  --c-amber-600: 217 119 6;
+  --c-amber-700: 180 83 9;
+  --c-amber-800: 146 64 14;
+  --c-amber-900: 120 53 15;
+  --c-amber-950: 69 26 3;
+  --c-sky-50: 240 249 255;
+  --c-sky-100: 224 242 254;
+  --c-sky-200: 186 230 253;
+  --c-sky-300: 125 211 252;
+  --c-sky-400: 56 189 248;
+  --c-sky-500: 14 165 233;
+  --c-sky-600: 2 132 199;
+  --c-sky-700: 3 105 161;
+  --c-sky-800: 7 89 133;
+  --c-sky-900: 12 74 110;
+  --c-sky-950: 8 47 73;
+  color-scheme: light;
+}
+.dark {
+  --c-white: 21 19 27;
+  --c-black: 247 246 251;
+  --c-ink: 243 241 248;
+  --c-paper: 11 10 16;
+  --c-gray-50: 26 24 32;
+  --c-gray-100: 34 31 41;
+  --c-gray-200: 45 42 53;
+  --c-gray-300: 61 57 70;
+  --c-gray-400: 93 88 104;
+  --c-gray-500: 140 135 150;
+  --c-gray-600: 170 165 179;
+  --c-gray-700: 198 194 206;
+  --c-gray-800: 222 219 228;
+  --c-gray-900: 241 239 245;
+  --c-gray-950: 250 249 252;
+  --c-violet-50: 27 21 48;
+  --c-violet-100: 35 26 63;
+  --c-violet-200: 47 35 84;
+  --c-violet-300: 74 58 134;
+  --c-violet-400: 124 99 238;
+  --c-violet-500: 139 92 246;
+  --c-violet-600: 124 58 237;
+  --c-violet-700: 176 156 251;
+  --c-violet-800: 201 187 253;
+  --c-violet-900: 222 214 254;
+  --c-violet-950: 239 235 255;
+  --c-purple-50: 29 18 48;
+  --c-purple-100: 40 23 63;
+  --c-purple-200: 55 31 85;
+  --c-purple-300: 87 48 138;
+  --c-purple-400: 160 102 240;
+  --c-purple-500: 168 85 247;
+  --c-purple-600: 147 51 234;
+  --c-purple-700: 198 151 251;
+  --c-purple-800: 216 180 254;
+  --c-purple-900: 233 213 255;
+  --c-purple-950: 243 232 255;
+  --c-indigo-50: 21 24 49;
+  --c-indigo-100: 28 33 66;
+  --c-indigo-200: 39 47 92;
+  --c-indigo-300: 58 67 138;
+  --c-indigo-400: 111 116 240;
+  --c-indigo-500: 99 102 241;
+  --c-indigo-600: 79 70 229;
+  --c-indigo-700: 165 180 252;
+  --c-indigo-800: 199 210 254;
+  --c-indigo-900: 224 231 255;
+  --c-indigo-950: 238 242 255;
+  --c-emerald-50: 11 35 28;
+  --c-emerald-100: 15 50 39;
+  --c-emerald-200: 21 71 55;
+  --c-emerald-300: 30 107 80;
+  --c-emerald-400: 52 211 153;
+  --c-emerald-500: 16 185 129;
+  --c-emerald-600: 5 150 105;
+  --c-emerald-700: 74 222 159;
+  --c-emerald-800: 134 239 196;
+  --c-emerald-900: 187 247 221;
+  --c-emerald-950: 236 253 245;
+  --c-rose-50: 42 15 22;
+  --c-rose-100: 58 20 30;
+  --c-rose-200: 85 28 43;
+  --c-rose-300: 131 41 63;
+  --c-rose-400: 251 113 133;
+  --c-rose-500: 244 63 94;
+  --c-rose-600: 225 29 72;
+  --c-rose-700: 251 131 153;
+  --c-rose-800: 253 164 175;
+  --c-rose-900: 254 205 211;
+  --c-rose-950: 255 241 242;
+  --c-amber-50: 39 28 8;
+  --c-amber-100: 54 39 11;
+  --c-amber-200: 79 58 16;
+  --c-amber-300: 122 87 22;
+  --c-amber-400: 251 191 36;
+  --c-amber-500: 245 158 11;
+  --c-amber-600: 217 119 6;
+  --c-amber-700: 251 191 36;
+  --c-amber-800: 252 211 77;
+  --c-amber-900: 253 230 138;
+  --c-amber-950: 255 251 235;
+  --c-sky-50: 11 30 43;
+  --c-sky-100: 14 42 61;
+  --c-sky-200: 18 58 85;
+  --c-sky-300: 29 91 133;
+  --c-sky-400: 56 189 248;
+  --c-sky-500: 14 165 233;
+  --c-sky-600: 2 132 199;
+  --c-sky-700: 125 211 252;
+  --c-sky-800: 186 230 253;
+  --c-sky-900: 224 242 254;
+  --c-sky-950: 240 249 255;
+  color-scheme: dark;
+}
+
+/* White text sits on coloured buttons/badges in both themes: keep it white. */
+.dark .text-white {
+  color: rgb(255 255 255);
+}
+/* ...except on surfaces that invert to light in dark mode (black pills/buttons). */
+.dark :is(.bg-gray-900, .bg-gray-800, .bg-ink, .bg-black).text-white,
+.dark :is(.bg-gray-900, .bg-gray-800, .bg-ink, .bg-black) .text-white {
+  color: rgb(var(--c-paper));
+}
+/* Light text tints used on violet/emerald hero cards stay light on those cards. */
+.dark :is([class*="from-violet-6"], [class*="bg-violet-6"], [class*="bg-emerald-6"]) :is(.text-violet-100, .text-violet-200, .text-emerald-100, .text-emerald-200) {
+  color: rgb(237 233 254 / 0.9);
+}
+
+/* Theme switch: the Magic UI circular reveal (View Transitions). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 @layer base {
   * {
     @apply border-gray-200;
@@ -67,3 +284,23 @@
   pointer-events: none;
 }
 
+
+/* Slim violet scrollbar for dropdown panels (Docs menu). */
+.menu-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #a78bfa transparent;
+}
+.menu-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.menu-scroll::-webkit-scrollbar-track {
+  background: rgba(237, 233, 254, 0.6);
+  border-radius: 999px;
+}
+.menu-scroll::-webkit-scrollbar-thumb {
+  background: #a78bfa;
+  border-radius: 999px;
+}
+.menu-scroll::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
+}

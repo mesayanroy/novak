@@ -164,7 +164,7 @@ function FeeFlow({ flow }: { flow: Record<(typeof FLOW)[number]["key"], bigint> 
 }
 
 export default function NetworkPage() {
-  const { data: stats, isLoading } = useNetworkStats();
+  const { data: stats, isLoading, error: statsError, refetch } = useNetworkStats();
   const { data: health, error: healthError } = useResolverHealth();
   const { data: tier1Bond } = useReadContract({
     address: deployment?.disputeManager,
@@ -219,6 +219,14 @@ export default function NetworkPage() {
       <div className="mx-auto max-w-6xl px-6">
         {!deployment ? (
           <p className="mt-10 text-gray-600">No deployment configured for this chain.</p>
+        ) : statsError && !stats ? (
+          <div className="mt-8 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800">
+            <p className="font-semibold">Couldn&apos;t read the resolver network from chain.</p>
+            <p className="mt-1 font-mono text-[11px] opacity-80">{(statsError as Error).message.split(String.fromCharCode(10))[0].slice(0, 200)}</p>
+            <button type="button" onClick={() => refetch()} className="mt-3 rounded-full bg-rose-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-rose-700">
+              Try again
+            </button>
+          </div>
         ) : isLoading || !stats ? (
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[0, 1, 2].map((i) => (

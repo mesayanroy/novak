@@ -3,24 +3,21 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Availability, MarketStatus } from "@novakoracle/sdk";
 import { MarketCard } from "@/components/markets/MarketCard";
 import { CreateMarketCard } from "@/components/CreateMarketCard";
 import { EventStatusPill, CompositeStatusPill } from "@/components/StatusPill";
 
 // Below-the-fold explainer sections — split out of the initial bundle so the
 // market list/create flow above the fold isn't gated on their JS.
-const OracleArchitectureGuide = dynamic(
-  () => import("@/components/markets/OracleArchitectureGuide").then((m) => m.OracleArchitectureGuide),
-);
 const DistributionMarketFAQ = dynamic(
   () => import("@/components/markets/DistributionMarketFAQ").then((m) => m.DistributionMarketFAQ),
 );
 import { NOVAK_CHAIN_ID, deployment } from "@/lib/addresses";
-import { fmtTime, fmtUsdg, showingExamples, useEvents, useMarkets, type EventNode, type LiveMarket } from "@/lib/novak";
+import { fmtTime, fmtUsdg, showingExamples, useEventCounts, useEvents, useMarkets, type EventNode, type LiveMarket } from "@/lib/novak";
 import { ExampleDataBadge } from "@/components/ExampleDataBadge";
 import { MarketFeed } from "@/components/markets/MarketFeed";
 import { useDistributionMarkets } from "@/lib/distribution";
+import { useCommunityMarkets } from "@/lib/community";
 import { shortHex, cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -30,12 +27,11 @@ import {
   TrendingUp,
   Search,
   Filter,
-  Cpu,
   HelpCircle,
   Sparkles,
 } from "lucide-react";
 
-type MainTab = "markets" | "events" | "oracle" | "faq" | "create";
+type MainTab = "markets" | "events" | "faq" | "create";
 type MarketCategory = "all font-bold" | "all" | "corporate" | "trading" | "price" | "composite";
 
 export default function MarketsPage() {
@@ -52,19 +48,21 @@ export default function MarketsPage() {
   const [category, setCategory] = useState<MarketCategory>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  const markets = useMarkets();
-  const events = useEvents();
-  const distMarkets = useDistributionMarkets();
+  const markets = useMarkets({ live: true });
+  const events = useEvents({ limit: 60 });
+  const distMarkets = useDistributionMarkets({ live: true });
+  const counts = useEventCounts();
+  const communityMarkets = useCommunityMarkets({ live: true });
 
 
   const list = markets.data ?? [];
   const dists = distMarkets.data ?? [];
-  // Collateral at work: yes/no pools + range markets' reserves (LMSR subsidy + trades).
-  const pooled = list.reduce((s, m) => s + m.yesPool + m.noPool, 0n) + dists.reduce((s, d) => s + d.reserve, 0n);
-  const open =
-    list.filter((m) => m.status === MarketStatus.Open).length + dists.filter((d) => d.status === 0).length;
+  // Collateral at work in live markets: yes/no pools + range reserves (LMSR subsidy + trades) + community pools.
+  const pooled =
+    list.reduce((s, m) => s + m.yesPool + m.noPool, 0n) +
+    dists.reduce((s, d) => s + d.reserve, 0n) +
+    (communityMarkets.data ?? []).reduce((s, c) => s + c.totalPool, 0n);
   const evs = events.data ?? [];
-  const decided = evs.filter((e) => e.availability !== Availability.Pending).length;
 
   // Filtering Markets by category & search
   const filteredList = list.filter((m) => {
@@ -114,8 +112,8 @@ export default function MarketsPage() {
       {/* Metric Cards */}
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat icon={<TrendingUp className="h-3.5 w-3.5" />} label="USDG in markets" value={fmtUsdg(pooled)} />
-        <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Markets" value={`${list.length + dists.length}`} note={`${open} open · ${dists.length} range`} />
-        <Stat icon={<Radio className="h-3.5 w-3.5" />} label="Events" value={`${evs.length}`} note={`${decided} decided`} />
+        <Stat icon={<BarChart3 className="h-3.5 w-3.5" />} label="Live markets" value={`${list.length + dists.length + (communityMarkets.data?.length ?? 0)}`} note={`${dists.length} range · ${communityMarkets.data?.length ?? 0} community`} />
+        <Stat icon={<Radio className="h-3.5 w-3.5" />} label="Events" value={counts.data ? `${counts.data.total}` : "…"} note={counts.data ? `${counts.data.decided} decided` : ""} />
         <Stat icon={<ShieldAlert className="h-3.5 w-3.5" />} label="Disputes" value="Tier 1 → 2" note="bonded committees, never token votes" />
       </div>
 
@@ -125,10 +123,7 @@ export default function MarketsPage() {
           Markets Explorer ({list.length + dists.length})
         </TabButton>
         <TabButton active={tab === "events"} onClick={() => setTab("events")} icon={<Radio className="h-4 w-4" />}>
-          Event Feed ({evs.length})
-        </TabButton>
-        <TabButton active={tab === "oracle"} onClick={() => setTab("oracle")} icon={<Cpu className="h-4 w-4" />}>
-          Oracle Architecture
+          Event Feed (latest {evs.length})
         </TabButton>
         <TabButton active={tab === "faq"} onClick={() => setTab("faq")} icon={<HelpCircle className="h-4 w-4" />}>
           Rules &amp; FAQs
@@ -144,6 +139,7 @@ export default function MarketsPage() {
           <MarketFeed
             markets={markets.data ?? []}
             dists={distMarkets.data ?? []}
+            community={communityMarkets.data ?? []}
             loading={markets.isLoading || distMarkets.isLoading}
             error={(markets.error ?? distMarkets.error) as Error | null}
             onCreate={() => setTab("create")}
@@ -158,13 +154,6 @@ export default function MarketsPage() {
           {evs.map((e) => (
             <EventRow key={e.id} e={e} />
           ))}
-        </div>
-      )}
-
-      {/* Tab: Oracle Architecture */}
-      {tab === "oracle" && (
-        <div className="mt-6">
-          <OracleArchitectureGuide />
         </div>
       )}
 
