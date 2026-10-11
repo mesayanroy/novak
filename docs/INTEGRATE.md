@@ -14,8 +14,15 @@ You never run an oracle, a quorum or a dispute process. You never trust a
 single reporter.
 
 ```bash
-npm i @novakoracle/sdk viem
+npm i https://github.com/mesayanroy/novak/releases/download/sdk-v0.2.0/novakoracle-sdk-0.2.0.tgz viem
 ```
+
+This installs the [v0.2.0 release](https://github.com/mesayanroy/novak/releases/tag/sdk-v0.2.0). It works with npm, pnpm and yarn,
+and you import it as `@novakoracle/sdk`. The npm registry release
+(`npm i @novakoracle/sdk viem`) is on its way; your imports stay the same
+when you switch.
+
+A working five-minute example is in [`sdk/README.md`](../sdk/README.md#quick-start-runs-as-is).
 
 Three ways in, from least to most code:
 
@@ -83,7 +90,14 @@ works this way.
 ## 2a. Settle on-chain: inherit `NovakConsumer`
 
 `NovakConsumer` holds **only** an `IEventBus` reference and gives you the
-whole settlement surface:
+whole settlement surface. Get the contracts into your Foundry project with:
+
+```bash
+forge install mesayanroy/novak
+echo "novak/=lib/novak/" >> remappings.txt
+```
+
+Then:
 
 ```solidity
 import { NovakConsumer } from "novak/contracts/integrations/NovakConsumer.sol";
@@ -180,6 +194,74 @@ Once each event is decided, its fees split into thirds:
 - ⅓ to the treasury.
 
 Novak's own `Market` and `DistributionMarket` do exactly this.
+
+## 4. Run the dispute layer yourself
+
+Pick how much of Novak you want to operate. Most markets need option A only.
+
+### A. Use the shared network (nothing to run)
+
+Point your market at the Event Bus from `getDeployment(46630)`. The resolvers,
+keeper and committees are already running. Your users, or you, dispute a
+wrong proposal from the Dispute Center (`/disputes`) or by calling
+`DisputeManager.dispute(eventId)` with the bond. You inherit the whole
+escalation ladder for free.
+
+### B. Run a resolver on the shared network
+
+Resolvers must be authorized by the Registry owner
+(`EventRegistry.setResolverAuthorization`). Open an issue with your resolver
+address. Once you're authorized:
+
+```bash
+git clone https://github.com/mesayanroy/novak && cd novak
+docker build --target resolver -t novak-resolver .
+docker run -d --name novak-resolver --restart unless-stopped -p 8787:8787 \
+  -v novak-data:/data -e RESOLVER_KEYS=0xYOUR_KEY -e RESOLVER_KEEPER_INDEX=0 \
+  -e ALCHEMY_API_KEY=... novak-resolver
+curl localhost:8787/health          # "authorized": true
+```
+
+Your node observes every event, submits outcomes with evidence, votes when
+it's drawn into a dispute committee, and earns its share of fees through the
+TreasuryVault. Fund the key with testnet ETH from the faucet for gas and bonds.
+
+### C. Run your own Novak instance
+
+This gives you your own Registry, DisputeManager, committees, Event Bus and
+resolver set. Use it for a private deployment, another chain, or tests.
+
+```bash
+git clone https://github.com/mesayanroy/novak && cd novak
+forge install foundry-rs/forge-std --no-commit
+pnpm install && pnpm --filter @novakoracle/sdk build
+
+# Deploy (your keys; testnet ETH from https://faucet.testnet.chain.robinhood.com)
+DEPLOYER_PRIVATE_KEY=0x.. RESOLVER_ADDRESSES=0xr1,0xr2,0xr3 \
+  forge script script/Deploy.s.sol --rpc-url robinhood_testnet --broadcast
+node script/export-deployment.mjs 46630        # writes deployments/46630.json
+pnpm --filter @novakoracle/sdk gen && pnpm --filter @novakoracle/sdk build
+
+# Run your resolver network + web app
+echo "RESOLVER_KEYS=0xr1key,0xr2key,0xr3key" >> .env
+docker compose up --build -d
+```
+
+To try it on a local chain first (`anvil`), follow
+[README → Local development](../README.md#local-development).
+
+Then pass your own addresses to the SDK instead of the shared ones:
+
+```ts
+import { readFileSync } from "node:fs";
+import { NovakClient, type NovakDeployment } from "@novakoracle/sdk";
+
+const mine = JSON.parse(readFileSync("deployments/46630.json", "utf8")) as NovakDeployment;
+const novak = new NovakClient(publicClient, walletClient, mine);
+```
+
+On-chain consumers take your Event Bus address in their constructor, as
+before. Everything else in this guide is unchanged.
 
 ## Addresses
 

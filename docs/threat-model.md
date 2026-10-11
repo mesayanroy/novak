@@ -283,6 +283,22 @@ determinism) unless marked unresolved.
     committee members who voted it, so being wrong pays nothing. Insurance
     top-ups are capped at one extra third per event.
 
+21. **Community-market creator trust.** `CommunityMarket` pools (sports,
+    friendly challenges) are deliberately *not* settled by Novak: the
+    creator proposes the result. Mitigations:
+    - Any staker can object during the objection window. Objections from
+      more than ⅓ of the pool void it, and everyone is refunded.
+    - A creator who misses the result deadline gets the pool voided
+      (`voidUnresolved`).
+    - If nobody backed the proposed result, everyone is refunded.
+
+    **Residual:** a creator, alone or with friends, who holds more than ⅔
+    of the pool can't be outvoted by objections. Those pools are only as
+    honest as their creator. The UI labels them "creator-resolved", and they
+    never touch the event layer, so a bad community pool can't affect any
+    Novak event, market or fee. To settle a fact trustlessly, use a Novak
+    event and `Market`/`DistributionMarket`, not a community pool.
+
 ## Cycle-impossibility proof (Gap 3)
 
 **Claim:** the composition DAG built by `EventComposer.createComposite` can

@@ -1,6 +1,18 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Docker builds set NEXT_OUTPUT=standalone: a self-contained server.js with
+  // only the files it needs (see /Dockerfile). Vercel and `next dev` ignore it.
+  ...(process.env.NEXT_OUTPUT === "standalone"
+    ? {
+        output: "standalone",
+        // pnpm workspace: trace dependencies from the repo root (the SDK lives there).
+        experimental: { outputFileTracingRoot: join(dirname(fileURLToPath(import.meta.url)), "..") },
+      }
+    : {}),
   // Lets a production build run beside `next dev` without clobbering .next/.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   transpilePackages: ["@novakoracle/sdk"],

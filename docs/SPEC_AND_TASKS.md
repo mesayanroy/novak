@@ -362,9 +362,9 @@ tracked here regardless of which repo-ownership row it falls under.
       visible "Example data" badge, since `Market.sol` has no market
       enumeration getter — see `docs/FRONTEND_SPEC.md`'s live/mock data map
       for the exact per-page breakdown
-- [ ] Real market discovery/indexing — no on-chain enumeration exists;
-      `/markets` cannot show real markets until an indexer or subgraph is
-      built
+- [x] Real market discovery: `Market`, `DistributionMarket` and
+      `CommunityMarket` enumerate on-chain (`marketCount` / `getMarketIds`),
+      so `/markets` lists live testnet markets with no indexer
 - [ ] A live API server for `/docs/api`'s documented REST surface — that
       page is explicitly labeled "on-chain reference, not a live REST API"
       pending one
@@ -434,10 +434,13 @@ tracked here regardless of which repo-ownership row it falls under.
       canonical demo run against it, successfully
 - [x] Simulated against the live **Robinhood Chain testnet** (46630): full
       stack deploys, ≈ 0.0003 ETH total.
-- [ ] **Broadcast to Robinhood Chain testnet** — needs the team's faucet-funded
-      key. Run `forge script script/Deploy.s.sol --rpc-url robinhood_testnet
-      --broadcast --verify` (Blockscout verification is configured in
-      `foundry.toml`), then `node script/export-deployment.mjs 46630`.
+- [x] **Broadcast to Robinhood Chain testnet**: deployed 2026-10-05,
+      redeployed 2026-10-06 with three resolvers (quorum 2 of 3). Every
+      contract is verified on Blockscout; addresses are in
+      `deployments/46630.json`. `bash script/deploy-testnet.sh` redeploys.
+- [x] Container images: `Dockerfile` (`resolver`, `frontend` targets),
+      `docker-compose.yml`, and GHCR publishing in `.github/workflows/docker.yml`.
+      See `docs/DOCKER.md`.
 
 ---
 

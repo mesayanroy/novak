@@ -47,6 +47,10 @@ ITreasuryVault(vault).depositFees(eventIds, fee);
 // per event, once decided: 1/3 correct resolvers · 1/3 correct committee voters
 // (or insurance reserve) · 1/3 treasury`;
 
+const SELF_HOST = `git clone https://github.com/mesayanroy/novak && cd novak
+cp .env.example .env               # RESOLVER_KEYS=0xr1,0xr2,0xr3 (+ ALCHEMY_API_KEY)
+docker compose up --build -d       # resolvers :8787/health · web app :3000`;
+
 export default function IntegratePage() {
   return (
     <article>
@@ -59,8 +63,16 @@ export default function IntegratePage() {
       </p>
 
       <div className="mt-6">
-        <CodeBlock code={"npm i @novakoracle/sdk viem"} label="install" />
+        <CodeBlock code={"npm i https://github.com/mesayanroy/novak/releases/download/sdk-v0.2.0/novakoracle-sdk-0.2.0.tgz viem"} label="install" />
       </div>
+      <p className="mt-2 text-sm text-gray-600">
+        Installs the{" "}
+        <a href="https://github.com/mesayanroy/novak/releases/tag/sdk-v0.2.0" target="_blank" rel="noreferrer">
+          sdk-v0.2.0 release
+        </a>{" "}
+        with npm, pnpm or yarn. You import it as <code>@novakoracle/sdk</code>. The npm registry release is on its way,
+        and your imports stay the same.
+      </p>
 
       <h2 className="mt-10 text-xl font-semibold">1. Reuse or create the event</h2>
       <p className="mt-2 text-gray-700">
@@ -110,6 +122,33 @@ export default function IntegratePage() {
       </div>
       <p className="mt-2 text-sm text-gray-600">
         The TreasuryVault pays the people who keep resolution honest. Novak&apos;s own markets route every fee through it.
+      </p>
+
+      <h2 className="mt-10 text-xl font-semibold">4. Run the dispute layer yourself</h2>
+      <ul className="mt-3 list-disc space-y-2 pl-5 text-gray-700">
+        <li>
+          <strong>Use the shared network (nothing to run).</strong> Point your market at the testnet Event Bus. Resolvers,
+          keeper and committees are already live, and anyone can dispute from the{" "}
+          <Link href="/disputes">Dispute Center</Link>.
+        </li>
+        <li>
+          <strong>Run a resolver.</strong> Once the Registry owner authorizes your address, run the resolver image with your
+          key. It observes events, submits evidence, votes in committees and earns its fee third.
+        </li>
+        <li>
+          <strong>Run your own Novak instance.</strong> Deploy your own Registry, DisputeManager and Event Bus with{" "}
+          <code>script/Deploy.s.sol</code>, then start your resolvers and web app with <code>docker compose up</code>.
+        </li>
+      </ul>
+      <div className="mt-3">
+        <CodeBlock code={SELF_HOST} label="bash" />
+      </div>
+      <p className="mt-2 text-sm text-gray-600">
+        Step-by-step commands for all three are in{" "}
+        <a href="https://github.com/mesayanroy/novak/blob/main/docs/INTEGRATE.md#4-run-the-dispute-layer-yourself" target="_blank" rel="noreferrer">
+          docs/INTEGRATE.md
+        </a>
+        .
       </p>
     </article>
   );

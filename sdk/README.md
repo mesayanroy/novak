@@ -16,10 +16,47 @@ The final answer then sits on-chain for any market to read. Use this SDK to:
 - settle Polymarket-style Conditional Tokens.
 
 ```bash
-npm i @novakoracle/sdk viem
+npm i https://github.com/mesayanroy/novak/releases/download/sdk-v0.2.0/novakoracle-sdk-0.2.0.tgz viem
 ```
 
+This installs the [v0.2.0 release](https://github.com/mesayanroy/novak/releases/tag/sdk-v0.2.0). It works with npm, pnpm and yarn,
+and you import it as `@novakoracle/sdk`. The npm registry release
+(`npm i @novakoracle/sdk viem`) is on its way; your imports stay the same
+when you switch.
+
 `viem` (≥ 2.56) is a peer dependency.
+
+## Quick start (runs as-is)
+
+`import` lines are code, not terminal commands. Put them in a file:
+
+```bash
+mkdir novak-demo && cd novak-demo && npm init -y
+npm i https://github.com/mesayanroy/novak/releases/download/sdk-v0.2.0/novakoracle-sdk-0.2.0.tgz viem
+```
+
+Save this as `demo.mjs`:
+
+```js
+import { createPublicClient, http } from "viem";
+import { NovakClient, getDeployment, robinhoodTestnet, Availability } from "@novakoracle/sdk";
+
+const publicClient = createPublicClient({ chain: robinhoodTestnet, transport: http() });
+const novak = new NovakClient(publicClient, undefined, getDeployment(robinhoodTestnet.id));
+
+const markets = await novak.listMarkets();
+console.log(`Yes/no markets on testnet: ${markets.length}`);
+
+for (const m of markets.slice(-3)) {
+  const a = await novak.getAvailability(m.eventId);
+  const status = a === Availability.Available ? "FINALIZED" : a === Availability.Voided ? "VOIDED (refund)" : "pending";
+  console.log(`- ${m.question}  [${status}]`);
+}
+```
+
+Then run `node demo.mjs`. It reads live markets and their Novak event status
+from Robinhood Chain testnet. In TypeScript, use a `.ts` file with
+`"type": "module"` in `package.json` (or run it with `npx tsx demo.ts`).
 
 ## Read an outcome
 

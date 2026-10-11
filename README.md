@@ -48,6 +48,8 @@ Three consumers ship in this repo and read the **same** events:
 - [Repository layout](#repository-layout)
 - [Status](#status)
 - [Quickstart: Robinhood Chain testnet](#quickstart-robinhood-chain-testnet)
+- [Use Novak in your market](#use-novak-in-your-market)
+- [Run with Docker](#run-with-docker)
 - [Local development](#local-development)
 - [Testing & CI](#testing--ci)
 - [Contributing](#contributing)
@@ -213,6 +215,46 @@ pnpm --filter novak-frontend dev
 See what a resolver would vote right now, against live sources, without any
 deployment: `pnpm --filter novak-resolver probe`.
 
+## Use Novak in your market
+
+Your market keeps its own trading. Novak answers "what actually happened?"
+with a quorum of resolvers and a bonded dispute ladder, and voids the event
+rather than guessing.
+
+```bash
+npm i https://github.com/mesayanroy/novak/releases/download/sdk-v0.2.0/novakoracle-sdk-0.2.0.tgz viem
+```
+
+```ts
+import { NovakClient, getDeployment, robinhoodTestnet } from "@novakoracle/sdk";
+const novak = new NovakClient(publicClient, undefined, getDeployment(robinhoodTestnet.id));
+const r = await novak.waitForOutcome(eventId);   // { voided: true } → refund your users
+```
+
+| You want to… | Start here |
+|---|---|
+| Settle a market in Solidity | Inherit [`NovakConsumer`](contracts/integrations/NovakConsumer.sol) (`forge install mesayanroy/novak`) |
+| Settle a Polymarket-style Conditional Tokens market | [`NovakCTFAdapter`](contracts/integrations/NovakCTFAdapter.sol) |
+| Settle from a backend | [`sdk/README.md`](sdk/README.md): a runnable five-minute example |
+| Run a resolver, or your own Novak instance | [`docs/INTEGRATE.md` → Run the dispute layer yourself](docs/INTEGRATE.md#4-run-the-dispute-layer-yourself) |
+
+The full guide is [docs/INTEGRATE.md](docs/INTEGRATE.md). The SDK release is
+[sdk-v0.2.0](https://github.com/mesayanroy/novak/releases/tag/sdk-v0.2.0).
+
+## Run with Docker
+
+The resolver network and the web app ship as two images from one
+multi-stage `Dockerfile`. Both are non-root and health-checked:
+
+```bash
+cp .env.example .env            # set RESOLVER_KEYS=0xk1,0xk2,0xk3 (+ ALCHEMY_API_KEY)
+docker compose up --build -d    # web app :3000, resolvers :8787/health
+```
+
+Pre-built images are published to GHCR by `.github/workflows/docker.yml`
+(`ghcr.io/mesayanroy/novak-resolver`, `ghcr.io/mesayanroy/novak-frontend`).
+Every variable and single-service runs are in [docs/DOCKER.md](docs/DOCKER.md).
+
 ## Local development
 
 ```bash
@@ -264,6 +306,16 @@ Ownership** table — check there before assuming who to loop in on a review.
 The "Owner" column reflects who's leading an area, not a gate on whether work
 counts as done; `docs/SPEC_AND_TASKS.md` is checked off against actual
 passing tests regardless of who touched the code.
+
+Set up from a fresh clone:
+
+```bash
+git clone https://github.com/mesayanroy/novak && cd novak
+forge install foundry-rs/forge-std --no-commit
+pnpm install
+pnpm --filter @novakoracle/sdk build      # the resolver and frontend depend on it
+forge test && pnpm test                   # everything should pass before you start
+```
 
 Before opening a PR:
 

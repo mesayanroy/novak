@@ -1,0 +1,63 @@
+# Novak — resolver network + web app, one command:
+#
+#   cp .env.example .env      # set RESOLVER_KEYS (and optionally ALCHEMY_API_KEY)
+#   docker compose up --build -d
+#
+#   web app      http://localhost:3000
+#   resolvers    http://localhost:8787/health
+#
+# See docs/DOCKER.md for every variable and for running only one service.
+name: novak
+
+services:
+  resolver:
+    build:
+      context: .
+      target: resolver
+    image: ${NOVAK_IMAGE_PREFIX:-novak}-resolver:${NOVAK_TAG:-local}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NOVAK_CHAIN_ID: ${NOVAK_CHAIN_ID:-46630}
+      PORT: 8787
+      # Comma-separated resolver private keys (r1,r2,r3). Required.
+      RESOLVER_KEYS: ${RESOLVER_KEYS:?set RESOLVER_KEYS in .env}
+      RESOLVER_IDS: ${RESOLVER_IDS:-r1,r2,r3}
+      # The node that also runs keeper duties and the daily market lister.
+      RESOLVER_KEEPER_INDEX: ${RESOLVER_KEEPER_INDEX:-2}
+      RESOLVER_LISTER: ${RESOLVER_LISTER:-true}
+      ALCHEMY_API_KEY: ${ALCHEMY_API_KEY:-}
+      RESOLVER_SOURCE_RPC_URL: ${RESOLVER_SOURCE_RPC_URL:-}
+      RESOLVER_ALERT_WEBHOOK_URL: ${RESOLVER_ALERT_WEBHOOK_URL:-}
+    ports:
+      - "${RESOLVER_PORT:-8787}:8787"
+    volumes:
+      # Evidence JSON behind every on-chain evidence hash survives restarts.
+      - resolver-data:/data
+
+  frontend:
+    build:
+      context: .
+      target: frontend
+      args:
+        NEXT_PUBLIC_CHAIN_ID: ${NOVAK_CHAIN_ID:-46630}
+        # What the visitor's BROWSER calls for /health and /evidence.
+        NEXT_PUBLIC_RESOLVER_URL: ${NEXT_PUBLIC_RESOLVER_URL:-http://localhost:8787}
+        NEXT_PUBLIC_ALCHEMY_API_KEY: ${NEXT_PUBLIC_ALCHEMY_API_KEY:-}
+        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+    image: ${NOVAK_IMAGE_PREFIX:-novak}-frontend:${NOVAK_TAG:-local}
+    restart: unless-stopped
+    environment:
+      # Server-side API routes (live Chainlink feeds) read Robinhood Chain mainnet.
+      ALCHEMY_API_KEY: ${ALCHEMY_API_KEY:-}
+      RESOLVER_SOURCE_RPC_URL: ${RESOLVER_SOURCE_RPC_URL:-}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      resolver:
+        condition: service_started
+
+volumes:
+  resolver-data:
