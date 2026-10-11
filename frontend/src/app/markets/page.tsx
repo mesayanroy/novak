@@ -118,7 +118,7 @@ export default function MarketsPage() {
       </div>
 
       {/* Main Tabs */}
-      <div className="mt-10 flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3">
+      <div className="swipe-row swipe-row-sm-wrap -mx-6 mt-10 items-center gap-2 border-b border-gray-200 px-6 pb-3 sm:mx-0 sm:px-0">
         <TabButton active={tab === "markets"} onClick={() => setTab("markets")} icon={<BarChart3 className="h-4 w-4" />}>
           Markets Explorer ({list.length + dists.length})
         </TabButton>
@@ -197,12 +197,12 @@ function EventRow({ e }: { e: EventNode }) {
 
 function Stat({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note?: string }) {
   return (
-    <div className="border border-gray-300 bg-paper p-4 rounded-sm shadow-sm">
-      <div className="flex items-center justify-between text-xs font-mono text-gray-500 uppercase tracking-wide">
+    <div className="border border-gray-300 bg-paper p-3 rounded-sm shadow-sm sm:p-4">
+      <div className="flex items-center justify-between text-[10px] font-mono text-gray-500 uppercase tracking-wide sm:text-xs">
         <span>{label}</span>
         {icon}
       </div>
-      <p className="mt-2 text-2xl font-semibold font-mono text-ink">{value}</p>
+      <p className="mt-2 text-xl font-semibold font-mono text-ink sm:text-2xl">{value}</p>
       {note && <p className="mt-1 text-[11px] text-gray-500 font-mono">{note}</p>}
     </div>
   );
@@ -222,7 +222,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`link-plain flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-medium rounded-sm transition-colors cursor-pointer ${
+      className={`link-plain flex flex-none items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs font-mono font-medium rounded-sm transition-colors cursor-pointer sm:py-1.5 ${
         active ? "bg-ink text-paper" : "text-gray-600 hover:text-ink hover:bg-gray-100"
       }`}
     >

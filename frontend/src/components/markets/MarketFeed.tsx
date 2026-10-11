@@ -164,10 +164,10 @@ export function MarketFeed({
           <Image src="/capitol.webp" alt="" fill sizes="240px" className="object-contain object-right-bottom" />
         </div>
         <div className="relative max-w-xl">
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Trade on real-world events</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Trade on what happens to your tokenized assets</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Prediction and range markets on tokenized stocks, tokenized Treasuries and the Fed — priced by live Chainlink
-            feeds, settled by Novak&apos;s dispute layer: independent resolvers, bonded committees, never a token vote.
+            Prediction and range markets on tokenized stocks, Treasuries, and macro events — priced by live feeds and
+            settled by Novak&apos;s bonded dispute committees.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button onClick={onCreate} className="inline-flex items-center gap-1.5 rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">
@@ -184,7 +184,7 @@ export function MarketFeed({
 
       {/* Lifecycle switch: trading now vs closed and awaiting a result */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-full border border-gray-200 bg-white p-0.5" role="tablist" aria-label="Market stage">
+        <div className="grid w-full grid-cols-3 rounded-full border border-gray-200 bg-white p-0.5 sm:flex sm:w-auto" role="tablist" aria-label="Market stage">
           {(
             [
               ["all", "All active", stageCounts.all],
@@ -201,9 +201,9 @@ export function MarketFeed({
                 setStage(k);
                 setShown(PAGE);
               }}
-              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${stage === k ? "bg-violet-600 text-white" : "text-gray-600 hover:text-violet-700"}`}
+              className={`whitespace-nowrap rounded-full px-2 py-2 text-[12.5px] font-medium transition-colors sm:px-3.5 sm:py-1.5 sm:text-sm ${stage === k ? "bg-violet-600 text-white" : "text-gray-600 hover:text-violet-700"}`}
             >
-              {label}
+              {label === "All active" ? <><span className="sm:hidden">Active</span><span className="hidden sm:inline">All active</span></> : label === "Awaiting result" ? <><span className="sm:hidden">Awaiting</span><span className="hidden sm:inline">Awaiting result</span></> : <><span className="sm:hidden">Trading</span><span className="hidden sm:inline">Trading now</span></>}
               <span className={`ml-1.5 font-mono text-[11px] ${stage === k ? "text-violet-200" : "text-gray-400"}`}>{n}</span>
             </button>
           ))}
@@ -224,8 +224,9 @@ export function MarketFeed({
         <span className="ml-auto hidden text-xs text-gray-500 sm:block">Markets stay here until they&apos;re settled; then find them in your Portfolio.</span>
       </div>
 
-      {/* Pills + search */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Pills + search (pills swipe sideways on phones) */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="swipe-row swipe-row-sm-wrap -mx-6 gap-2 px-6 sm:mx-0 sm:px-0">
         {PILLS.map(([key, label]) => (
           <button
             key={key}
@@ -233,7 +234,7 @@ export function MarketFeed({
               setPill(key);
               setShown(PAGE);
             }}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors sm:py-1.5 ${
               pill === key ? "bg-gray-900 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-violet-300"
             }`}
           >
@@ -241,7 +242,8 @@ export function MarketFeed({
             {counts[key] ? <span className={`ml-1.5 font-mono text-[11px] ${pill === key ? "text-violet-200" : "text-gray-400"}`}>{counts[key]}</span> : null}
           </button>
         ))}
-        <div className="relative ml-auto w-full sm:w-64">
+        </div>
+        <div className="relative w-full sm:ml-auto sm:w-64">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
           <input
             value={q}

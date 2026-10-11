@@ -99,7 +99,7 @@ export default function Home() {
               transition={{ duration: 0.35, delay: 0.05 }}
               className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl text-ink leading-[1.08]"
             >
-              Chainlink tells your contract the price. Novak tells it what happened.
+              Novak tells you what happens to your tokenized bonds and contracts.
             </motion.h1>
 
             <motion.p

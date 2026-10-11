@@ -363,7 +363,53 @@ export default function PortfolioPage() {
                 </Link>
               </div>
             ) : (
-              <div className="-mx-5 overflow-x-auto px-5">
+              <>
+              {/* phones: one card per position */}
+              <ul className="space-y-2.5 sm:hidden">
+                {rows.map(({ p, st, invested, current, done, ret, pct, status }) => (
+                  <li key={idOf(p)}>
+                    <Link href={hrefOf(p)} className="link-plain block rounded-xl border border-gray-100 p-3 active:bg-violet-50/60">
+                      <div className="flex items-center gap-3">
+                        <AssetStack tickers={tickersFor(p)} size={36} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-ink">{titleOf(p)}</p>
+                          <p className="flex items-center gap-1.5">
+                            <span className="rounded bg-gray-100 px-1.5 font-mono text-[9px] uppercase text-gray-600">{p.kind === "binary" ? "yes/no" : "range"}</span>
+                            <span
+                              className={cn(
+                                "truncate font-mono text-[10px]",
+                                status.tone === "ready" ? "text-emerald-700" : status.tone === "wait" ? "text-amber-700" : status.tone === "live" ? "text-violet-700" : "text-gray-500",
+                              )}
+                            >
+                              {status.label}
+                            </span>
+                          </p>
+                        </div>
+                        <Sparkline points={st?.spark ?? []} width={64} height={28} />
+                      </div>
+                      <dl className="mt-3 grid grid-cols-4 gap-1 text-center">
+                        {[
+                          ["Price", st ? `${Math.round(st.price * 100)}¢` : "—"],
+                          ["Invested", usd(invested)],
+                          ["Current", usd(current > 0 ? current : done)],
+                        ].map(([k, v]) => (
+                          <div key={k} className="rounded-lg bg-gray-50 px-1 py-1.5">
+                            <dt className="font-mono text-[9px] uppercase tracking-wide text-gray-500">{k}</dt>
+                            <dd className="text-[12.5px] font-semibold tabular-nums text-ink">{v}</dd>
+                          </div>
+                        ))}
+                        <div className="rounded-lg bg-gray-50 px-1 py-1.5">
+                          <dt className="font-mono text-[9px] uppercase tracking-wide text-gray-500">Return</dt>
+                          <dd className={cn("text-[12.5px] font-semibold tabular-nums", ret >= 0 ? "text-emerald-700" : "text-rose-700")}>
+                            {invested > 0 ? `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` : usd(ret)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <div className="-mx-5 hidden overflow-x-auto px-5 sm:block">
                 <table className="w-full min-w-[860px] text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 text-left font-mono text-[10px] uppercase tracking-wide text-gray-500">
@@ -439,6 +485,7 @@ export default function PortfolioPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </Panel>
 
@@ -535,9 +582,9 @@ export default function PortfolioPage() {
                           : `market ${it.marketId?.slice(0, 10)}…`;
                     const amount = it.kind === "dispute" ? `${Number(formatEther(it.amount)).toFixed(4)} ETH bond` : `${fmtUsdg(it.amount)} USDG`;
                     return (
-                      <li key={`${it.tx}-${it.kind}-${it.bucket ?? ""}`} className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-violet-50/50">
-                        <span className={cn("w-20 flex-none rounded-full px-2 py-0.5 text-center font-mono text-[10px] font-semibold", ACT[it.kind].cls)}>{ACT[it.kind].label}</span>
-                        <span className="min-w-0 flex-1 truncate text-sm text-gray-800">{what}</span>
+                      <li key={`${it.tx}-${it.kind}-${it.bucket ?? ""}`} className="flex items-center gap-2 rounded-xl px-2 py-2 hover:bg-violet-50/50 sm:gap-3">
+                        <span className={cn("w-[4.5rem] flex-none rounded-full px-1.5 py-0.5 text-center font-mono text-[10px] font-semibold sm:w-20 sm:px-2", ACT[it.kind].cls)}>{ACT[it.kind].label}</span>
+                        <span className="min-w-0 flex-1 truncate text-[13px] text-gray-800 sm:text-sm">{what}</span>
                         <span className="flex-none text-right">
                           <span className="block text-sm font-semibold text-ink">{amount}</span>
                           <a href={explorer ? `${explorer}/tx/${it.tx}` : undefined} target="_blank" rel="noreferrer" className="font-mono text-[10px] text-gray-400 hover:text-violet-700">
@@ -561,9 +608,9 @@ export default function PortfolioPage() {
                   <div className="mt-2 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-gray-100" aria-hidden>
                     {fees > 0 && SERIES.slice(0, 3).map((c) => <span key={c} className="h-full flex-1" style={{ background: c }} />)}
                   </div>
-                  <ul className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                  <ul className="mt-2 grid grid-cols-1 gap-1.5 text-[11px] sm:grid-cols-3 sm:gap-2">
                     {["Correct resolvers", "Committee / insurance", "Treasury"].map((l, i) => (
-                      <li key={l}>
+                      <li key={l} className="flex items-center justify-between sm:block">
                         <span className="flex items-center gap-1 text-gray-500">
                           <span className="h-2 w-2 rounded-sm" style={{ background: SERIES[i] }} /> {l}
                         </span>

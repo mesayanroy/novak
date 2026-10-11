@@ -123,7 +123,7 @@ function DisputeTelemetryList({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "absolute right-3 top-3 w-[92%] sm:w-[360px] [mask-image:linear-gradient(to_bottom,#000_62%,transparent_100%)]",
+        "absolute left-1/2 top-4 w-[92%] max-w-[400px] -translate-x-1/2 [mask-image:linear-gradient(to_bottom,#000_62%,transparent_100%)]",
         className,
       )}
     >
@@ -265,7 +265,7 @@ const features = [
       "Finalized once in the EventBus, then read by every downstream app as a permanent on-chain reference.",
     href: "/docs/architecture",
     cta: "Explore event store",
-    className: "col-span-3 lg:col-span-1",
+    className: "col-span-12 lg:col-span-5",
     background: <CanonicalEventsMarquee />,
   },
   {
@@ -275,7 +275,7 @@ const features = [
       "Economic dispute ladder with real-time bond tracking, committee voting quorum, and automated VOID safety hard floors.",
     href: "/docs/disputes",
     cta: "View dispute spec",
-    className: "col-span-3 lg:col-span-2",
+    className: "col-span-12 lg:col-span-7",
     background: <DisputeTelemetryList />,
   },
   {
@@ -285,7 +285,7 @@ const features = [
       "Combine primitive facts using AND, OR, NOT, and WITHIN temporal windows without writing custom oracle glue code.",
     href: "/docs/composition",
     cta: "See operator matrix",
-    className: "col-span-3 lg:col-span-2",
+    className: "col-span-12 lg:col-span-8",
     background: <TopologyBeamDemo />,
   },
   {
@@ -295,7 +295,7 @@ const features = [
       "Every event is evaluated at a fixed time T, inside a set observation and dispute window.",
     href: "/docs/lifecycle",
     cta: "View lifecycle",
-    className: "col-span-3 lg:col-span-1",
+    className: "col-span-12 lg:col-span-4",
     background: (
       <div className="absolute top-4 right-4 flex justify-center [mask-image:linear-gradient(to_top,transparent_10%,#000_100%)]">
         <Calendar className="scale-90 origin-top-right transition-transform duration-300 group-hover:scale-95" />

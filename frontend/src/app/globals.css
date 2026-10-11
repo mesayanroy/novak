@@ -304,3 +304,27 @@
 .menu-scroll::-webkit-scrollbar-thumb:hover {
   background: #7c3aed;
 }
+
+/* Phones: one swipeable row instead of chips wrapping onto several lines. */
+.swipe-row {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 1.5rem; /* matches the row's px-6 so the first chip isn't flush to the edge */
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.swipe-row::-webkit-scrollbar {
+  display: none;
+}
+.swipe-row > * {
+  scroll-snap-align: start;
+  flex: none;
+}
+@media (min-width: 640px) {
+  .swipe-row-sm-wrap {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}

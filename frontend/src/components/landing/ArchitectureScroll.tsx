@@ -117,7 +117,7 @@ export function SourcesMap({ className }: { className?: string }) {
       <div className="flex items-center justify-between gap-2">
         <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-violet-700">01 · Sources → resolvers</p>
         <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-100">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> mainnet · read-only
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> testnet
         </span>
       </div>
       <div className="relative mt-3 aspect-[2/1] w-full rounded-xl bg-violet-50/40 ring-1 ring-violet-100">
@@ -226,12 +226,15 @@ const leftArc = (w: number, h: number) => {
   return { R, cx: focusX - R, cy: h / 2, focusX };
 };
 /** Right arc: mirror of the left. Circle centred off-screen right; its left-most
- *  point is the focus; the frame sits just right of its node, like the left card. */
+ *  point is the focus, where the active card is centred. */
 const rightArc = (w: number, h: number) => {
   const panelW = Math.min(430, w * 0.37);
-  const R = Math.min(h * 0.46, 380);
-  const focusX = w - panelW - 52;
-  return { R, cx: focusX + R, cy: h / 2, panelW, focusX };
+  const { R, focusX: leftFocus } = leftArc(w, h);
+  // The arc passes through the centre of the (larger) right-hand cards; same
+  // radius as the left arc, and clipped to the same visible width (`visW`), so
+  // the two tracks are exact mirror images.
+  const focusX = w - panelW / 2 - 24;
+  return { R, cx: focusX + R, cy: h / 2, panelW, focusX, visW: leftFocus };
 };
 
 function ArcNode({ i, p, w, h, active, onPick }: { i: number; p: MotionValue<number>; w: MotionValue<number>; h: MotionValue<number>; active: boolean; onPick: () => void }) {
@@ -285,35 +288,24 @@ function ArcPanel({ i, p, w, h, width, children }: { i: number; p: MotionValue<n
   // map leaves over the top while the orbit rises from below.
   const drift = useTransform(p, [0, 0.42, 0.58, 1], [-6, 0, PANEL_SPAN, PANEL_SPAN + 6]);
   const phi = useTransform(drift, (d) => 180 - i * PANEL_SPAN + d);
-  const x = useTransform([phi, w, h] as MotionValue<number>[], ([f, ww, hh]: number[]) => {
+  const at = (f: number, ww: number, hh: number) => {
     const a = rightArc(ww, hh);
-    return r2(a.cx + a.R * Math.cos((f * Math.PI) / 180));
-  });
-  const y = useTransform([phi, w, h] as MotionValue<number>[], ([f, ww, hh]: number[]) => {
-    const a = rightArc(ww, hh);
-    return r2(a.cy + a.R * Math.sin((f * Math.PI) / 180));
-  });
+    const rad = (f * Math.PI) / 180;
+    return [a.cx + a.R * Math.cos(rad), a.cy + a.R * Math.sin(rad)];
+  };
+  const x = useTransform([phi, w, h] as MotionValue<number>[], ([f, ww, hh]: number[]) => r2(at(f, ww, hh)[0]));
+  const y = useTransform([phi, w, h] as MotionValue<number>[], ([f, ww, hh]: number[]) => r2(at(f, ww, hh)[1]));
+
   const opacity = useTransform(phi, (f) => r2(Math.max(0, 1 - Math.abs(f - 180) / 46)));
-  const nodeScale = useTransform(phi, (f) => r2(1 + Math.max(0, 1 - Math.abs(f - 180) / 20) * 0.25));
-  const [focused, setFocused] = useState(i === 0);
-  useMotionValueEvent(phi, "change", (f) => setFocused(Math.abs(f - 180) < 30));
   return (
-    // outer: rides the arc (framer owns its transform); node on the arc, frame beside it
-    <motion.div style={{ x, y, opacity }} className="absolute left-0 top-0 h-0 w-0">
-      <motion.span
-        style={{ scale: nodeScale }}
-        className={cn(
-          "absolute -left-5 -top-5 flex h-10 w-10 items-center justify-center rounded-full border-[3px] border-white font-mono text-[11px] font-bold shadow-lg transition-colors",
-          focused ? "bg-violet-600 text-white shadow-violet-500/40" : "bg-white text-violet-600 ring-1 ring-violet-200",
-        )}
-      >
-        {String(i + 1).padStart(2, "0")}
-      </motion.span>
-      <span className="absolute left-6 top-0 h-px w-5 bg-violet-300" />
-      <div className="absolute left-12 top-0 -translate-y-1/2" style={{ width }}>
-        {children}
-      </div>
-    </motion.div>
+    <>
+      {/* the card, centred on its point of the arc (framer owns the outer transform) */}
+      <motion.div style={{ x, y, opacity }} className="absolute left-0 top-0 h-0 w-0">
+        <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2" style={{ width }}>
+          {children}
+        </div>
+      </motion.div>
+    </>
   );
 }
 
@@ -336,7 +328,7 @@ function DesktopScroll() {
   const L = leftArc(size.w, size.h);
   const Rr = rightArc(size.w, size.h);
   const cardLeft = L.focusX + 48;
-  const cardWidth = Math.max(300, Math.min(420, Rr.focusX - 64 - cardLeft));
+  const cardWidth = Math.max(300, Math.min(420, Rr.focusX - Rr.panelW / 2 - 40 - cardLeft));
 
   const jump = (i: number) => {
     const el = sectionRef.current;
@@ -360,10 +352,16 @@ function DesktopScroll() {
               </linearGradient>
             </defs>
             <circle cx={L.cx} cy={L.cy} r={L.R} fill="none" stroke="url(#arcfade)" strokeWidth={2} strokeDasharray="2 7" strokeLinecap="round" />
-            <circle cx={L.cx} cy={L.cy} r={L.R - 26} fill="none" stroke="#ede9fe" strokeWidth={1} />
-            <circle cx={Rr.cx} cy={Rr.cy} r={Rr.R} fill="none" stroke="url(#arcfade)" strokeWidth={2} strokeDasharray="2 7" strokeLinecap="round" />
-            <circle cx={Rr.cx} cy={Rr.cy} r={Rr.R - 26} fill="none" stroke="#ede9fe" strokeWidth={1} />
-            <line x1={L.focusX + 24} x2={cardLeft - 8} y1={L.cy} y2={L.cy} stroke="#c4b5fd" strokeWidth={1.5} strokeDasharray="3 4" />
+            <circle cx={L.cx} cy={L.cy} r={L.R - 26} fill="none" stroke="rgb(var(--c-violet-100))" strokeWidth={1} />
+            {/* right: the same two rings, mirrored and clipped to the same visible width */}
+            <clipPath id="rightArcClip">
+              <rect x={Rr.focusX - 2} y={0} width={Rr.visW + 2} height={size.h} />
+            </clipPath>
+            <g clipPath="url(#rightArcClip)">
+              <circle cx={Rr.cx} cy={Rr.cy} r={Rr.R} fill="none" stroke="url(#arcfade)" strokeWidth={2} strokeDasharray="2 7" strokeLinecap="round" />
+              <circle cx={Rr.cx} cy={Rr.cy} r={Rr.R - 26} fill="none" stroke="rgb(var(--c-violet-100))" strokeWidth={1} />
+            </g>
+            <line x1={L.focusX + 24} x2={cardLeft - 8} y1={L.cy} y2={L.cy} stroke="rgb(var(--c-violet-300))" strokeWidth={1.5} strokeDasharray="3 4" />
           </svg>
 
           {/* left: layer nodes riding the arc */}
