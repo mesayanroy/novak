@@ -90,7 +90,7 @@ export default function Home() {
               className="flex items-center gap-2 border border-purple-200/80 bg-purple-50/80 px-3.5 py-1 text-xs font-mono uppercase tracking-wider text-purple-900 rounded-full shadow-sm"
             >
               <span className="h-2 w-2 rounded-full bg-purple-600 animate-pulse-subtle" />
-              <span>Built on Robinhood Chain • Event layer for tokenized stocks</span>
+              <span>Dispute layer for tokenized stocks</span>
             </motion.div>
 
             <motion.h1
